@@ -154,6 +154,15 @@
   .kv b { font-variant-numeric: tabular-nums; }
   .note { font-size: 13px; color: var(--muted); }
   .hidden { display: none !important; }
+  .cardio.off .cardio-body { display: none; }
+  .cardio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .cardio-grid label { font-size: 12px; color: var(--muted); display: grid; gap: 4px; }
+  .cardio-grid input, .cardio-grid select { width: 100%; padding: 10px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); color: var(--text); font-size: 16px; }
+  .switch { width: 50px; height: 30px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); position: relative; flex: none; }
+  .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--muted); transition: .2s; }
+  .switch.on { background: var(--accent); border-color: var(--accent); }
+  .switch.on::after { left: 23px; background: #fff; }
+  .del-btn { margin-top: 12px; padding: 8px 12px; border-radius: 10px; font-size: 14px; color: var(--danger); border: 1px solid #4a2a2e; }
   .stack > * + * { margin-top: 10px; }
 </style>
 </head>
@@ -241,6 +250,15 @@ const PLANS = {
   }
 };
 const ORDER = ['A', 'B', 'C'];
+
+/* Aeróbico opcional ao final do treino */
+const CARDIO_TYPES = ['Esteira', 'Bicicleta', 'Elíptico', 'Escada', 'Remo', 'Corda', 'Caminhada/corrida na rua'];
+const CARDIO_INT = ['Leve', 'Moderado', 'Intenso', 'HIIT (intervalado)'];
+const CARDIO_SUG = {
+  A: { min: 20, int: 'Moderado', txt: '15–20 min em ritmo moderado (dá para conversar com alguma dificuldade). Ex.: esteira inclinada ou bicicleta.' },
+  B: { min: 20, int: 'Moderado', txt: '15–20 min em ritmo leve a moderado, para não prejudicar a recuperação do treino de hipertrofia.' },
+  C: { min: 12, int: 'HIIT (intervalado)', txt: '10–15 min intervalado: 30 s forte + 60 s leve, repetindo de 8 a 10 vezes. Ex.: bicicleta ou remo.' },
+};
 
 /* ============================== Armazenamento ============================== */
 const KEY = 'treino-fullbody-v1';
@@ -337,12 +355,17 @@ function viewHistory() {
     }).join('');
     return `<div class="card hist-item" data-hist>
       <div class="row between"><div class="row"><span class="tag ${h.plan}">${h.plan}</span>
-        <div><h3>${p.name} · ${p.focus}</h3><div class="muted small">${fmtDate(h.end)} · ${mins} min</div></div></div>
-        <div style="text-align:right"><b>${sessionVolume(h).toLocaleString('pt-BR')}</b><div class="muted small">kg volume</div></div></div>
-      <div class="hist-sets">${detail || 'Sem séries registradas.'}</div>
+        <div><h3>${p.name} · ${p.focus}</h3><div class="muted small">${fmtDate(h.end)} · ${mins} min${h.cardio ? ' · + aeróbico' : ''}</div></div></div>
+        <div style="text-align:right;white-space:nowrap"><b>${sessionVolume(h).toLocaleString('pt-BR')}</b><div class="muted small">kg volume</div></div></div>
+      <div class="hist-sets">${detail || 'Sem séries registradas.'}
+        ${h.cardio ? `<div><b style="color:var(--text)">Aeróbico</b>: ${esc(h.cardio.type)} · ${h.cardio.min ?? '–'} min${h.cardio.km ? ' · ' + String(h.cardio.km).replace('.', ',') + ' km' : ''} · ${esc(h.cardio.int)}</div>` : ''}
+        <button class="del-btn" data-del="${h.end}">Excluir este treino</button>
+      </div>
     </div>`;
   }).join('');
-  return `<div class="wrap"><h1>Histórico</h1><p class="muted small">Toque num treino para ver as cargas.</p>${items}</div>`;
+  return `<div class="wrap"><h1>Histórico</h1><p class="muted small">Toque num treino para ver as cargas ou excluí-lo.</p>${items}
+    <button class="btn danger" id="clearHist" style="margin-top:8px">Excluir todo o histórico</button>
+    <p class="note">As cargas da “última vez” de cada exercício são mantidas, para você não perder a referência.</p></div>`;
 }
 
 function calcProfile() {
@@ -396,10 +419,37 @@ function startSession(k) {
       const last = S.last[e.id] || {};
       sets[e.id] = Array.from({ length: e.sets }, () => ({ kg: last.kg ?? null, reps: null, done: false }));
     }
-    S.active = { plan: k, start: Date.now(), sets };
+    S.active = { plan: k, start: Date.now(), sets, cardio: newCardio(k) };
     save();
   }
   go('session');
+}
+
+function newCardio(k) {
+  const prev = S.lastCardio || {};
+  return { on: false, type: prev.type || 'Esteira', min: CARDIO_SUG[k].min, km: null, int: CARDIO_SUG[k].int };
+}
+
+function viewCardio(a) {
+  const c = a.cardio; const sug = CARDIO_SUG[a.plan];
+  const opt = (list, v) => list.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
+  return `<div class="card cardio ${c.on ? '' : 'off'}" id="cardio">
+    <div class="row between">
+      <div><h3>Aeróbico <span class="muted small" style="font-weight:400">(opcional)</span></h3>
+        <div class="muted small">Faça depois da musculação</div></div>
+      <button class="switch ${c.on ? 'on' : ''}" id="cardioSw" role="switch" aria-checked="${c.on}" aria-label="Incluir aeróbico"></button>
+    </div>
+    <div class="cardio-body">
+      <div class="note" style="margin-top:10px"><b style="color:var(--text)">Sugestão:</b> ${esc(sug.txt)}</div>
+      <div class="cardio-grid">
+        <label>Modalidade<select data-c="type">${opt(CARDIO_TYPES, c.type)}</select></label>
+        <label>Intensidade<select data-c="int">${opt(CARDIO_INT, c.int)}</select></label>
+        <label>Tempo (min)<input data-c="min" inputmode="numeric" value="${c.min ?? ''}"></label>
+        <label>Distância (km, opcional)<input data-c="km" inputmode="decimal" value="${c.km ?? ''}" placeholder="—"></label>
+      </div>
+      <button class="btn ghost" id="cardioTimer" style="margin-top:12px">Iniciar cronômetro de ${c.min || 0} min</button>
+    </div>
+  </div>`;
 }
 
 function progressPct() {
@@ -410,6 +460,7 @@ function progressPct() {
 
 function viewSession() {
   const a = S.active; const p = PLANS[a.plan];
+  if (!a.cardio) a.cardio = newCardio(a.plan);
   const cards = p.exercises.map((e, ei) => {
     const last = S.last[e.id];
     const lastTxt = last ? `Última vez: ${last.kg ?? '–'} kg × ${last.reps ?? '–'}` : 'Primeira vez neste exercício';
@@ -444,6 +495,7 @@ function viewSession() {
       <div class="progress"><i id="prog" style="width:${progressPct()}%"></i></div>
     </div></div>
     <div class="wrap">${cards}
+      ${viewCardio(a)}
       <button class="btn" id="finishBtn" style="margin-top:8px">Finalizar treino</button>
       <button class="btn danger" id="discardBtn" style="margin-top:10px">Descartar treino</button>
     </div>`;
@@ -453,6 +505,17 @@ function bindSession() {
   const a = S.active;
   $('#backBtn').onclick = () => go('home');
   $('#finishBtn').onclick = finishSession;
+  $('#cardioSw').onclick = () => {
+    a.cardio.on = !a.cardio.on; save();
+    $('#cardio').classList.toggle('off', !a.cardio.on);
+    $('#cardioSw').classList.toggle('on', a.cardio.on); $('#cardioSw').setAttribute('aria-checked', a.cardio.on);
+  };
+  document.querySelectorAll('[data-c]').forEach(el => el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => {
+    const f = el.dataset.c; a.cardio[f] = (f === 'min' || f === 'km') ? num(el.value) : el.value;
+    if (f === 'min') $('#cardioTimer').textContent = `Iniciar cronômetro de ${a.cardio.min || 0} min`;
+    save();
+  }));
+  $('#cardioTimer').onclick = () => { if (a.cardio.min) startRest(a.cardio.min * 60, `Aeróbico · ${a.cardio.type}`); };
   $('#discardBtn').onclick = () => { if (confirm('Descartar este treino? Nada será salvo.')) { S.active = null; save(); stopRest(); go('home'); } };
   document.querySelectorAll('[data-tip]').forEach(b => b.onclick = () => {
     const c = b.closest('.ex'); c.classList.toggle('open'); b.textContent = c.classList.contains('open') ? 'Ocultar dica' : 'Como executar';
@@ -489,12 +552,14 @@ function bindSession() {
 
 function finishSession() {
   const a = S.active; const doneCount = Object.values(a.sets).flat().filter(s => s.done).length;
-  if (!doneCount && !confirm('Nenhuma série foi marcada. Finalizar mesmo assim?')) return;
+  if (!doneCount && !(a.cardio && a.cardio.on) && !confirm('Nenhuma série foi marcada. Finalizar mesmo assim?')) return;
   for (const id in a.sets) {
     const done = a.sets[id].filter(s => s.done);
     if (done.length) { const best = done.reduce((m, s) => (s.kg ?? 0) >= (m.kg ?? 0) ? s : m, done[0]); S.last[id] = { kg: best.kg, reps: best.reps }; }
   }
-  S.history.push({ plan: a.plan, start: a.start, end: Date.now(), sets: a.sets });
+  const cardio = a.cardio && a.cardio.on && a.cardio.min ? { type: a.cardio.type, min: a.cardio.min, km: a.cardio.km, int: a.cardio.int } : null;
+  if (cardio) S.lastCardio = { type: cardio.type };
+  S.history.push({ plan: a.plan, start: a.start, end: Date.now(), sets: a.sets, cardio });
   S.next = ORDER[(ORDER.indexOf(a.plan) + 1) % 3];
   S.active = null; save(); stopRest();
   alert(`Treino concluído! ${doneCount} séries registradas. Próximo: ${PLANS[S.next].name}.`);
@@ -540,6 +605,13 @@ setInterval(() => { const el = $('#elapsed'); if (el && S.active) el.textContent
 function bind() {
   document.querySelectorAll('[data-start]').forEach(b => b.onclick = () => startSession(b.dataset.start));
   document.querySelectorAll('[data-hist]').forEach(c => c.onclick = () => c.classList.toggle('open'));
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = ev => {
+    ev.stopPropagation();
+    if (!confirm('Excluir este treino do histórico?')) return;
+    S.history = S.history.filter(h => String(h.end) !== b.dataset.del); save(); render();
+  });
+  const ch = $('#clearHist');
+  if (ch) ch.onclick = () => { if (confirm('Excluir TODO o histórico de treinos? Essa ação não pode ser desfeita.')) { S.history = []; save(); render(); } };
   if (tab === 'profile') {
     const upd = () => {
       const p = S.profile;
