@@ -154,6 +154,16 @@
   .kv b { font-variant-numeric: tabular-nums; }
   .note { font-size: 13px; color: var(--muted); }
   .hidden { display: none !important; }
+  .tcell { display: flex; gap: 6px; min-width: 0; }
+  .tcell input { flex: 1; }
+  .play { width: 40px; flex: none; border-radius: 10px; background: var(--b); display: grid; place-items: center; }
+  .play svg { width: 18px; height: 18px; fill: #06182b; }
+  .set.timed { grid-template-columns: 34px 0.8fr 1.4fr 52px; }
+  .set.running { background: rgba(90,169,255,.10); }
+  .set.running .play { background: var(--danger); }
+  .set.running input[data-f="reps"] { color: var(--b); font-weight: 800; }
+  .set.running.hit input[data-f="reps"] { color: var(--accent); }
+  .set.done .play { opacity: .35; }
   .cardio.off .cardio-body { display: none; }
   .cardio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
   .cardio-grid label { font-size: 12px; color: var(--muted); display: grid; gap: 4px; }
@@ -275,6 +285,8 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>'
 const fmtTime = sec => `${Math.floor(sec / 60)}:${String(Math.max(0, sec) % 60).padStart(2, '0')}`;
 const fmtDate = ts => new Date(ts).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' });
 const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? null : n; };
+const PLAY = '<svg viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></svg>';
+const STOP = '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
 const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>';
 
 function weekCount() {
@@ -290,7 +302,7 @@ function sessionVolume(h) {
 
 /* ============================== Telas ============================== */
 let tab = 'home';
-function go(t) { tab = t; render(); window.scrollTo(0, 0); }
+function go(t) { if (sw) stopWatch(false); tab = t; render(); window.scrollTo(0, 0); }
 
 function render() {
   const app = $('#app');
@@ -465,10 +477,12 @@ function viewSession() {
     const last = S.last[e.id];
     const lastTxt = last ? `Última vez: ${last.kg ?? '–'} kg × ${last.reps ?? '–'}` : 'Primeira vez neste exercício';
     const rows = a.sets[e.id].map((s, si) => `
-      <div class="set ${s.done ? 'done' : ''}" data-ex="${e.id}" data-i="${si}">
+      <div class="set ${e.unit === 's' ? 'timed' : ''} ${s.done ? 'done' : ''}" data-ex="${e.id}" data-i="${si}">
         <div class="n">${si + 1}</div>
         <input inputmode="decimal" placeholder="${e.bodyweight ? 'peso corp.' : 'kg'}" value="${s.kg ?? ''}" data-f="kg" aria-label="Carga série ${si + 1}">
-        <input inputmode="numeric" placeholder="${e.unit === 's' ? 'seg' : esc(e.reps)}" value="${s.reps ?? ''}" data-f="reps" aria-label="Repetições série ${si + 1}">
+        ${e.unit === 's'
+          ? `<div class="tcell"><input inputmode="numeric" placeholder="seg" value="${s.reps ?? ''}" data-f="reps" aria-label="Segundos série ${si + 1}"><button class="play" data-play aria-label="Cronometrar série ${si + 1}">${PLAY}</button></div>`
+          : `<input inputmode="numeric" placeholder="${esc(e.reps)}" value="${s.reps ?? ''}" data-f="reps" aria-label="Repetições série ${si + 1}">`}
         <button class="check" data-done aria-label="Marcar série ${si + 1} como feita">${CHECK}</button>
       </div>`).join('');
     return `<div class="card ex" id="ex-${e.id}">
@@ -481,7 +495,7 @@ function viewSession() {
         <div class="tip">${esc(e.tip)}</div>
       </div>
       <div class="sets">
-        <div class="set set-h"><div>Série</div><div style="text-align:center">kg</div><div style="text-align:center">${e.unit === 's' ? 'seg' : 'reps'}</div><div></div></div>
+        <div class="set set-h ${e.unit === 's' ? 'timed' : ''}"><div>Série</div><div style="text-align:center">kg</div><div style="text-align:center">${e.unit === 's' ? 'seg' : 'reps'}</div><div></div></div>
         ${rows}
       </div>
     </div>`;
@@ -530,8 +544,15 @@ function bindSession() {
       });
       save();
     }));
-    $('[data-done]', row).onclick = () => {
-      const ex = PLANS[a.plan].exercises.find(e => e.id === id);
+    const ex = PLANS[a.plan].exercises.find(e => e.id === id);
+    const play = $('[data-play]', row);
+    if (play) play.onclick = () => {
+      if (sw && sw.row === row) return stopWatch(true);
+      if (s.done) return;
+      startWatch(row, s, parseInt(ex.reps, 10), () => toggleDone());
+    };
+    $('[data-done]', row).onclick = () => { if (sw && sw.row === row) return stopWatch(true); toggleDone(); };
+    function toggleDone() {
       s.done = !s.done;
       if (s.done && s.reps == null) {
         const def = parseInt(ex.reps, 10); // usa o início da faixa como padrão
@@ -546,7 +567,7 @@ function bindSession() {
         const idx = PLANS[a.plan].exercises.indexOf(ex); const nxt = PLANS[a.plan].exercises[idx + 1];
         startRest(ex.rest, allDone ? (nxt ? `Próximo: ${nxt.name}` : 'Último exercício concluído!') : `${ex.name} · série ${i + 2}`);
       }
-    };
+    }
   });
 }
 
@@ -564,6 +585,50 @@ function finishSession() {
   S.active = null; save(); stopRest();
   alert(`Treino concluído! ${doneCount} séries registradas. Próximo: ${PLANS[S.next].name}.`);
   go('history');
+}
+
+/* ============================== Cronômetro de exercício (ex.: prancha) ============================== */
+let sw = null; // { row, s, start, tick, target, hit, onDone }
+function tone(freq, dur = 0.15) {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain(); const t = audioCtx.currentTime;
+    o.frequency.value = freq; o.connect(g); g.connect(audioCtx.destination);
+    g.gain.setValueAtTime(0.2, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); o.start(t); o.stop(t + dur);
+  } catch (e) {}
+}
+function startWatch(row, s, target, onDone) {
+  if (sw) stopWatch(true);           // só um cronômetro por vez
+  stopRest();
+  const inp = $('input[data-f="reps"]', row), btn = $('[data-play]', row);
+  sw = { row, s, target, onDone, hit: false, start: Date.now() + 3000 };   // 3 s para se posicionar
+  row.classList.add('running'); btn.innerHTML = STOP; btn.setAttribute('aria-label', 'Parar cronômetro');
+  let lastCount = null;
+  const upd = () => {
+    const ms = Date.now() - sw.start;
+    if (ms < 0) {                    // contagem regressiva 3-2-1
+      const c = Math.ceil(-ms / 1000);
+      if (c !== lastCount) { lastCount = c; tone(660); }
+      inp.value = ''; inp.placeholder = `em ${c}…`; return;
+    }
+    if (lastCount !== 0) { lastCount = 0; tone(990, 0.3); }
+    const sec = Math.floor(ms / 1000); inp.value = sec;
+    if (!sw.hit && target && sec >= target) { sw.hit = true; row.classList.add('hit'); beep(); }
+  };
+  upd(); sw.tick = setInterval(upd, 200);
+  try { navigator.wakeLock && navigator.wakeLock.request('screen').then(l => { if (sw) sw.lock = l; else l.release(); }).catch(() => {}); } catch (e) {}
+}
+function stopWatch(record) {
+  if (!sw) return;
+  const { row, s, onDone, tick } = sw; clearInterval(tick);
+  try { sw.lock && sw.lock.release(); } catch (e) {}
+  const sec = Math.max(0, Math.floor((Date.now() - sw.start) / 1000));
+  const inp = $('input[data-f="reps"]', row), btn = $('[data-play]', row);
+  row.classList.remove('running', 'hit'); inp.placeholder = 'seg';
+  if (btn) { btn.innerHTML = PLAY; btn.setAttribute('aria-label', 'Cronometrar série'); }
+  const started = Date.now() >= sw.start; sw = null;
+  if (record && started && sec > 0) { s.reps = sec; inp.value = sec; save(); if (!s.done) onDone(); }
+  else { inp.value = s.reps ?? ''; }
 }
 
 /* ============================== Timer de descanso ============================== */

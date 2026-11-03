@@ -1,5 +1,5 @@
 // Service worker: permite usar o app offline depois do primeiro acesso.
-const CACHE = 'treino-v2';
+const CACHE = 'treino-v3';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
