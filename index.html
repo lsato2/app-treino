@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Treino Full Body</title>
+<meta name="description" content="Treinos full body A, B e C com registro de cargas e timer de descanso.">
+<meta name="theme-color" content="#0f1115">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Treino">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<style>
+  :root {
+    --bg: #0f1115;
+    --surface: #181b22;
+    --surface-2: #20242d;
+    --line: #2c313c;
+    --text: #eef0f4;
+    --muted: #9aa1ad;
+    --accent: #3ddc97;
+    --accent-ink: #06291a;
+    --a: #3ddc97;
+    --b: #5aa9ff;
+    --c: #ffb547;
+    --danger: #ff6b6b;
+    --radius: 16px;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-t: env(safe-area-inset-top, 0px);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    padding-top: var(--safe-t);
+    padding-bottom: calc(76px + var(--safe-b));
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 0; background: none; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 28px; line-height: 1.15; margin: 8px 0 4px; letter-spacing: -0.02em; }
+  h2 { font-size: 20px; margin: 24px 0 12px; letter-spacing: -0.01em; }
+  h3 { font-size: 17px; margin: 0; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
+  }
+  .row { display: flex; align-items: center; gap: 12px; }
+  .between { justify-content: space-between; }
+  .tag {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px; border-radius: 12px; font-weight: 800; font-size: 18px;
+    color: #0b0d10; flex: none;
+  }
+  .tag.A { background: var(--a); } .tag.B { background: var(--b); } .tag.C { background: var(--c); }
+  .btn {
+    display: block; width: 100%; padding: 15px 18px; border-radius: 14px;
+    background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 17px; text-align: center;
+  }
+  .btn.ghost { background: var(--surface-2); color: var(--text); border: 1px solid var(--line); }
+  .btn.danger { background: transparent; color: var(--danger); border: 1px solid #4a2a2e; }
+  .btn:active { transform: scale(.98); }
+  .hero { padding: 20px; background: linear-gradient(160deg, #1d2a24, var(--surface) 70%); }
+  .hero.B { background: linear-gradient(160deg, #1b2534, var(--surface) 70%); }
+  .hero.C { background: linear-gradient(160deg, #2e2619, var(--surface) 70%); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+  .stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 12px; color: var(--muted); }
+  .ex-list { list-style: none; padding: 0; margin: 12px 0 0; }
+  .ex-list li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 15px; }
+  .ex-list li span:last-child { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  /* Sessão */
+  .session-head {
+    position: sticky; top: 0; z-index: 5; background: rgba(15,17,21,.92);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    padding: calc(10px + var(--safe-t)) 16px 10px; margin-top: calc(-1 * var(--safe-t));
+    border-bottom: 1px solid var(--line);
+  }
+  .session-head .inner { max-width: 560px; margin: 0 auto; }
+  .progress { height: 4px; background: var(--surface-2); border-radius: 4px; overflow: hidden; margin-top: 10px; }
+  .progress i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+  .ex { padding: 0; overflow: hidden; }
+  .ex-top { padding: 16px; }
+  .ex-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .pill { font-size: 12px; padding: 4px 9px; border-radius: 999px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+  .tip { font-size: 14px; color: var(--muted); margin-top: 10px; display: none; }
+  .ex.open .tip { display: block; }
+  .tip-toggle { font-size: 13px; color: var(--b); margin-top: 8px; padding: 0; }
+  .sets { border-top: 1px solid var(--line); }
+  .set {
+    display: grid; grid-template-columns: 34px 1fr 1fr 52px; gap: 8px; align-items: center;
+    padding: 8px 16px; border-bottom: 1px solid var(--line);
+  }
+  .set:last-child { border-bottom: 0; }
+  .set-h { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding-top: 10px; padding-bottom: 4px; }
+  .set .n { color: var(--muted); font-weight: 700; text-align: center; }
+  .set input {
+    width: 100%; min-width: 0; padding: 10px; border-radius: 10px; background: var(--surface-2);
+    border: 1px solid var(--line); text-align: center; font-size: 16px; font-variant-numeric: tabular-nums;
+  }
+  .set input:focus { outline: 2px solid var(--b); outline-offset: -1px; }
+  .check {
+    width: 44px; height: 40px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line);
+    display: grid; place-items: center; justify-self: end;
+  }
+  .check svg { width: 20px; height: 20px; stroke: var(--muted); }
+  .set.done { background: rgba(61,220,151,.07); }
+  .set.done .check { background: var(--accent); border-color: var(--accent); }
+  .set.done .check svg { stroke: var(--accent-ink); }
+  .last { font-size: 12px; color: var(--muted); }
+
+  /* Timer de descanso */
+  .rest {
+    position: fixed; left: 12px; right: 12px; bottom: calc(84px + var(--safe-b)); z-index: 20;
+    max-width: 536px; margin: 0 auto; background: #232833; border: 1px solid #3a4150; border-radius: 18px;
+    padding: 12px 14px; display: none; align-items: center; gap: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.5);
+  }
+  .rest.show { display: flex; }
+  .rest .time { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 82px; }
+  .rest .lbl { flex: 1; font-size: 13px; color: var(--muted); line-height: 1.3; }
+  .rest button { padding: 9px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); font-weight: 600; font-size: 14px; }
+  .rest.over .time { color: var(--accent); }
+
+  /* Navegação */
+  nav.tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    background: rgba(15,17,21,.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-top: 1px solid var(--line); padding-bottom: var(--safe-b);
+  }
+  nav.tabs .inner { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); }
+  nav.tabs button { padding: 10px 0 8px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); }
+  nav.tabs button svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  nav.tabs button.on { color: var(--accent); }
+
+  .hist-item .row { align-items: flex-start; }
+  .hist-sets { font-size: 13px; color: var(--muted); margin-top: 8px; display: none; }
+  .hist-item.open .hist-sets { display: block; }
+  .hist-sets div { padding: 3px 0; }
+  .empty { text-align: center; padding: 32px 16px; color: var(--muted); }
+  .field { display: grid; grid-template-columns: 1fr 110px; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .field:first-child { border-top: 0; }
+  .field input { padding: 10px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); text-align: center; width: 100%; }
+  .kv { display: flex; justify-content: space-between; padding: 9px 0; border-top: 1px solid var(--line); font-size: 15px; }
+  .kv:first-child { border-top: 0; }
+  .kv b { font-variant-numeric: tabular-nums; }
+  .note { font-size: 13px; color: var(--muted); }
+  .hidden { display: none !important; }
+  .stack > * + * { margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<div class="rest" id="rest" role="status" aria-live="polite">
+  <div class="time" id="restTime">0:00</div>
+  <div class="lbl" id="restLbl">Descanso</div>
+  <button id="restPlus">+15s</button>
+  <button id="restSkip">Pular</button>
+</div>
+
+<nav class="tabs" id="tabs">
+  <div class="inner">
+    <button data-tab="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Início</button>
+    <button data-tab="plans"><svg viewBox="0 0 24 24"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg>Treinos</button>
+    <button data-tab="history"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Histórico</button>
+    <button data-tab="profile"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Perfil</button>
+  </div>
+</nav>
+
+<script>
+/* ============================================================
+   PLANO DE TREINO — 3 treinos full body, 6 exercícios cada
+   A: Força (cargas altas, poucas repetições)
+   B: Hipertrofia (volume moderado)
+   C: Resistência / condicionamento (repetições altas, descanso curto)
+   ============================================================ */
+const PLANS = {
+  A: {
+    name: 'Treino A', focus: 'Força',
+    desc: 'Movimentos básicos com cargas mais altas e descanso maior.',
+    exercises: [
+      { id: 'agachamento', name: 'Agachamento livre com barra', muscles: 'Quadríceps, glúteos, core', sets: 4, reps: '6–8', rest: 120,
+        tip: 'Pés na largura dos ombros, desça até a coxa ficar paralela ao chão mantendo a coluna neutra e os joelhos alinhados com a ponta dos pés.' },
+      { id: 'supino-reto', name: 'Supino reto com barra', muscles: 'Peitoral, tríceps, ombro anterior', sets: 4, reps: '6–8', rest: 120,
+        tip: 'Escápulas retraídas e pés firmes no chão. Desça a barra até a linha do peito, com cotovelos a ~45° do tronco.' },
+      { id: 'remada-curvada', name: 'Remada curvada com barra', muscles: 'Dorsais, trapézio, bíceps', sets: 4, reps: '6–8', rest: 120,
+        tip: 'Tronco inclinado a ~45°, coluna neutra. Puxe a barra em direção ao umbigo, apertando as escápulas.' },
+      { id: 'desenvolvimento', name: 'Desenvolvimento com halteres', muscles: 'Ombros, tríceps', sets: 3, reps: '8–10', rest: 90,
+        tip: 'Sentado com encosto, empurre os halteres acima da cabeça sem arquear a lombar.' },
+      { id: 'stiff', name: 'Stiff com barra', muscles: 'Posteriores de coxa, glúteos, lombar', sets: 3, reps: '8–10', rest: 90,
+        tip: 'Joelhos levemente flexionados, leve o quadril para trás e desça a barra rente às pernas até sentir alongar o posterior.' },
+      { id: 'prancha', name: 'Prancha abdominal', muscles: 'Core', sets: 3, reps: '40s', rest: 60, unit: 's',
+        tip: 'Antebraços no chão, corpo em linha reta da cabeça aos calcanhares. Contraia abdômen e glúteos.' },
+    ]
+  },
+  B: {
+    name: 'Treino B', focus: 'Hipertrofia',
+    desc: 'Volume moderado, controle do movimento e foco na contração.',
+    exercises: [
+      { id: 'terra', name: 'Levantamento terra', muscles: 'Posteriores, glúteos, lombar, costas', sets: 3, reps: '6–8', rest: 120,
+        tip: 'Barra próxima à canela, coluna neutra. Empurre o chão com os pés e estenda quadril e joelhos juntos.' },
+      { id: 'supino-inclinado', name: 'Supino inclinado com halteres', muscles: 'Peitoral superior, ombros, tríceps', sets: 3, reps: '8–12', rest: 90,
+        tip: 'Banco a 30°. Desça os halteres de forma controlada (2–3 s) e suba sem bater um no outro.' },
+      { id: 'puxada', name: 'Puxada frontal (pulldown)', muscles: 'Dorsais, bíceps', sets: 3, reps: '10–12', rest: 90,
+        tip: 'Pegada um pouco mais larga que os ombros. Puxe a barra até o alto do peito, levando os cotovelos para baixo.' },
+      { id: 'bulgaro', name: 'Agachamento búlgaro', muscles: 'Quadríceps, glúteos', sets: 3, reps: '10 cada perna', rest: 90,
+        tip: 'Pé de trás apoiado no banco. Desça até o joelho de trás quase tocar o chão, tronco levemente inclinado.' },
+      { id: 'elevacao-lateral', name: 'Elevação lateral com halteres', muscles: 'Ombro lateral', sets: 3, reps: '12–15', rest: 60,
+        tip: 'Cotovelos levemente flexionados, eleve até a altura dos ombros sem balançar o tronco.' },
+      { id: 'rosca-triceps', name: 'Rosca direta + tríceps corda (bi-set)', muscles: 'Bíceps, tríceps', sets: 3, reps: '12 + 12', rest: 60,
+        tip: 'Faça a rosca e, sem descanso, o tríceps na polia. Registre a carga da rosca no campo kg.' },
+    ]
+  },
+  C: {
+    name: 'Treino C', focus: 'Resistência',
+    desc: 'Repetições mais altas e descanso curto para condicionamento.',
+    exercises: [
+      { id: 'leg-press', name: 'Leg press 45°', muscles: 'Quadríceps, glúteos', sets: 3, reps: '12–15', rest: 60,
+        tip: 'Pés no meio da plataforma, desça até ~90° de joelho sem tirar a lombar do encosto.' },
+      { id: 'barra-fixa', name: 'Barra fixa (ou graviton)', muscles: 'Dorsais, bíceps', sets: 3, reps: 'máx.', rest: 60,
+        tip: 'Se ainda não fizer 6 repetições livres, use o graviton/elástico. No graviton, registre o contrapeso em kg.' },
+      { id: 'flexao', name: 'Flexão de braço', muscles: 'Peitoral, tríceps, core', sets: 3, reps: '12–20', rest: 60, bodyweight: true,
+        tip: 'Mãos um pouco mais abertas que os ombros, corpo alinhado. Se necessário, apoie as mãos num banco.' },
+      { id: 'mesa-flexora', name: 'Mesa flexora', muscles: 'Posteriores de coxa', sets: 3, reps: '12–15', rest: 60,
+        tip: 'Quadril colado no banco; flexione os joelhos com controle e segure 1 s no topo.' },
+      { id: 'remada-unilateral', name: 'Remada unilateral com halter', muscles: 'Dorsais, romboides', sets: 3, reps: '12 cada lado', rest: 60,
+        tip: 'Mão e joelho apoiados no banco. Puxe o halter em direção ao quadril, sem girar o tronco.' },
+      { id: 'farmer', name: 'Caminhada do fazendeiro', muscles: 'Antebraço, trapézio, core', sets: 3, reps: '40 m', rest: 60,
+        tip: 'Um halter pesado em cada mão, ombros para trás, passos curtos e firmes. Registre o peso de cada halter.' },
+    ]
+  }
+};
+const ORDER = ['A', 'B', 'C'];
+
+/* ============================== Armazenamento ============================== */
+const KEY = 'treino-fullbody-v1';
+const DEFAULT = { next: 'A', history: [], last: {}, active: null,
+  profile: { sexo: 'M', idade: 32, altura: 178, peso: 79, atividade: 1.55 } };
+let S;
+try { S = Object.assign(structuredClone(DEFAULT), JSON.parse(localStorage.getItem(KEY)) || {}); }
+catch (e) { S = structuredClone(DEFAULT); }
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+
+/* ============================== Utilidades ============================== */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+const fmtTime = sec => `${Math.floor(sec / 60)}:${String(Math.max(0, sec) % 60).padStart(2, '0')}`;
+const fmtDate = ts => new Date(ts).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' });
+const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? null : n; };
+const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>';
+
+function weekCount() {
+  const now = new Date(); const d = new Date(now); d.setHours(0,0,0,0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // segunda-feira
+  return S.history.filter(h => h.end >= d.getTime()).length;
+}
+function sessionVolume(h) {
+  let v = 0;
+  for (const id in h.sets) for (const s of h.sets[id]) if (s.done && s.kg && s.reps) v += s.kg * s.reps;
+  return Math.round(v);
+}
+
+/* ============================== Telas ============================== */
+let tab = 'home';
+function go(t) { tab = t; render(); window.scrollTo(0, 0); }
+
+function render() {
+  const app = $('#app');
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  if (tab === 'session' && S.active) { app.innerHTML = viewSession(); bindSession(); return; }
+  if (tab === 'session') tab = 'home';
+  app.innerHTML = { home: viewHome, plans: viewPlans, history: viewHistory, profile: viewProfile }[tab]();
+  bind();
+}
+
+function planList(k) {
+  return `<ul class="ex-list">${PLANS[k].exercises.map(e =>
+    `<li><span>${esc(e.name)}</span><span>${e.sets} × ${esc(e.reps)}</span></li>`).join('')}</ul>`;
+}
+
+function viewHome() {
+  const k = S.active ? S.active.plan : S.next; const p = PLANS[k];
+  const last = S.history[S.history.length - 1];
+  return `<div class="wrap">
+    <p class="muted small" style="margin:8px 0 0">${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+    <h1>Bora treinar, Lucas</h1>
+    <div class="card hero ${k}" style="margin-top:16px">
+      <div class="row"><span class="tag ${k}">${k}</span>
+        <div><div class="muted small">${S.active ? 'Treino em andamento' : 'Próximo treino'}</div><h3>${p.name} · ${p.focus}</h3></div></div>
+      ${planList(k)}
+      <button class="btn" style="margin-top:16px" data-start="${k}">${S.active ? 'Continuar treino' : 'Começar ' + p.name}</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>${weekCount()}</b><span>nesta semana</span></div>
+      <div class="stat"><b>${S.history.length}</b><span>treinos no total</span></div>
+      <div class="stat"><b>${last ? last.plan : '—'}</b><span>último treino</span></div>
+    </div>
+    <h2>Como funciona</h2>
+    <div class="card note stack">
+      <div>Alterne os treinos na sequência <b>A → B → C</b>, com pelo menos um dia de descanso entre eles (ex.: seg, qua, sex).</div>
+      <div>Ao marcar uma série como feita, o cronômetro de descanso começa sozinho.</div>
+      <div><b>Progressão:</b> quando conseguir fazer todas as séries no topo da faixa de repetições, aumente a carga em 2–5%.</div>
+    </div>
+  </div>`;
+}
+
+function viewPlans() {
+  return `<div class="wrap"><h1>Treinos</h1><p class="muted">3 treinos full body · 6 exercícios cada</p>
+    ${ORDER.map(k => `<div class="card">
+      <div class="row"><span class="tag ${k}">${k}</span><div><h3>${PLANS[k].name} · ${PLANS[k].focus}</h3>
+      <div class="muted small">${PLANS[k].desc}</div></div></div>
+      ${planList(k)}
+      <button class="btn ghost" style="margin-top:14px" data-start="${k}">${S.active && S.active.plan === k ? 'Continuar' : 'Iniciar ' + PLANS[k].name}</button>
+    </div>`).join('')}
+    <p class="note">Antes de cada treino, faça 5–10 min de aquecimento (bicicleta, esteira ou mobilidade) e 1–2 séries leves do primeiro exercício.</p>
+  </div>`;
+}
+
+function viewHistory() {
+  if (!S.history.length) return `<div class="wrap"><h1>Histórico</h1><div class="card empty">Nenhum treino registrado ainda.<br>Finalize um treino para ele aparecer aqui.</div></div>`;
+  const items = [...S.history].reverse().map((h, i) => {
+    const p = PLANS[h.plan]; const mins = Math.max(1, Math.round((h.end - h.start) / 60000));
+    const detail = p.exercises.map(e => {
+      const ss = (h.sets[e.id] || []).filter(s => s.done);
+      if (!ss.length) return '';
+      return `<div><b style="color:var(--text)">${esc(e.name)}</b>: ${ss.map(s => `${s.kg ?? '–'}kg×${s.reps ?? '–'}`).join(', ')}</div>`;
+    }).join('');
+    return `<div class="card hist-item" data-hist>
+      <div class="row between"><div class="row"><span class="tag ${h.plan}">${h.plan}</span>
+        <div><h3>${p.name} · ${p.focus}</h3><div class="muted small">${fmtDate(h.end)} · ${mins} min</div></div></div>
+        <div style="text-align:right"><b>${sessionVolume(h).toLocaleString('pt-BR')}</b><div class="muted small">kg volume</div></div></div>
+      <div class="hist-sets">${detail || 'Sem séries registradas.'}</div>
+    </div>`;
+  }).join('');
+  return `<div class="wrap"><h1>Histórico</h1><p class="muted small">Toque num treino para ver as cargas.</p>${items}</div>`;
+}
+
+function calcProfile() {
+  const p = S.profile; const h = p.altura / 100;
+  const imc = p.peso / (h * h);
+  const tmb = 10 * p.peso + 6.25 * p.altura - 5 * p.idade + (p.sexo === 'M' ? 5 : -161); // Mifflin-St Jeor
+  return { imc, tmb, get: tmb * p.atividade, protMin: p.peso * 1.6, protMax: p.peso * 2.2, agua: p.peso * 35 };
+}
+function imcClass(v) { return v < 18.5 ? 'abaixo do peso' : v < 25 ? 'faixa normal' : v < 30 ? 'sobrepeso' : 'obesidade'; }
+
+function viewProfile() {
+  const p = S.profile; const c = calcProfile();
+  const acts = [[1.375, 'Leve'], [1.55, 'Moderada'], [1.725, 'Alta']];
+  return `<div class="wrap"><h1>Perfil</h1>
+    <div class="card">
+      <div class="field"><label for="pIdade">Idade (anos)</label><input id="pIdade" inputmode="numeric" value="${p.idade}"></div>
+      <div class="field"><label for="pAltura">Altura (cm)</label><input id="pAltura" inputmode="numeric" value="${p.altura}"></div>
+      <div class="field"><label for="pPeso">Peso (kg)</label><input id="pPeso" inputmode="decimal" value="${p.peso}"></div>
+      <div class="field"><label for="pAtiv">Atividade</label>
+        <select id="pAtiv" style="padding:10px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);width:100%">
+        ${acts.map(([v, l]) => `<option value="${v}" ${p.atividade == v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+    </div>
+    <h2>Estimativas</h2>
+    <div class="card">
+      <div class="kv"><span>IMC</span><b>${c.imc.toFixed(1).replace('.', ',')} <span class="muted small">(${imcClass(c.imc)})</span></b></div>
+      <div class="kv"><span>Metabolismo basal</span><b>${Math.round(c.tmb).toLocaleString('pt-BR')} kcal</b></div>
+      <div class="kv"><span>Gasto diário estimado</span><b>${Math.round(c.get).toLocaleString('pt-BR')} kcal</b></div>
+      <div class="kv"><span>Proteína sugerida</span><b>${Math.round(c.protMin)}–${Math.round(c.protMax)} g/dia</b></div>
+      <div class="kv"><span>Água</span><b>~${(c.agua / 1000).toFixed(1).replace('.', ',')} L/dia</b></div>
+    </div>
+    <p class="note">Cálculos de referência: Mifflin-St Jeor (metabolismo basal), atividade leve 1–3x, moderada 3–5x e alta 6–7x por semana, 1,6–2,2 g/kg de proteína e 35 ml/kg de água. O IMC não diferencia massa muscular de gordura. São estimativas e não substituem a avaliação de um profissional de educação física, médico ou nutricionista.</p>
+    <h2>Dados</h2>
+    <div class="stack">
+      <button class="btn ghost" id="exportBtn">Exportar backup (.json)</button>
+      <label class="btn ghost" style="cursor:pointer">Importar backup<input type="file" id="importIn" accept="application/json" class="hidden"></label>
+      <button class="btn danger" id="resetBtn">Apagar todos os dados</button>
+    </div>
+    <p class="note">Os dados ficam salvos apenas neste aparelho/navegador.</p>
+  </div>`;
+}
+
+/* ============================== Sessão de treino ============================== */
+function startSession(k) {
+  if (S.active && S.active.plan !== k) {
+    if (!confirm(`Há um ${PLANS[S.active.plan].name} em andamento. Descartar e iniciar o ${PLANS[k].name}?`)) return;
+    S.active = null;
+  }
+  if (!S.active) {
+    const sets = {};
+    for (const e of PLANS[k].exercises) {
+      const last = S.last[e.id] || {};
+      sets[e.id] = Array.from({ length: e.sets }, () => ({ kg: last.kg ?? null, reps: null, done: false }));
+    }
+    S.active = { plan: k, start: Date.now(), sets };
+    save();
+  }
+  go('session');
+}
+
+function progressPct() {
+  let t = 0, d = 0;
+  for (const id in S.active.sets) for (const s of S.active.sets[id]) { t++; if (s.done) d++; }
+  return t ? Math.round(d / t * 100) : 0;
+}
+
+function viewSession() {
+  const a = S.active; const p = PLANS[a.plan];
+  const cards = p.exercises.map((e, ei) => {
+    const last = S.last[e.id];
+    const lastTxt = last ? `Última vez: ${last.kg ?? '–'} kg × ${last.reps ?? '–'}` : 'Primeira vez neste exercício';
+    const rows = a.sets[e.id].map((s, si) => `
+      <div class="set ${s.done ? 'done' : ''}" data-ex="${e.id}" data-i="${si}">
+        <div class="n">${si + 1}</div>
+        <input inputmode="decimal" placeholder="${e.bodyweight ? 'peso corp.' : 'kg'}" value="${s.kg ?? ''}" data-f="kg" aria-label="Carga série ${si + 1}">
+        <input inputmode="numeric" placeholder="${e.unit === 's' ? 'seg' : esc(e.reps)}" value="${s.reps ?? ''}" data-f="reps" aria-label="Repetições série ${si + 1}">
+        <button class="check" data-done aria-label="Marcar série ${si + 1} como feita">${CHECK}</button>
+      </div>`).join('');
+    return `<div class="card ex" id="ex-${e.id}">
+      <div class="ex-top">
+        <div class="row between" style="align-items:flex-start"><h3>${ei + 1}. ${esc(e.name)}</h3></div>
+        <div class="muted small" style="margin-top:2px">${esc(e.muscles)}</div>
+        <div class="ex-meta"><span class="pill">${e.sets} séries</span><span class="pill">${esc(e.reps)}</span><span class="pill">descanso ${fmtTime(e.rest)}</span></div>
+        <div class="last" style="margin-top:8px">${lastTxt}</div>
+        <button class="tip-toggle" data-tip>Como executar</button>
+        <div class="tip">${esc(e.tip)}</div>
+      </div>
+      <div class="sets">
+        <div class="set set-h"><div>Série</div><div style="text-align:center">kg</div><div style="text-align:center">${e.unit === 's' ? 'seg' : 'reps'}</div><div></div></div>
+        ${rows}
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="session-head"><div class="inner">
+      <div class="row between">
+        <div class="row"><span class="tag ${a.plan}" style="width:34px;height:34px;font-size:16px">${a.plan}</span>
+          <div><h3>${p.name} · ${p.focus}</h3><div class="muted small" id="elapsed">0:00</div></div></div>
+        <button class="btn ghost" style="width:auto;padding:8px 14px;font-size:15px" id="backBtn">Sair</button>
+      </div>
+      <div class="progress"><i id="prog" style="width:${progressPct()}%"></i></div>
+    </div></div>
+    <div class="wrap">${cards}
+      <button class="btn" id="finishBtn" style="margin-top:8px">Finalizar treino</button>
+      <button class="btn danger" id="discardBtn" style="margin-top:10px">Descartar treino</button>
+    </div>`;
+}
+
+function bindSession() {
+  const a = S.active;
+  $('#backBtn').onclick = () => go('home');
+  $('#finishBtn').onclick = finishSession;
+  $('#discardBtn').onclick = () => { if (confirm('Descartar este treino? Nada será salvo.')) { S.active = null; save(); stopRest(); go('home'); } };
+  document.querySelectorAll('[data-tip]').forEach(b => b.onclick = () => {
+    const c = b.closest('.ex'); c.classList.toggle('open'); b.textContent = c.classList.contains('open') ? 'Ocultar dica' : 'Como executar';
+  });
+  document.querySelectorAll('.set[data-ex]').forEach(row => {
+    const id = row.dataset.ex, i = +row.dataset.i; const s = a.sets[id][i];
+    row.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => {
+      s[inp.dataset.f] = num(inp.value);
+      // repete a carga nas séries seguintes ainda não feitas
+      if (inp.dataset.f === 'kg') a.sets[id].forEach((o, j) => {
+        if (j > i && !o.done) { o.kg = s.kg; const el = $(`.set[data-ex="${id}"][data-i="${j}"] input[data-f="kg"]`); if (el) el.value = s.kg ?? ''; }
+      });
+      save();
+    }));
+    $('[data-done]', row).onclick = () => {
+      const ex = PLANS[a.plan].exercises.find(e => e.id === id);
+      s.done = !s.done;
+      if (s.done && s.reps == null) {
+        const def = parseInt(ex.reps, 10); // usa o início da faixa como padrão
+        if (!isNaN(def)) { s.reps = def; $('input[data-f="reps"]', row).value = def; }
+      }
+      row.classList.toggle('done', s.done);
+      $('#prog').style.width = progressPct() + '%';
+      save();
+      if (s.done) {
+        if (navigator.vibrate) navigator.vibrate(30);
+        const allDone = a.sets[id].every(x => x.done);
+        const idx = PLANS[a.plan].exercises.indexOf(ex); const nxt = PLANS[a.plan].exercises[idx + 1];
+        startRest(ex.rest, allDone ? (nxt ? `Próximo: ${nxt.name}` : 'Último exercício concluído!') : `${ex.name} · série ${i + 2}`);
+      }
+    };
+  });
+}
+
+function finishSession() {
+  const a = S.active; const doneCount = Object.values(a.sets).flat().filter(s => s.done).length;
+  if (!doneCount && !confirm('Nenhuma série foi marcada. Finalizar mesmo assim?')) return;
+  for (const id in a.sets) {
+    const done = a.sets[id].filter(s => s.done);
+    if (done.length) { const best = done.reduce((m, s) => (s.kg ?? 0) >= (m.kg ?? 0) ? s : m, done[0]); S.last[id] = { kg: best.kg, reps: best.reps }; }
+  }
+  S.history.push({ plan: a.plan, start: a.start, end: Date.now(), sets: a.sets });
+  S.next = ORDER[(ORDER.indexOf(a.plan) + 1) % 3];
+  S.active = null; save(); stopRest();
+  alert(`Treino concluído! ${doneCount} séries registradas. Próximo: ${PLANS[S.next].name}.`);
+  go('history');
+}
+
+/* ============================== Timer de descanso ============================== */
+let restEnd = 0, restTick = null, beeped = false, audioCtx = null;
+function beep() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.25].forEach(t => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.frequency.value = 880; o.connect(g); g.connect(audioCtx.destination);
+      g.gain.setValueAtTime(0.2, audioCtx.currentTime + t); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + t + 0.2);
+      o.start(audioCtx.currentTime + t); o.stop(audioCtx.currentTime + t + 0.2);
+    });
+  } catch (e) {}
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+}
+function startRest(sec, label) {
+  try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch (e) {}
+  restEnd = Date.now() + sec * 1000; beeped = false;
+  $('#restLbl').textContent = label; $('#rest').classList.add('show'); $('#rest').classList.remove('over');
+  clearInterval(restTick); restTick = setInterval(updateRest, 250); updateRest();
+}
+function updateRest() {
+  const left = Math.round((restEnd - Date.now()) / 1000);
+  if (left <= 0) {
+    $('#restTime').textContent = '0:00'; $('#rest').classList.add('over');
+    if (!beeped) { beeped = true; beep(); $('#restLbl').textContent = 'Descanso finalizado — próxima série!'; setTimeout(stopRest, 6000); }
+    return;
+  }
+  $('#restTime').textContent = fmtTime(left);
+}
+function stopRest() { clearInterval(restTick); $('#rest').classList.remove('show'); }
+$('#restSkip').onclick = stopRest;
+$('#restPlus').onclick = () => { restEnd += 15000; if (beeped) { beeped = false; $('#rest').classList.remove('over'); clearInterval(restTick); restTick = setInterval(updateRest, 250); } updateRest(); };
+
+setInterval(() => { const el = $('#elapsed'); if (el && S.active) el.textContent = `${fmtTime(Math.floor((Date.now() - S.active.start) / 1000))} · ${progressPct()}% concluído`; }, 1000);
+
+/* ============================== Eventos gerais ============================== */
+function bind() {
+  document.querySelectorAll('[data-start]').forEach(b => b.onclick = () => startSession(b.dataset.start));
+  document.querySelectorAll('[data-hist]').forEach(c => c.onclick = () => c.classList.toggle('open'));
+  if (tab === 'profile') {
+    const upd = () => {
+      const p = S.profile;
+      p.idade = num($('#pIdade').value) || p.idade; p.altura = num($('#pAltura').value) || p.altura;
+      p.peso = num($('#pPeso').value) || p.peso; p.atividade = num($('#pAtiv').value) || p.atividade;
+      save();
+    };
+    ['#pIdade', '#pAltura', '#pPeso'].forEach(s => $(s).addEventListener('change', () => { upd(); render(); }));
+    $('#pAtiv').onchange = () => { upd(); render(); };
+    $('#exportBtn').onclick = () => {
+      const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = `treino-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+    };
+    $('#importIn').onchange = ev => {
+      const f = ev.target.files[0]; if (!f) return;
+      f.text().then(t => { const d = JSON.parse(t); if (!d.history) throw 0; S = Object.assign(structuredClone(DEFAULT), d); save(); alert('Backup importado.'); render(); })
+        .catch(() => alert('Arquivo inválido.'));
+    };
+    $('#resetBtn').onclick = () => { if (confirm('Apagar histórico, cargas e perfil? Essa ação não pode ser desfeita.')) { S = structuredClone(DEFAULT); save(); render(); } };
+  }
+}
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => go(b.dataset.tab));
+
+if (S.active) tab = 'home';
+render();
+
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>
