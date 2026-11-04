@@ -188,7 +188,7 @@
 
   /* Modo Foco */
   .focus { max-width: 560px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; min-height: calc(100vh - 92px - var(--safe-t) - var(--safe-b)); min-height: calc(100dvh - 92px - var(--safe-t) - var(--safe-b)); }
-  .f-top { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-top: 6px; }
+  .f-top { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-top: 6px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .f-name { font-size: 30px; margin: 6px 0 6px; }
   .f-meta { color: var(--muted); font-size: 16px; }
   .f-meta b { color: var(--text); }
@@ -224,6 +224,21 @@
   .adj { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .next-card { margin-top: 16px; }
   .next-card b { display: block; margin-top: 2px; }
+  .swapped { font-size: 13px; color: var(--c); margin-top: -2px; }
+  .sug { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-top: 12px; padding: 12px 14px; border-radius: 14px; font-size: 14px; line-height: 1.35; background: var(--surface); border: 1px solid var(--line); color: var(--muted); }
+  .sug b { color: var(--text); font-size: 13px; }
+  .sug.up { background: rgba(61,220,151,.09); border-color: rgba(61,220,151,.35); }
+  .sug.up b { color: var(--accent); }
+  .sug .hbtn { flex: none; background: var(--accent); color: var(--accent-ink); border: 0; }
+  .sheet-bg { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.55); display: flex; align-items: flex-end; justify-content: center; }
+  .sheet { width: 100%; max-width: 560px; max-height: 85vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 22px 22px 0 0; padding: 10px 16px calc(16px + var(--safe-b)); }
+  .sheet-grip { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto 12px; }
+  .opt { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; text-align: left; padding: 12px 14px; min-height: 56px; margin-top: 8px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); }
+  .opt.on { border-color: var(--accent); }
+  .opt svg { width: 22px; height: 22px; stroke: var(--accent); flex: none; }
+  .opt .pill { font-size: 11px; padding: 2px 7px; }
+  .remember { display: flex; gap: 10px; align-items: center; margin-top: 14px; font-size: 14px; color: var(--muted); }
+  .remember input { width: 20px; height: 20px; accent-color: var(--accent); }
   .done-ico { width: 72px; height: 72px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; margin: 24px auto 4px; }
   @media (max-height: 740px) {
     .f-top { margin-top: 0; }
@@ -328,6 +343,218 @@ const PLANS = {
 };
 const ORDER = ['A', 'B', 'C'];
 
+/* ============================================================
+   SUBSTITUIÇÕES — alternativas para quando o aparelho estiver ocupado
+   (herdam séries, repetições e descanso do exercício original, salvo indicação)
+   ============================================================ */
+const ALTS = {
+  agachamento: [
+    { id: 'agachamento-smith', name: 'Agachamento no Smith', muscles: 'Quadríceps, glúteos', tip: 'Pés um pouco à frente da barra, desça controlado até a coxa ficar paralela ao chão.' },
+    { id: 'hack', name: 'Agachamento hack (máquina)', muscles: 'Quadríceps, glúteos', tip: 'Costas apoiadas no encosto, desça até ~90° de joelho e suba empurrando com o pé inteiro.' },
+    { id: 'leg-press', name: 'Leg press 45°', muscles: 'Quadríceps, glúteos', tip: 'Pés no meio da plataforma, desça até ~90° de joelho sem tirar a lombar do encosto.' },
+    { id: 'goblet', name: 'Agachamento goblet com halter', muscles: 'Quadríceps, glúteos, core', step: 2, tip: 'Segure o halter junto ao peito, cotovelos para baixo, e desça mantendo o tronco ereto.' },
+  ],
+  'supino-reto': [
+    { id: 'supino-halteres', name: 'Supino reto com halteres', muscles: 'Peitoral, tríceps, ombro anterior', step: 2, tip: 'Escápulas retraídas; desça os halteres até a linha do peito e suba aproximando-os sem bater.' },
+    { id: 'supino-maquina', name: 'Supino reto na máquina', muscles: 'Peitoral, tríceps', tip: 'Ajuste o banco para a pegada ficar na linha do peito. Empurre sem travar os cotovelos.' },
+    { id: 'supino-smith', name: 'Supino reto no Smith', muscles: 'Peitoral, tríceps, ombro anterior', tip: 'Banco posicionado para a barra descer na linha do peito. Escápulas retraídas.' },
+  ],
+  'remada-curvada': [
+    { id: 'remada-baixa', name: 'Remada baixa no cabo', muscles: 'Dorsais, romboides, bíceps', tip: 'Sentado, coluna neutra. Puxe o triângulo até o abdômen, levando os cotovelos para trás.' },
+    { id: 'remada-cavalinho', name: 'Remada cavalinho (T-bar)', muscles: 'Dorsais, trapézio, bíceps', tip: 'Tronco inclinado e coluna neutra. Puxe a barra até o peito apertando as escápulas.' },
+    { id: 'remada-maquina', name: 'Remada na máquina articulada', muscles: 'Dorsais, romboides', tip: 'Peito apoiado, puxe as alças até a lateral do tronco e controle a volta.' },
+  ],
+  desenvolvimento: [
+    { id: 'desenvolvimento-maquina', name: 'Desenvolvimento na máquina', muscles: 'Ombros, tríceps', step: 2.5, tip: 'Pegada na altura dos ombros. Empurre para cima sem arquear a lombar.' },
+    { id: 'desenvolvimento-barra', name: 'Desenvolvimento com barra (militar)', muscles: 'Ombros, tríceps, core', step: 2.5, tip: 'Em pé ou sentado, barra na frente do rosto até acima da cabeça. Contraia glúteos e abdômen.' },
+    { id: 'arnold', name: 'Desenvolvimento Arnold', muscles: 'Ombros', step: 2, tip: 'Comece com as palmas para você e gire os halteres enquanto empurra para cima.' },
+  ],
+  stiff: [
+    { id: 'stiff-halteres', name: 'Stiff com halteres', muscles: 'Posteriores de coxa, glúteos', step: 2, tip: 'Joelhos levemente flexionados, leve o quadril para trás com os halteres rente às pernas.' },
+    { id: 'mesa-flexora', name: 'Mesa flexora', muscles: 'Posteriores de coxa', tip: 'Quadril colado no banco; flexione os joelhos com controle e segure 1 s no topo.' },
+    { id: 'cadeira-flexora', name: 'Cadeira flexora', muscles: 'Posteriores de coxa', tip: 'Sentado, joelho alinhado ao eixo da máquina. Flexione puxando o rolo para baixo com controle.' },
+  ],
+  prancha: [
+    { id: 'prancha-lateral', name: 'Prancha lateral', muscles: 'Oblíquos, core', reps: '30s cada lado', unit: 's', tip: 'Apoio no antebraço, corpo alinhado e quadril elevado. Registre o tempo de um lado e repita do outro.' },
+    { id: 'abdominal-infra', name: 'Elevação de pernas (abdominal infra)', muscles: 'Abdômen, flexores do quadril', reps: '12–15', bodyweight: true, tip: 'Deitado, lombar colada no chão, eleve as pernas estendidas até 90° e desça devagar.' },
+    { id: 'dead-bug', name: 'Dead bug', muscles: 'Core', reps: '10 cada lado', bodyweight: true, tip: 'Deitado, braços e joelhos a 90°. Estenda braço e perna opostos sem tirar a lombar do chão.' },
+  ],
+  terra: [
+    { id: 'terra-hex', name: 'Levantamento terra com barra hexagonal', muscles: 'Quadríceps, glúteos, posteriores, costas', tip: 'Fique no centro da barra, coluna neutra, empurre o chão estendendo quadril e joelhos juntos.' },
+    { id: 'terra-romeno-halteres', name: 'Terra romeno com halteres', muscles: 'Posteriores, glúteos, lombar', step: 2, tip: 'Halteres rente às coxas, quadril para trás e joelhos levemente flexionados.' },
+    { id: 'hip-thrust', name: 'Hip thrust com barra', muscles: 'Glúteos, posteriores', tip: 'Costas apoiadas no banco, barra sobre o quadril. Eleve o quadril até alinhar com o tronco e contraia os glúteos.' },
+  ],
+  'supino-inclinado': [
+    { id: 'supino-inclinado-barra', name: 'Supino inclinado com barra', muscles: 'Peitoral superior, ombros, tríceps', step: 2.5, tip: 'Banco a 30°, barra desce na parte alta do peito com cotovelos a ~45°.' },
+    { id: 'supino-inclinado-maquina', name: 'Supino inclinado na máquina', muscles: 'Peitoral superior, tríceps', step: 2.5, tip: 'Ajuste o banco para a pegada ficar na altura do peito superior. Empurre sem travar os cotovelos.' },
+    { id: 'supino-inclinado-smith', name: 'Supino inclinado no Smith', muscles: 'Peitoral superior, ombros', step: 2.5, tip: 'Banco a 30° posicionado para a barra descer na parte alta do peito.' },
+  ],
+  puxada: [
+    { id: 'puxada-triangulo', name: 'Puxada com triângulo (pegada neutra)', muscles: 'Dorsais, bíceps', tip: 'Tronco levemente inclinado para trás, puxe o triângulo até o peito.' },
+    { id: 'barra-fixa', name: 'Barra fixa (ou graviton)', muscles: 'Dorsais, bíceps', assist: true, tip: 'No graviton, registre o contrapeso em kg. Suba até o queixo passar a barra.' },
+    { id: 'puxada-maquina', name: 'Puxada na máquina articulada', muscles: 'Dorsais, bíceps', tip: 'Coxas presas no apoio, puxe as alças até a altura do peito com controle.' },
+  ],
+  bulgaro: [
+    { id: 'afundo', name: 'Afundo (passada) com halteres', muscles: 'Quadríceps, glúteos', step: 2, tip: 'Passo largo à frente, desça até os dois joelhos ficarem a ~90° e volte empurrando com a perna da frente.' },
+    { id: 'agachamento-smith', name: 'Agachamento no Smith', muscles: 'Quadríceps, glúteos', reps: '10–12', tip: 'Pés um pouco à frente da barra, desça controlado até a coxa ficar paralela ao chão.' },
+    { id: 'leg-press-unilateral', name: 'Leg press unilateral', muscles: 'Quadríceps, glúteos', tip: 'Um pé no centro da plataforma, desça até ~90° de joelho sem a lombar sair do encosto.' },
+  ],
+  'elevacao-lateral': [
+    { id: 'elevacao-lateral-cabo', name: 'Elevação lateral no cabo', muscles: 'Ombro lateral', step: 1, tip: 'Polia baixa, um braço por vez, eleve até a altura do ombro. Registre a carga de um lado.' },
+    { id: 'elevacao-lateral-maquina', name: 'Elevação lateral na máquina', muscles: 'Ombro lateral', step: 2.5, tip: 'Cotovelos apoiados nas almofadas, eleve até a altura dos ombros e desça devagar.' },
+  ],
+  'rosca-triceps': [
+    { id: 'martelo-testa', name: 'Rosca martelo + tríceps testa (bi-set)', muscles: 'Bíceps, braquial, tríceps', step: 2, tip: 'Rosca com pegada neutra e, sem descanso, tríceps testa. Registre a carga da rosca.' },
+    { id: 'rosca-cabo-triceps', name: 'Rosca no cabo + tríceps barra reta (bi-set)', muscles: 'Bíceps, tríceps', step: 2.5, tip: 'Rosca na polia baixa e, sem descanso, tríceps na polia alta. Registre a carga da rosca.' },
+  ],
+  'leg-press': [
+    { id: 'hack', name: 'Agachamento hack (máquina)', muscles: 'Quadríceps, glúteos', tip: 'Costas apoiadas no encosto, desça até ~90° de joelho e suba empurrando com o pé inteiro.' },
+    { id: 'goblet', name: 'Agachamento goblet com halter', muscles: 'Quadríceps, glúteos, core', step: 2, tip: 'Segure o halter junto ao peito, cotovelos para baixo, e desça mantendo o tronco ereto.' },
+    { id: 'cadeira-extensora', name: 'Cadeira extensora', muscles: 'Quadríceps', tip: 'Joelho alinhado ao eixo da máquina. Estenda as pernas e segure 1 s no topo.' },
+  ],
+  'barra-fixa': [
+    { id: 'puxada', name: 'Puxada frontal (pulldown)', muscles: 'Dorsais, bíceps', reps: '12–15', assist: false, tip: 'Pegada um pouco mais larga que os ombros. Puxe a barra até o alto do peito.' },
+    { id: 'puxada-triangulo', name: 'Puxada com triângulo (pegada neutra)', muscles: 'Dorsais, bíceps', reps: '12–15', assist: false, tip: 'Tronco levemente inclinado para trás, puxe o triângulo até o peito.' },
+  ],
+  flexao: [
+    { id: 'supino-halteres', name: 'Supino reto com halteres', muscles: 'Peitoral, tríceps, ombro anterior', reps: '12–15', bodyweight: false, step: 2, tip: 'Escápulas retraídas; desça os halteres até a linha do peito e suba aproximando-os sem bater.' },
+    { id: 'supino-maquina', name: 'Supino reto na máquina', muscles: 'Peitoral, tríceps', reps: '12–15', bodyweight: false, tip: 'Ajuste o banco para a pegada ficar na linha do peito. Empurre sem travar os cotovelos.' },
+    { id: 'flexao-joelhos', name: 'Flexão com joelhos apoiados', muscles: 'Peitoral, tríceps', tip: 'Joelhos no chão, corpo alinhado dos joelhos à cabeça. Desça o peito até perto do chão.' },
+  ],
+  'mesa-flexora': [
+    { id: 'cadeira-flexora', name: 'Cadeira flexora', muscles: 'Posteriores de coxa', tip: 'Sentado, joelho alinhado ao eixo da máquina. Flexione puxando o rolo para baixo com controle.' },
+    { id: 'stiff-halteres', name: 'Stiff com halteres', muscles: 'Posteriores de coxa, glúteos', step: 2, tip: 'Joelhos levemente flexionados, leve o quadril para trás com os halteres rente às pernas.' },
+  ],
+  'remada-unilateral': [
+    { id: 'remada-baixa', name: 'Remada baixa no cabo', muscles: 'Dorsais, romboides, bíceps', reps: '12–15', step: 2.5, tip: 'Sentado, coluna neutra. Puxe o triângulo até o abdômen, levando os cotovelos para trás.' },
+    { id: 'remada-maquina', name: 'Remada na máquina articulada', muscles: 'Dorsais, romboides', reps: '12–15', step: 2.5, tip: 'Peito apoiado, puxe as alças até a lateral do tronco e controle a volta.' },
+  ],
+  farmer: [
+    { id: 'encolhimento', name: 'Encolhimento com halteres', muscles: 'Trapézio, antebraço', reps: '12–15', dist: false, tip: 'Halteres ao lado do corpo, eleve os ombros em direção às orelhas e segure 1 s.' },
+    { id: 'prancha', name: 'Prancha abdominal', muscles: 'Core', reps: '40s', dist: false, unit: 's', step: 2.5, tip: 'Antebraços no chão, corpo em linha reta da cabeça aos calcanhares.' },
+  ],
+};
+
+/* Exercício efetivo de cada posição do treino, considerando trocas (swaps: { índice: idAlternativa }) */
+function slotEx(plan, ei, swaps) {
+  const base = PLANS[plan].exercises[ei];
+  const altId = swaps && swaps[ei];
+  const alt = altId && (ALTS[base.id] || []).find(x => x.id === altId);
+  if (!alt) return base;
+  const { unit, dist, assist, bodyweight, step, ...core } = base;   // flags do original não passam para o substituto
+  return { ...core, ...alt, base };
+}
+function exList(x) { return PLANS[x.plan].exercises.map((_, i) => slotEx(x.plan, i, x.swaps)); }
+function prefSwaps(plan) {
+  const out = {}; const pref = S.prefSwaps || {};
+  PLANS[plan].exercises.forEach((e, i) => { if (pref[e.id] && (ALTS[e.id] || []).some(x => x.id === pref[e.id])) out[i] = pref[e.id]; });
+  return out;
+}
+function newSets(e) {
+  const last = S.last[e.id] || {};
+  return Array.from({ length: e.sets }, () => ({ kg: last.kg ?? null, reps: null, done: false }));
+}
+
+/* ============================================================
+   PROGRESSÃO — dupla progressão: ao completar todas as séries
+   no topo da faixa, sobe a carga; senão, mantém e busca +reps
+   ============================================================ */
+function lastSessionSets(id) {
+  for (let k = S.history.length - 1; k >= 0; k--) {
+    const ss = (S.history[k].sets[id] || []).filter(s => s.done);
+    if (ss.length) return ss;
+  }
+  return null;
+}
+function repRange(e) {
+  const n = (String(e.reps).match(/\d+/g) || []).map(Number);
+  if (!n.length) return null;
+  return { lo: n[0], hi: /\d\s*[–-]\s*\d/.test(e.reps) ? n[1] : n[0] };
+}
+function suggestion(e) {
+  const ss = lastSessionSets(e.id); if (!ss) return null;
+  const m = metric(e); const list = ss.map(s => s.reps ?? '–').join(', ');
+  const full = ss.length >= e.sets; const step = e.step || 2.5;
+  if (m === 'dist') return null;
+  if (e.assist) {
+    const kg = Math.max(...ss.map(s => s.kg || 0));
+    if (full && kg > 0 && ss.every(s => (s.reps || 0) >= 8))
+      return { type: 'up', kg: Math.max(0, kg - step), text: `Você fez ${list} repetições com ${fmtKg(kg)} kg de contrapeso. Reduza o contrapeso para ${fmtKg(Math.max(0, kg - step))} kg.` };
+    return null;
+  }
+  const r = repRange(e); if (!r) return null;
+  if (m === 'time') {
+    if (full && ss.every(s => (s.reps || 0) >= r.lo)) return { type: 'up', text: `Você segurou ${list} s. Tente ${r.lo + 10} s em cada série hoje.` };
+    return { type: 'keep', text: `Na última vez: ${list} s. Busque ${r.lo} s em todas as séries.` };
+  }
+  if (e.bodyweight && !ss.some(s => s.kg)) {
+    if (full && ss.every(s => (s.reps || 0) >= r.hi)) return { type: 'up', text: `Você fez ${list} repetições, todas no topo da faixa. Dificulte: desça mais devagar (3 s) ou acrescente carga.` };
+    return { type: 'keep', text: `Na última vez: ${list} repetições. Busque ${r.hi} em todas as séries.` };
+  }
+  const kg = Math.max(...ss.map(s => s.kg || 0)); if (!kg) return null;
+  const atKg = ss.filter(s => s.kg === kg);
+  if (full && atKg.length === ss.length && ss.every(s => (s.reps || 0) >= r.hi)) {
+    const nkg = Math.round((kg + step) * 100) / 100;
+    return { type: 'up', kg: nkg, text: `Na última vez: ${fmtKg(kg)} kg × ${list}, todas no topo da faixa (${r.hi}). Suba para ${fmtKg(nkg)} kg.` };
+  }
+  if (ss.some(s => (s.reps || 0) < r.lo)) return { type: 'keep', kg, text: `Na última vez: ${fmtKg(kg)} kg × ${list}. Mantenha ${fmtKg(kg)} kg até fazer pelo menos ${r.lo} em todas as séries.` };
+  return { type: 'keep', kg, text: `Na última vez: ${fmtKg(kg)} kg × ${list}. Mantenha ${fmtKg(kg)} kg e busque ${r.hi} repetições em todas.` };
+}
+function sugCard(e, a, compact) {
+  const sg = suggestion(e); if (!sg) return '';
+  const pending = a ? a.sets[e.id].filter(s => !s.done) : [];
+  const canApply = sg.kg != null && pending.length && pending.some(s => s.kg !== sg.kg);
+  return `<div class="sug ${sg.type}${compact ? ' compact' : ''}">
+    <div><b>${sg.type === 'up' ? '↑ Hora de progredir' : 'Meta de hoje'}</b><div>${esc(sg.text)}</div></div>
+    ${canApply ? `<button class="hbtn small" data-apply="${e.id}" data-kg="${sg.kg}">Usar ${fmtKg(sg.kg)} kg</button>` : ''}
+  </div>`;
+}
+
+/* ============================================================
+   TROCA DE EXERCÍCIO (folha inferior)
+   ============================================================ */
+function openSwap(ei) {
+  const a = S.active; const base = PLANS[a.plan].exercises[ei]; const cur = slotEx(a.plan, ei, a.swaps);
+  const opts = [{ ...base, isBase: true }, ...(ALTS[base.id] || []).map(x => slotEx(a.plan, ei, { [ei]: x.id }))];
+  const fixed = (S.prefSwaps || {})[base.id];
+  const el = document.createElement('div'); el.className = 'sheet-bg';
+  el.innerHTML = `<div class="sheet" role="dialog" aria-label="Trocar exercício">
+    <div class="sheet-grip"></div>
+    <h3>Trocar exercício</h3>
+    <p class="muted small" style="margin:4px 0 12px">Aparelho ocupado ou indisponível? Escolha uma alternativa para os mesmos músculos.</p>
+    ${opts.map(o => `<button class="opt ${o.id === cur.id ? 'on' : ''}" data-alt="${o.isBase ? '' : o.id}">
+        <span><b>${esc(o.name)}</b>${o.isBase ? ' <span class="pill">original</span>' : ''}<br><span class="muted small">${esc(o.muscles)} · ${o.sets} × ${esc(o.reps)}</span></span>
+        ${o.id === cur.id ? CHECK : ''}</button>`).join('')}
+    <label class="remember"><input type="checkbox" id="swRemember" ${fixed ? 'checked' : ''}> Usar sempre esta escolha no ${PLANS[a.plan].name}</label>
+    <button class="btn ghost" id="swCancel" style="margin-top:8px">Cancelar</button>
+  </div>`;
+  document.body.appendChild(el);
+  const close = () => el.remove();
+  el.onclick = ev => { if (ev.target === el) close(); };
+  $('#swCancel', el).onclick = close;
+  el.querySelectorAll('[data-alt]').forEach(b => b.onclick = () => {
+    const altId = b.dataset.alt || null;
+    if (swapExercise(ei, altId, $('#swRemember', el).checked)) { close(); render(); window.scrollTo(0, 0); }
+  });
+}
+function swapExercise(ei, altId, remember) {
+  const a = S.active; const old = slotEx(a.plan, ei, a.swaps); const baseId = PLANS[a.plan].exercises[ei].id;
+  const changing = (old.id !== (altId || baseId));
+  if (changing && (a.sets[old.id] || []).some(s => s.done) && !confirm(`As séries já feitas de ${old.name} serão descartadas. Trocar mesmo assim?`)) return false;
+  if (changing) {
+    delete a.sets[old.id];
+    a.swaps = a.swaps || {};
+    if (altId) a.swaps[ei] = altId; else delete a.swaps[ei];
+    const ne = slotEx(a.plan, ei, a.swaps);
+    a.sets[ne.id] = newSets(ne);
+  }
+  S.prefSwaps = S.prefSwaps || {};
+  if (remember && altId) S.prefSwaps[baseId] = altId; else delete S.prefSwaps[baseId];   // desmarcado = sem troca fixa
+  if (sw) stopWatch(false);
+  save(); return true;
+}
+
+
 /* Aeróbico opcional ao final do treino */
 const CARDIO_TYPES = ['Esteira', 'Bicicleta', 'Elíptico', 'Escada', 'Remo', 'Corda', 'Caminhada/corrida na rua'];
 const CARDIO_INT = ['Leve', 'Moderado', 'Intenso', 'HIIT (intervalado)'];
@@ -363,7 +590,7 @@ function weekCount() {
 }
 function sessionVolume(h) {
   let v = 0;
-  for (const e of PLANS[h.plan].exercises) {
+  for (const e of exList(h)) {
     if (metric(e) !== 'reps' || e.assist) continue;   // tempo, distância e contrapeso não entram no volume
     for (const s of h.sets[e.id] || []) if (s.done && s.kg && s.reps) v += s.kg * s.reps;
   }
@@ -386,8 +613,8 @@ function render() {
 }
 
 function planList(k) {
-  return `<ul class="ex-list">${PLANS[k].exercises.map(e =>
-    `<li><span>${esc(e.name)}</span><span>${e.sets} × ${esc(e.reps)}</span></li>`).join('')}</ul>`;
+  return `<ul class="ex-list">${exList({ plan: k, swaps: prefSwaps(k) }).map(e =>
+    `<li><span>${esc(e.name)}${e.base ? ' <span class="pill">troca fixa</span>' : ''}</span><span>${e.sets} × ${esc(e.reps)}</span></li>`).join('')}</ul>`;
 }
 
 function viewHome() {
@@ -432,7 +659,7 @@ function viewHistory() {
   if (!S.history.length) return `<div class="wrap"><h1>Histórico</h1><div class="card empty">Nenhum treino registrado ainda.<br>Finalize um treino para ele aparecer aqui.</div></div>`;
   const items = [...S.history].reverse().map((h, i) => {
     const p = PLANS[h.plan]; const mins = Math.max(1, Math.round((h.end - h.start) / 60000));
-    const detail = p.exercises.map(e => {
+    const detail = exList(h).map(e => {
       const ss = (h.sets[e.id] || []).filter(s => s.done);
       if (!ss.length) return '';
       return `<div><b style="color:var(--text)">${esc(e.name)}</b>: ${ss.map(s => fmtSet(e, s)).join(', ')}</div>`;
@@ -518,12 +745,9 @@ function startSession(k) {
     S.active = null;
   }
   if (!S.active) {
-    const sets = {};
-    for (const e of PLANS[k].exercises) {
-      const last = S.last[e.id] || {};
-      sets[e.id] = Array.from({ length: e.sets }, () => ({ kg: last.kg ?? null, reps: null, done: false }));
-    }
-    S.active = { plan: k, start: Date.now(), sets, cardio: newCardio(k), view: 'focus', cur: 0 };
+    const swaps = prefSwaps(k); const sets = {};
+    for (const e of exList({ plan: k, swaps })) sets[e.id] = newSets(e);
+    S.active = { plan: k, start: Date.now(), sets, swaps, cardio: newCardio(k), view: 'focus', cur: 0 };
     save();
   }
   go('session');
@@ -578,7 +802,7 @@ function progressPct() {
 
 /* Próxima série pendente: primeiro no exercício atual, depois nos seguintes (dando a volta) */
 function nextPending(a, fromEi) {
-  const ex = PLANS[a.plan].exercises;
+  const ex = exList(a);
   for (let k = 0; k < ex.length; k++) {
     const ei = (fromEi + k) % ex.length;
     const si = a.sets[ex[ei].id].findIndex(s => !s.done);
@@ -588,14 +812,14 @@ function nextPending(a, fromEi) {
 }
 function nextLabel(a, pos) {
   if (!pos) return '';
-  const e = PLANS[a.plan].exercises[pos.ei]; const s = a.sets[e.id][pos.si];
+  const e = exList(a)[pos.ei]; const s = a.sets[e.id][pos.si];
   const load = metric(e) === 'time' ? `meta ${e.reps}` : `${s.kg != null ? fmtKg(s.kg) + ' kg · ' : ''}meta ${e.reps}`;
   return `${e.name} · série ${pos.si + 1} de ${e.sets} · ${load}`;
 }
 
 /* Conclui uma série (comum aos modos Foco e Lista) */
 function completeSet(ei, si) {
-  const a = S.active; const e = PLANS[a.plan].exercises[ei]; const sets = a.sets[e.id]; const s = sets[si];
+  const a = S.active; const e = exList(a)[ei]; const sets = a.sets[e.id]; const s = sets[si];
   s.done = true;
   sets.forEach((o, j) => { if (j > si && !o.done) o.kg = s.kg; });   // repete a carga nas próximas séries
   const nxt = nextPending(a, ei);
@@ -625,7 +849,7 @@ function viewSession() {
 
 /* ---------- Modo Foco ---------- */
 function viewFocus(a) {
-  const ex = PLANS[a.plan].exercises;
+  const ex = exList(a);
   if (rest) {
     const total = Math.max(1, rest.total);
     return `<div class="focus rest-screen">
@@ -656,8 +880,11 @@ function viewFocus(a) {
       <button id="fPrev" ${ei === 0 ? 'disabled' : ''}>‹ Anterior</button>
       <button id="toList">Ver lista</button>
       <button id="fNext" ${ei === ex.length - 1 ? 'disabled' : ''}>Próximo ›</button></div>`;
-  const header = `<div class="f-top">Exercício ${ei + 1} de ${ex.length} · ${esc(e.muscles)}</div>
-      <h1 class="f-name">${esc(e.name)}</h1>`;
+  const header = `<div class="row between" style="align-items:flex-start;gap:8px">
+        <div class="f-top">Exercício ${ei + 1} de ${ex.length} · ${esc(e.muscles)}</div>
+        <button class="hbtn small" data-swap="${ei}">⇄ Trocar</button></div>
+      <h1 class="f-name">${esc(e.name)}</h1>
+      ${e.base ? `<div class="swapped">no lugar de ${esc(e.base.name)}</div>` : ''}`;
   if (si < 0) {
     return `<div class="focus">${header}
       <div class="f-meta">Exercício concluído ✓</div>
@@ -690,12 +917,13 @@ function viewFocus(a) {
       <div class="f-last">${last ? `Última vez: ${fmtSet(e, last)}` : 'Primeira vez neste exercício'}
         · <button class="tip-toggle" id="fTipBtn" style="margin:0">Como executar</button></div>
       <div class="tip" id="fTip">${esc(e.tip)}</div>
+      ${si === 0 ? sugCard(e, a, true) : ''}
       ${body}
     </div>`;
 }
 
 function bindFocus(a) {
-  const ex = PLANS[a.plan].exercises;
+  const ex = exList(a);
   const rr = () => { render(); window.scrollTo(0, 0); };
   if ($('#toList')) $('#toList').onclick = () => { a.view = 'list'; save(); rr(); };
   if ($('#fPrev')) $('#fPrev').onclick = () => { a.cur = Math.max(0, a.cur - 1); save(); rr(); };
@@ -708,7 +936,7 @@ function bindFocus(a) {
   if ($('#fPlus')) $('#fPlus').onclick = () => adjustRest(15);
   if ($('#fMinus')) $('#fMinus').onclick = () => adjustRest(-15);
   if ($('#finishBtn')) $('#finishBtn').onclick = finishSession;
-  bindCardio(a);
+  bindCardio(a); bindSwapApply(a);
 
   const e = ex[a.cur]; if (!e) return;
   const si = a.sets[e.id].findIndex(s => !s.done); if (si < 0) return;
@@ -753,7 +981,7 @@ function bindFocus(a) {
 /* ---------- Modo Lista ---------- */
 function viewList(a) {
   const p = PLANS[a.plan];
-  const cards = p.exercises.map((e, ei) => {
+  const cards = exList(a).map((e, ei) => {
     const last = S.last[e.id]; const m = metric(e);
     const lastTxt = last ? `Última vez: ${fmtSet(e, last)}` : 'Primeira vez neste exercício';
     const rows = a.sets[e.id].map((s, si) => `
@@ -768,10 +996,12 @@ function viewList(a) {
     return `<div class="card ex" id="ex-${e.id}">
       <div class="ex-top">
         <div class="row between" style="align-items:flex-start"><h3>${ei + 1}. ${esc(e.name)}</h3>
-          <button class="hbtn small" data-focus="${ei}">Focar</button></div>
+          <div class="row" style="gap:6px"><button class="hbtn small" data-swap="${ei}">⇄</button><button class="hbtn small" data-focus="${ei}">Focar</button></div></div>
+        ${e.base ? `<div class="swapped">no lugar de ${esc(e.base.name)}</div>` : ''}
         <div class="muted small" style="margin-top:2px">${esc(e.muscles)}</div>
         <div class="ex-meta"><span class="pill">${e.sets} séries</span><span class="pill">${esc(e.reps)}</span><span class="pill">descanso ${fmtTime(e.rest)}</span></div>
         <div class="last" style="margin-top:8px">${lastTxt}</div>
+        ${a.sets[e.id].every(s => !s.done) ? sugCard(e, a, true) : ''}
         <button class="tip-toggle" data-tip>Como executar</button>
         <div class="tip">${esc(e.tip)}</div>
       </div>
@@ -790,7 +1020,7 @@ function viewList(a) {
 
 function bindList(a) {
   $('#finishBtn').onclick = finishSession;
-  bindCardio(a);
+  bindCardio(a); bindSwapApply(a);
   $('#discardBtn').onclick = () => { if (confirm('Descartar este treino? Nada será salvo.')) { S.active = null; save(); endRest(false); go('home'); } };
   document.querySelectorAll('[data-focus]').forEach(b => b.onclick = () => { a.view = 'focus'; a.cur = +b.dataset.focus; save(); render(); window.scrollTo(0, 0); });
   document.querySelectorAll('[data-tip]').forEach(b => b.onclick = () => {
@@ -798,7 +1028,7 @@ function bindList(a) {
   });
   document.querySelectorAll('.set[data-ex]').forEach(row => {
     const id = row.dataset.ex, ei = +row.dataset.ei, i = +row.dataset.i; const s = a.sets[id][i];
-    const ex = PLANS[a.plan].exercises[ei];
+    const ex = exList(a)[ei];
     const repsInp = $('input[data-f="reps"]', row);
     row.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => {
       s[inp.dataset.f] = num(inp.value); inp.classList.remove('need');
@@ -832,6 +1062,14 @@ function bindList(a) {
   });
 }
 
+function bindSwapApply(a) {
+  document.querySelectorAll('[data-swap]').forEach(b => b.onclick = () => openSwap(+b.dataset.swap));
+  document.querySelectorAll('[data-apply]').forEach(b => b.onclick = () => {
+    const kg = +b.dataset.kg; (a.sets[b.dataset.apply] || []).forEach(s => { if (!s.done) s.kg = kg; });
+    save(); render();
+  });
+}
+
 function bindSession() {
   const a = S.active;
   $('#pauseBtn').onclick = () => go('home');
@@ -842,7 +1080,7 @@ function bindSession() {
 function finishSession() {
   const a = S.active; const doneCount = Object.values(a.sets).flat().filter(s => s.done).length;
   if (!doneCount && !(a.cardio && a.cardio.on) && !confirm('Nenhuma série foi marcada. Finalizar mesmo assim?')) return;
-  for (const e of PLANS[a.plan].exercises) {
+  for (const e of exList(a)) {
     const done = (a.sets[e.id] || []).filter(s => s.done);
     if (!done.length) continue;
     const key = metric(e) === 'reps' ? (s => s.kg ?? 0) : (s => s.reps ?? 0);
@@ -851,7 +1089,7 @@ function finishSession() {
   }
   const cardio = a.cardio && a.cardio.on && a.cardio.min ? { type: a.cardio.type, min: a.cardio.min, km: a.cardio.km, int: a.cardio.int } : null;
   if (cardio) S.lastCardio = { type: cardio.type };
-  S.history.push({ plan: a.plan, start: a.start, end: Date.now(), sets: a.sets, cardio });
+  S.history.push({ plan: a.plan, start: a.start, end: Date.now(), sets: a.sets, swaps: a.swaps || {}, cardio });
   S.next = ORDER[(ORDER.indexOf(a.plan) + 1) % 3];
   S.active = null; save(); endRest(false);
   alert(`Treino concluído! ${doneCount} séries registradas. Próximo: ${PLANS[S.next].name}.`);
