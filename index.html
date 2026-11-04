@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Treino Full Body</title>
 <meta name="description" content="Treinos full body A, B e C com registro de cargas e timer de descanso.">
 <meta name="theme-color" content="#eef2f8">
@@ -43,6 +43,9 @@
     --w95: rgba(255,255,255,.95);
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  /* Sem zoom por toque duplo: cada toque é um clique (como num app nativo) */
+  html, body, button, a, input, select, label, [role="button"] { touch-action: manipulation; }
+  button, .btn, .hbtn, nav.tabs, .stepper, .kp, .seg, .chips, .feel { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   html { background: var(--bg); }
   html, body { margin: 0; color: var(--ink); }
   body {
@@ -2733,6 +2736,20 @@ function applyTheme() {
   const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = dark ? '#0c1422' : '#eef2f8';
 }
 if (darkMQ && darkMQ.addEventListener) darkMQ.addEventListener('change', applyTheme);
+
+/* ============================== Sem zoom acidental (iOS) ============================== */
+document.addEventListener('gesturestart', e => e.preventDefault(), { passive: false });
+let lastTouch = 0;
+document.addEventListener('touchend', e => {
+  const now = Date.now();
+  // 2º toque rápido: o iPhone trataria como zoom; cancela o zoom e entrega o clique normalmente
+  if (now - lastTouch < 350 && !e.target.closest('input, textarea, select, .swipe')) {
+    e.preventDefault();
+    const el = e.target.closest('button, [role="button"], a, label, .opt, .msg, [data-goto], [data-hist], [data-libex]');
+    if (el) el.click();
+  }
+  lastTouch = now;
+}, { passive: false });
 
 /* ============================== Eventos gerais ============================== */
 function bind() {
