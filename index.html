@@ -1272,7 +1272,7 @@ function viewFocus(a) {
   }
   const s = sets[si];
   const repsVal = s.reps ?? defaultReps(e);
-  const step = e.step || (m === 'dist' ? 5 : 2.5);
+  const step = 5;   // botões + e − da carga sempre de 5 em 5 kg (valores quebrados: tocar no número e digitar)
   const stepper = (f, val, unit, st) => `<div class="stepper" data-f="${f}" data-step="${st}">
       <button data-d="-1" aria-label="Diminuir ${unit}">−</button>
       <label class="val"><input inputmode="none" readonly value="${val == null ? '' : String(val).replace('.', ',')}" placeholder="—" aria-label="${unit}"><span class="u">${unit}</span></label>
