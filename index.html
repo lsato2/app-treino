@@ -177,6 +177,7 @@
   nav.tabs .fab { width: 64px; height: 64px; margin: -6px auto; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #5a78a6, var(--accent-2)); color: #fff; display: grid; place-items: center;
     box-shadow: 0 10px 24px rgba(47,74,114,.45), inset 0 1px 0 rgba(255,255,255,.25); padding: 0; }
   nav.tabs .fab svg { width: 28px; height: 28px; stroke: #fff; stroke-width: 1.8; }
+  nav.tabs .fab .play-ico { width: 32px; height: 32px; fill: #fff; stroke: none; margin-left: 3px; }
   nav.tabs .fab.live { animation: pulse 2s infinite; }
   @keyframes pulse { 50% { box-shadow: 0 10px 24px rgba(47,74,114,.45), 0 0 0 8px rgba(61,90,134,.15); } }
 
@@ -405,7 +406,7 @@
   <div class="inner">
     <button data-tab="home"><svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/></svg>Início</button>
     <button data-tab="plans"><svg viewBox="0 0 24 24"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/></svg>Treinos</button>
-    <button class="fab" id="fab" aria-label="Iniciar treino"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="fab" id="fab" aria-label="Iniciar treino"><svg viewBox="0 0 24 24" class="play-ico"><path d="M8.5 5.8v12.4a.8.8 0 0 0 1.2.7l9.6-6.2a.8.8 0 0 0 0-1.4L9.7 5.1a.8.8 0 0 0-1.2.7z"/></svg></button>
     <button data-tab="history"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Histórico</button>
     <button data-tab="coach"><svg viewBox="0 0 24 24"><path d="M5 19V11M11 19V6M17 19v-5"/></svg>Coach</button>
   </div>
