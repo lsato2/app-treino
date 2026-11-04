@@ -1,5 +1,5 @@
 // Service worker: permite usar o app offline depois do primeiro acesso.
-const CACHE = 'treino-v9';
+const CACHE = 'treino-v10';
 const ASSETS = ['./', './index.html', './sync.js', './firebase-config.js', './manifest.webmanifest', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
