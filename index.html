@@ -290,7 +290,7 @@ const PLANS = {
     name: 'Treino A', focus: 'Força',
     desc: 'Movimentos básicos com cargas mais altas e descanso maior.',
     exercises: [
-      { id: 'agachamento', name: 'Agachamento livre com barra', muscles: 'Quadríceps, glúteos, core', sets: 4, reps: '6–8', rest: 120,
+      { id: 'agachamento', name: 'Agachamento livre com barra', muscles: 'Quadríceps, glúteos, core', sets: 4, reps: '6–8', rest: 120, step: 5,
         tip: 'Pés na largura dos ombros, desça até a coxa ficar paralela ao chão mantendo a coluna neutra e os joelhos alinhados com a ponta dos pés.' },
       { id: 'supino-reto', name: 'Supino reto com barra', muscles: 'Peitoral, tríceps, ombro anterior', sets: 4, reps: '6–8', rest: 120,
         tip: 'Escápulas retraídas e pés firmes no chão. Desça a barra até a linha do peito, com cotovelos a ~45° do tronco.' },
@@ -308,7 +308,7 @@ const PLANS = {
     name: 'Treino B', focus: 'Hipertrofia',
     desc: 'Volume moderado, controle do movimento e foco na contração.',
     exercises: [
-      { id: 'terra', name: 'Levantamento terra', muscles: 'Posteriores, glúteos, lombar, costas', sets: 3, reps: '6–8', rest: 120,
+      { id: 'terra', name: 'Levantamento terra', muscles: 'Posteriores, glúteos, lombar, costas', sets: 3, reps: '6–8', rest: 120, step: 5,
         tip: 'Barra próxima à canela, coluna neutra. Empurre o chão com os pés e estenda quadril e joelhos juntos.' },
       { id: 'supino-inclinado', name: 'Supino inclinado com halteres', muscles: 'Peitoral superior, ombros, tríceps', sets: 3, reps: '8–12', rest: 90, step: 2,
         tip: 'Banco a 30°. Desça os halteres de forma controlada (2–3 s) e suba sem bater um no outro.' },
@@ -326,7 +326,7 @@ const PLANS = {
     name: 'Treino C', focus: 'Resistência',
     desc: 'Repetições mais altas e descanso curto para condicionamento.',
     exercises: [
-      { id: 'leg-press', name: 'Leg press 45°', muscles: 'Quadríceps, glúteos', sets: 3, reps: '12–15', rest: 60,
+      { id: 'leg-press', name: 'Leg press 45°', muscles: 'Quadríceps, glúteos', sets: 3, reps: '12–15', rest: 60, step: 5,
         tip: 'Pés no meio da plataforma, desça até ~90° de joelho sem tirar a lombar do encosto.' },
       { id: 'barra-fixa', name: 'Barra fixa (ou graviton)', muscles: 'Dorsais, bíceps', sets: 3, reps: 'máx.', rest: 60, assist: true,
         tip: 'Se ainda não fizer 6 repetições livres, use o graviton/elástico. No graviton, registre o contrapeso em kg.' },
@@ -349,9 +349,9 @@ const ORDER = ['A', 'B', 'C'];
    ============================================================ */
 const ALTS = {
   agachamento: [
-    { id: 'agachamento-smith', name: 'Agachamento no Smith', muscles: 'Quadríceps, glúteos', tip: 'Pés um pouco à frente da barra, desça controlado até a coxa ficar paralela ao chão.' },
-    { id: 'hack', name: 'Agachamento hack (máquina)', muscles: 'Quadríceps, glúteos', tip: 'Costas apoiadas no encosto, desça até ~90° de joelho e suba empurrando com o pé inteiro.' },
-    { id: 'leg-press', name: 'Leg press 45°', muscles: 'Quadríceps, glúteos', tip: 'Pés no meio da plataforma, desça até ~90° de joelho sem tirar a lombar do encosto.' },
+    { id: 'agachamento-smith', name: 'Agachamento no Smith', muscles: 'Quadríceps, glúteos', step: 5, tip: 'Pés um pouco à frente da barra, desça controlado até a coxa ficar paralela ao chão.' },
+    { id: 'hack', name: 'Agachamento hack (máquina)', muscles: 'Quadríceps, glúteos', step: 5, tip: 'Costas apoiadas no encosto, desça até ~90° de joelho e suba empurrando com o pé inteiro.' },
+    { id: 'leg-press', name: 'Leg press 45°', muscles: 'Quadríceps, glúteos', step: 5, tip: 'Pés no meio da plataforma, desça até ~90° de joelho sem tirar a lombar do encosto.' },
     { id: 'goblet', name: 'Agachamento goblet com halter', muscles: 'Quadríceps, glúteos, core', step: 2, tip: 'Segure o halter junto ao peito, cotovelos para baixo, e desça mantendo o tronco ereto.' },
   ],
   'supino-reto': [
@@ -380,9 +380,9 @@ const ALTS = {
     { id: 'dead-bug', name: 'Dead bug', muscles: 'Core', reps: '10 cada lado', bodyweight: true, tip: 'Deitado, braços e joelhos a 90°. Estenda braço e perna opostos sem tirar a lombar do chão.' },
   ],
   terra: [
-    { id: 'terra-hex', name: 'Levantamento terra com barra hexagonal', muscles: 'Quadríceps, glúteos, posteriores, costas', tip: 'Fique no centro da barra, coluna neutra, empurre o chão estendendo quadril e joelhos juntos.' },
+    { id: 'terra-hex', name: 'Levantamento terra com barra hexagonal', muscles: 'Quadríceps, glúteos, posteriores, costas', step: 5, tip: 'Fique no centro da barra, coluna neutra, empurre o chão estendendo quadril e joelhos juntos.' },
     { id: 'terra-romeno-halteres', name: 'Terra romeno com halteres', muscles: 'Posteriores, glúteos, lombar', step: 2, tip: 'Halteres rente às coxas, quadril para trás e joelhos levemente flexionados.' },
-    { id: 'hip-thrust', name: 'Hip thrust com barra', muscles: 'Glúteos, posteriores', tip: 'Costas apoiadas no banco, barra sobre o quadril. Eleve o quadril até alinhar com o tronco e contraia os glúteos.' },
+    { id: 'hip-thrust', name: 'Hip thrust com barra', muscles: 'Glúteos, posteriores', step: 5, tip: 'Costas apoiadas no banco, barra sobre o quadril. Eleve o quadril até alinhar com o tronco e contraia os glúteos.' },
   ],
   'supino-inclinado': [
     { id: 'supino-inclinado-barra', name: 'Supino inclinado com barra', muscles: 'Peitoral superior, ombros, tríceps', step: 2.5, tip: 'Banco a 30°, barra desce na parte alta do peito com cotovelos a ~45°.' },
@@ -396,7 +396,7 @@ const ALTS = {
   ],
   bulgaro: [
     { id: 'afundo', name: 'Afundo (passada) com halteres', muscles: 'Quadríceps, glúteos', step: 2, tip: 'Passo largo à frente, desça até os dois joelhos ficarem a ~90° e volte empurrando com a perna da frente.' },
-    { id: 'agachamento-smith', name: 'Agachamento no Smith', muscles: 'Quadríceps, glúteos', reps: '10–12', tip: 'Pés um pouco à frente da barra, desça controlado até a coxa ficar paralela ao chão.' },
+    { id: 'agachamento-smith', name: 'Agachamento no Smith', muscles: 'Quadríceps, glúteos', step: 5, reps: '10–12', tip: 'Pés um pouco à frente da barra, desça controlado até a coxa ficar paralela ao chão.' },
     { id: 'leg-press-unilateral', name: 'Leg press unilateral', muscles: 'Quadríceps, glúteos', tip: 'Um pé no centro da plataforma, desça até ~90° de joelho sem a lombar sair do encosto.' },
   ],
   'elevacao-lateral': [
@@ -408,7 +408,7 @@ const ALTS = {
     { id: 'rosca-cabo-triceps', name: 'Rosca no cabo + tríceps barra reta (bi-set)', muscles: 'Bíceps, tríceps', step: 2.5, tip: 'Rosca na polia baixa e, sem descanso, tríceps na polia alta. Registre a carga da rosca.' },
   ],
   'leg-press': [
-    { id: 'hack', name: 'Agachamento hack (máquina)', muscles: 'Quadríceps, glúteos', tip: 'Costas apoiadas no encosto, desça até ~90° de joelho e suba empurrando com o pé inteiro.' },
+    { id: 'hack', name: 'Agachamento hack (máquina)', muscles: 'Quadríceps, glúteos', step: 5, tip: 'Costas apoiadas no encosto, desça até ~90° de joelho e suba empurrando com o pé inteiro.' },
     { id: 'goblet', name: 'Agachamento goblet com halter', muscles: 'Quadríceps, glúteos, core', step: 2, tip: 'Segure o halter junto ao peito, cotovelos para baixo, e desça mantendo o tronco ereto.' },
     { id: 'cadeira-extensora', name: 'Cadeira extensora', muscles: 'Quadríceps', tip: 'Joelho alinhado ao eixo da máquina. Estenda as pernas e segure 1 s no topo.' },
   ],
