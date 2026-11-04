@@ -239,6 +239,26 @@
   .opt .pill { font-size: 11px; padding: 2px 7px; }
   .remember { display: flex; gap: 10px; align-items: center; margin-top: 14px; font-size: 14px; color: var(--muted); }
   .remember input { width: 20px; height: 20px; accent-color: var(--accent); }
+  .skipped-card { opacity: .6; }
+  .ord-row { display: grid; grid-template-columns: 24px 1fr auto auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+  .ord-row:first-child { border-top: 0; }
+  .ord-row.done { opacity: .55; }
+  .ord-n { color: var(--muted); font-weight: 700; text-align: center; }
+  .ord-name { font-size: 15px; }
+  .ord-row .hbtn { min-width: 44px; min-height: 44px; }
+  .ord-row .hbtn:disabled { opacity: .3; }
+  .stat .dl { display: block; margin-top: 4px; }
+  .dl { font-size: 12px; font-weight: 700; }
+  .dl.up { color: var(--accent); } .dl.down { color: var(--danger); } .dl.eq { color: var(--muted); }
+  .pr-card { border-color: rgba(255,181,71,.45); background: rgba(255,181,71,.07); }
+  .pr-card b { color: var(--c); text-align: right; }
+  .pr-card .kv { gap: 12px; }
+  .cmp-row { padding: 10px 0; border-top: 1px solid var(--line); }
+  .cmp-row:first-child { border-top: 0; padding-top: 0; }
+  .cmp-name { font-size: 14px; color: var(--muted); }
+  .cmp-vals { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-top: 2px; }
+  .backup-card { border-color: rgba(90,169,255,.45); background: rgba(90,169,255,.07); margin-top: 12px; }
+  .sum-btn { color: var(--b); border-color: rgba(90,169,255,.4); }
   .done-ico { width: 72px; height: 72px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; margin: 24px auto 4px; }
   @media (max-height: 740px) {
     .f-top { margin-top: 0; }
@@ -566,7 +586,7 @@ const CARDIO_SUG = {
 
 /* ============================== Armazenamento ============================== */
 const KEY = 'treino-fullbody-v1';
-const DEFAULT = { next: 'A', history: [], last: {}, active: null,
+const DEFAULT = { next: 'A', history: [], last: {}, active: null, backupEvery: 5, backup: null,
   profile: { sexo: 'M', idade: 32, altura: 178, peso: 79, atividade: 1.55 } };
 let S;
 try { S = Object.assign(structuredClone(DEFAULT), JSON.parse(localStorage.getItem(KEY)) || {}); }
@@ -607,7 +627,8 @@ function render() {
   document.body.classList.toggle('in-session', tab === 'session' && !!S.active);
   if (tab === 'session' && S.active) { app.innerHTML = viewSession(); bindSession(); return; }
   if (tab === 'session') tab = 'home';
-  app.innerHTML = { home: viewHome, plans: viewPlans, history: viewHistory, profile: viewProfile }[tab]();
+  if (tab === 'summary' && !S.history.some(h => h.end === summaryEnd)) tab = 'history';
+  app.innerHTML = { home: viewHome, plans: viewPlans, history: viewHistory, profile: viewProfile, summary: viewSummary }[tab]();
   bind();
   if (typeof updateRest === 'function') updateRest();
 }
@@ -629,6 +650,7 @@ function viewHome() {
       ${planList(k)}
       <button class="btn" style="margin-top:16px" data-start="${k}">${S.active ? 'Continuar treino' : 'Começar ' + p.name}</button>
     </div>
+    ${S.active ? '' : backupCard()}
     <div class="stats">
       <div class="stat"><b>${weekCount()}</b><span>nesta semana</span></div>
       <div class="stat"><b>${S.history.length}</b><span>treinos no total</span></div>
@@ -670,7 +692,7 @@ function viewHistory() {
         <div style="text-align:right;white-space:nowrap"><b>${sessionVolume(h).toLocaleString('pt-BR')}</b><div class="muted small">kg volume</div></div></div>
       <div class="hist-sets">${detail || 'Sem séries registradas.'}
         ${h.cardio ? `<div><b style="color:var(--text)">Aeróbico</b>: ${esc(h.cardio.type)} · ${h.cardio.min ?? '–'} min${h.cardio.km ? ' · ' + String(h.cardio.km).replace('.', ',') + ' km' : ''} · ${esc(h.cardio.int)}</div>` : ''}
-        <button class="del-btn" data-del="${h.end}">Excluir este treino</button>
+        <div class="row" style="gap:8px"><button class="del-btn sum-btn" data-sum="${h.end}">Ver resumo</button><button class="del-btn" data-del="${h.end}">Excluir este treino</button></div>
       </div>
     </div>`;
   }).join('');
@@ -710,7 +732,13 @@ function viewProfile() {
     <p class="note">Cálculos de referência: Mifflin-St Jeor (metabolismo basal), atividade leve 1–3x, moderada 3–5x e alta 6–7x por semana, 1,6–2,2 g/kg de proteína e 35 ml/kg de água. O IMC não diferencia massa muscular de gordura. São estimativas e não substituem a avaliação de um profissional de educação física, médico ou nutricionista.</p>
     <h2>Dados</h2>
     <div class="stack">
-      <button class="btn ghost" id="exportBtn">Exportar backup (.json)</button>
+      <div class="card" style="margin:0">
+        <div class="kv"><span>Último backup</span><b>${S.backup && S.backup.at ? `${fmtDate(S.backup.at)} · ${backupPending()} treinos depois` : 'nunca'}</b></div>
+        <div class="field"><label for="bkEvery">Lembrar de fazer backup</label>
+          <select id="bkEvery" style="padding:10px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);width:100%">
+          ${[[3, 'a cada 3 treinos'], [5, 'a cada 5 treinos'], [10, 'a cada 10 treinos'], [0, 'nunca']].map(([v, l]) => `<option value="${v}" ${S.backupEvery === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      </div>
+      <button class="btn ghost" id="exportBtn">Fazer backup agora</button>
       <label class="btn ghost" style="cursor:pointer">Importar backup<input type="file" id="importIn" accept="application/json" class="hidden"></label>
       <button class="btn danger" id="resetBtn">Apagar todos os dados</button>
     </div>
@@ -747,7 +775,7 @@ function startSession(k) {
   if (!S.active) {
     const swaps = prefSwaps(k); const sets = {};
     for (const e of exList({ plan: k, swaps })) sets[e.id] = newSets(e);
-    S.active = { plan: k, start: Date.now(), sets, swaps, cardio: newCardio(k), view: 'focus', cur: 0 };
+    S.active = { plan: k, start: Date.now(), sets, swaps, order: PLANS[k].exercises.map((_, i) => i), skipped: {}, cardio: newCardio(k), view: 'focus', cur: 0 };
     save();
   }
   go('session');
@@ -795,20 +823,43 @@ function bindCardio(a) {
 }
 
 function progressPct() {
-  let t = 0, d = 0;
-  for (const id in S.active.sets) for (const s of S.active.sets[id]) { t++; if (s.done) d++; }
+  const a = S.active; let t = 0, d = 0;
+  exList(a).forEach((e, ei) => { if (isSkipped(a, ei)) return; for (const s of a.sets[e.id] || []) { t++; if (s.done) d++; } });
   return t ? Math.round(d / t * 100) : 0;
 }
 
 /* Próxima série pendente: primeiro no exercício atual, depois nos seguintes (dando a volta) */
+/* Ordem do treino (pode ser alterada durante a sessão) e exercícios pulados */
+function orderOf(a) {
+  const n = PLANS[a.plan].exercises.length;
+  if (!Array.isArray(a.order) || a.order.length !== n) a.order = Array.from({ length: n }, (_, i) => i);
+  return a.order;
+}
+const posOf = (a, ei) => orderOf(a).indexOf(ei);
+const isSkipped = (a, ei) => !!(a.skipped && a.skipped[ei]);
+
+/* Próxima série pendente seguindo a ordem do treino (ignora exercícios pulados) */
 function nextPending(a, fromEi) {
-  const ex = exList(a);
-  for (let k = 0; k < ex.length; k++) {
-    const ei = (fromEi + k) % ex.length;
+  const ex = exList(a); const ord = orderOf(a); const start = Math.max(0, ord.indexOf(fromEi));
+  for (let k = 0; k < ord.length; k++) {
+    const ei = ord[(start + k) % ord.length];
+    if (isSkipped(a, ei)) continue;
     const si = a.sets[ex[ei].id].findIndex(s => !s.done);
     if (si >= 0) return { ei, si };
   }
   return null;
+}
+function moveLater(ei) {
+  const a = S.active; const ord = orderOf(a); const nxt = nextPending(a, ord[(posOf(a, ei) + 1) % ord.length]);
+  ord.splice(posOf(a, ei), 1); ord.push(ei);
+  a.cur = nxt && nxt.ei !== ei ? nxt.ei : ei; save();
+}
+function skipToday(ei, on) {
+  const a = S.active; a.skipped = a.skipped || {};
+  if (on) { a.skipped[ei] = true; const n = nextPending(a, ei); if (n) a.cur = n.ei; }
+  else { delete a.skipped[ei]; a.cur = ei; }
+  if (sw) stopWatch(false);
+  save();
 }
 function nextLabel(a, pos) {
   if (!pos) return '';
@@ -867,24 +918,34 @@ function viewFocus(a) {
       <div class="done-ico">${CHECK}</div>
       <h1 style="text-align:center">Musculação concluída!</h1>
       <p class="muted" style="text-align:center;margin-top:0">${n} séries · ${elapsedTxt(true)}</p>
+      ${Object.keys(a.skipped || {}).length ? `<p class="note" style="text-align:center">Pulados hoje: ${Object.keys(a.skipped).map(i => esc(ex[i].name)).join(', ')}. Para retomar, use a lista.</p>` : ''}
       ${viewCardio(a)}
       <div class="f-cta stack"><button class="btn xl" id="finishBtn">Finalizar treino</button>
       <button class="btn ghost" id="toList">Revisar séries</button></div>
     </div>`;
   }
   const ei = Math.min(a.cur, ex.length - 1); const e = ex[ei]; const sets = a.sets[e.id];
+  const ord = orderOf(a); const pos = posOf(a, ei);
   const si = sets.findIndex(s => !s.done); const m = metric(e);
   const dots = sets.map((s, j) => `<i class="${s.done ? 'done' : j === si ? 'cur' : ''}"></i>`).join('');
   const last = S.last[e.id];
   const nav = `<div class="f-nav">
-      <button id="fPrev" ${ei === 0 ? 'disabled' : ''}>‹ Anterior</button>
+      <button id="fPrev" ${pos === 0 ? 'disabled' : ''}>‹ Anterior</button>
       <button id="toList">Ver lista</button>
-      <button id="fNext" ${ei === ex.length - 1 ? 'disabled' : ''}>Próximo ›</button></div>`;
+      <button id="fNext" ${pos === ord.length - 1 ? 'disabled' : ''}>Próximo ›</button></div>`;
   const header = `<div class="row between" style="align-items:flex-start;gap:8px">
-        <div class="f-top">Exercício ${ei + 1} de ${ex.length} · ${esc(e.muscles)}</div>
-        <button class="hbtn small" data-swap="${ei}">⇄ Trocar</button></div>
+        <div class="f-top">Exercício ${pos + 1} de ${ord.length} · ${esc(e.muscles)}</div>
+        <button class="hbtn small" data-actions="${ei}" aria-label="Opções do exercício">⋯ Opções</button></div>
       <h1 class="f-name">${esc(e.name)}</h1>
       ${e.base ? `<div class="swapped">no lugar de ${esc(e.base.name)}</div>` : ''}`;
+  if (isSkipped(a, ei)) {
+    return `<div class="focus">${header}
+      <div class="f-meta">Pulado hoje</div>
+      <p class="note">Este exercício não entra no treino de hoje. Se o aparelho liberou, é só retomar.</p>
+      <div class="f-cta stack"><button class="btn xl" data-resume="${ei}">Retomar exercício</button>
+      <button class="btn ghost" id="fGoNext">Ir para a próxima série pendente</button>${nav}</div>
+    </div>`;
+  }
   if (si < 0) {
     return `<div class="focus">${header}
       <div class="f-meta">Exercício concluído ✓</div>
@@ -926,9 +987,11 @@ function bindFocus(a) {
   const ex = exList(a);
   const rr = () => { render(); window.scrollTo(0, 0); };
   if ($('#toList')) $('#toList').onclick = () => { a.view = 'list'; save(); rr(); };
-  if ($('#fPrev')) $('#fPrev').onclick = () => { a.cur = Math.max(0, a.cur - 1); save(); rr(); };
-  if ($('#fNext')) $('#fNext').onclick = () => { a.cur = Math.min(ex.length - 1, a.cur + 1); save(); rr(); };
+  const ord = orderOf(a);
+  if ($('#fPrev')) $('#fPrev').onclick = () => { a.cur = ord[Math.max(0, posOf(a, a.cur) - 1)]; save(); rr(); };
+  if ($('#fNext')) $('#fNext').onclick = () => { a.cur = ord[Math.min(ord.length - 1, posOf(a, a.cur) + 1)]; save(); rr(); };
   if ($('#fGoNext')) $('#fGoNext').onclick = () => { const n = nextPending(a, a.cur); if (n) a.cur = n.ei; save(); rr(); };
+  document.querySelectorAll('[data-resume]').forEach(b => b.onclick = () => { skipToday(+b.dataset.resume, false); rr(); });
   if ($('#fTipBtn')) $('#fTipBtn').onclick = () => {
     const t = $('#fTip'); t.classList.toggle('show'); $('#fTipBtn').textContent = t.classList.contains('show') ? 'Ocultar dica' : 'Como executar';
   };
@@ -981,8 +1044,12 @@ function bindFocus(a) {
 /* ---------- Modo Lista ---------- */
 function viewList(a) {
   const p = PLANS[a.plan];
-  const cards = exList(a).map((e, ei) => {
-    const last = S.last[e.id]; const m = metric(e);
+  const exs = exList(a);
+  const cards = orderOf(a).map((ei, pos) => {
+    const e = exs[ei]; const last = S.last[e.id]; const m = metric(e);
+    if (isSkipped(a, ei)) return `<div class="card ex skipped-card">
+      <div class="ex-top"><div class="row between"><h3>${pos + 1}. ${esc(e.name)}</h3><button class="hbtn small" data-resume="${ei}">Retomar</button></div>
+      <div class="muted small">Pulado hoje</div></div></div>`;
     const lastTxt = last ? `Última vez: ${fmtSet(e, last)}` : 'Primeira vez neste exercício';
     const rows = a.sets[e.id].map((s, si) => `
       <div class="set ${m === 'time' ? 'timed' : ''} ${s.done ? 'done' : ''}" data-ex="${e.id}" data-ei="${ei}" data-i="${si}">
@@ -995,8 +1062,8 @@ function viewList(a) {
       </div>`).join('');
     return `<div class="card ex" id="ex-${e.id}">
       <div class="ex-top">
-        <div class="row between" style="align-items:flex-start"><h3>${ei + 1}. ${esc(e.name)}</h3>
-          <div class="row" style="gap:6px"><button class="hbtn small" data-swap="${ei}">⇄</button><button class="hbtn small" data-focus="${ei}">Focar</button></div></div>
+        <div class="row between" style="align-items:flex-start"><h3>${pos + 1}. ${esc(e.name)}</h3>
+          <div class="row" style="gap:6px"><button class="hbtn small" data-actions="${ei}" aria-label="Opções do exercício">⋯</button><button class="hbtn small" data-focus="${ei}">Focar</button></div></div>
         ${e.base ? `<div class="swapped">no lugar de ${esc(e.base.name)}</div>` : ''}
         <div class="muted small" style="margin-top:2px">${esc(e.muscles)}</div>
         <div class="ex-meta"><span class="pill">${e.sets} séries</span><span class="pill">${esc(e.reps)}</span><span class="pill">descanso ${fmtTime(e.rest)}</span></div>
@@ -1021,6 +1088,7 @@ function viewList(a) {
 function bindList(a) {
   $('#finishBtn').onclick = finishSession;
   bindCardio(a); bindSwapApply(a);
+  document.querySelectorAll('[data-resume]').forEach(b => b.onclick = () => { skipToday(+b.dataset.resume, false); a.cur = +b.dataset.resume; render(); });
   $('#discardBtn').onclick = () => { if (confirm('Descartar este treino? Nada será salvo.')) { S.active = null; save(); endRest(false); go('home'); } };
   document.querySelectorAll('[data-focus]').forEach(b => b.onclick = () => { a.view = 'focus'; a.cur = +b.dataset.focus; save(); render(); window.scrollTo(0, 0); });
   document.querySelectorAll('[data-tip]').forEach(b => b.onclick = () => {
@@ -1062,7 +1130,54 @@ function bindList(a) {
   });
 }
 
+function sheet(html) {
+  const el = document.createElement('div'); el.className = 'sheet-bg';
+  el.innerHTML = `<div class="sheet" role="dialog"><div class="sheet-grip"></div>${html}</div>`;
+  document.body.appendChild(el);
+  el.onclick = ev => { if (ev.target === el) el.remove(); };
+  return el;
+}
+function openActions(ei) {
+  const a = S.active; const e = exList(a)[ei]; const sk = isSkipped(a, ei);
+  const el = sheet(`<h3>${esc(e.name)}</h3>
+    <button class="opt" data-act="swap"><span><b>⇄ Trocar exercício</b><br><span class="muted small">Aparelho ocupado ou indisponível</span></span></button>
+    ${sk ? '' : `<button class="opt" data-act="later"><span><b>↓ Fazer depois</b><br><span class="muted small">Move para o fim do treino e segue para o próximo</span></span></button>`}
+    <button class="opt" data-act="skip"><span><b>${sk ? '↺ Retomar exercício' : '⤼ Pular hoje'}</b><br><span class="muted small">${sk ? 'Volta a fazer parte do treino de hoje' : 'Não entra no treino de hoje'}</span></span></button>
+    <button class="opt" data-act="order"><span><b>⇅ Reordenar treino</b><br><span class="muted small">Mudar a sequência dos exercícios de hoje</span></span></button>
+    <button class="btn ghost" data-act="close" style="margin-top:12px">Cancelar</button>`);
+  el.querySelectorAll('[data-act]').forEach(b => b.onclick = () => {
+    const act = b.dataset.act; el.remove();
+    if (act === 'swap') return openSwap(ei);
+    if (act === 'order') return openReorder();
+    if (act === 'later') moveLater(ei);
+    if (act === 'skip') skipToday(ei, !sk);
+    if (act !== 'close') { render(); window.scrollTo(0, 0); }
+  });
+}
+function openReorder() {
+  const a = S.active; const ex = exList(a);
+  const el = sheet(`<h3>Reordenar treino</h3><p class="muted small" style="margin:4px 0 8px">Use as setas para mudar a sequência de hoje.</p><div id="ordList"></div>
+    <button class="btn" id="ordDone" style="margin-top:12px">Concluir</button>`);
+  const draw = () => {
+    const ord = orderOf(a);
+    $('#ordList', el).innerHTML = ord.map((ei, pos) => {
+      const done = a.sets[ex[ei].id].every(s => s.done);
+      return `<div class="ord-row ${done ? 'done' : ''}"><span class="ord-n">${pos + 1}</span>
+        <span class="ord-name">${esc(ex[ei].name)}${done ? ' <span class="pill">feito</span>' : isSkipped(a, ei) ? ' <span class="pill">pulado</span>' : ''}</span>
+        <button class="hbtn small" data-up="${pos}" ${pos === 0 ? 'disabled' : ''} aria-label="Subir">↑</button>
+        <button class="hbtn small" data-down="${pos}" ${pos === ord.length - 1 ? 'disabled' : ''} aria-label="Descer">↓</button></div>`;
+    }).join('');
+    el.querySelectorAll('[data-up],[data-down]').forEach(b => b.onclick = () => {
+      const i = +(b.dataset.up ?? b.dataset.down); const j = b.dataset.up != null ? i - 1 : i + 1;
+      [ord[i], ord[j]] = [ord[j], ord[i]]; save(); draw();
+    });
+  };
+  draw();
+  $('#ordDone', el).onclick = () => { el.remove(); const n = nextPending(a, orderOf(a)[0]); if (n) a.cur = n.ei; save(); render(); window.scrollTo(0, 0); };
+}
+
 function bindSwapApply(a) {
+  document.querySelectorAll('[data-actions]').forEach(b => b.onclick = () => openActions(+b.dataset.actions));
   document.querySelectorAll('[data-swap]').forEach(b => b.onclick = () => openSwap(+b.dataset.swap));
   document.querySelectorAll('[data-apply]').forEach(b => b.onclick = () => {
     const kg = +b.dataset.kg; (a.sets[b.dataset.apply] || []).forEach(s => { if (!s.done) s.kg = kg; });
@@ -1089,11 +1204,11 @@ function finishSession() {
   }
   const cardio = a.cardio && a.cardio.on && a.cardio.min ? { type: a.cardio.type, min: a.cardio.min, km: a.cardio.km, int: a.cardio.int } : null;
   if (cardio) S.lastCardio = { type: cardio.type };
-  S.history.push({ plan: a.plan, start: a.start, end: Date.now(), sets: a.sets, swaps: a.swaps || {}, cardio });
+  const end = Date.now();
+  S.history.push({ plan: a.plan, start: a.start, end, sets: a.sets, swaps: a.swaps || {}, skipped: Object.keys(a.skipped || {}).map(Number), cardio });
   S.next = ORDER[(ORDER.indexOf(a.plan) + 1) % 3];
   S.active = null; save(); endRest(false);
-  alert(`Treino concluído! ${doneCount} séries registradas. Próximo: ${PLANS[S.next].name}.`);
-  go('history');
+  summaryEnd = end; go('summary');
 }
 
 /* ============================== Cronômetro de exercício (ex.: prancha) ============================== */
@@ -1198,10 +1313,126 @@ function elapsedTxt(short) {
 }
 setInterval(() => { const el = $('#elapsed'); if (el && S.active) el.textContent = elapsedTxt(); }, 1000);
 
+
+/* ============================== Resumo do treino ============================== */
+let summaryEnd = null;
+function bestSet(e, ss) {
+  const m = metric(e); const by = (f) => ss.reduce((b, s) => (f(s) > f(b) ? s : b), ss[0]);
+  if (m === 'time' || (e.bodyweight && !ss.some(s => s.kg))) return by(s => s.reps || 0);
+  if (m === 'dist') return by(s => s.kg || 0);
+  if (e.assist) return by(s => -(s.kg || 0) * 1000 + (s.reps || 0));
+  return by(s => (s.kg || 0) * 1000 + (s.reps || 0));
+}
+function cmpSet(e, a, b) {           // 1 = melhorou, 0 = igual, -1 = piorou
+  if (!a || !b) return null;
+  const m = metric(e); const sg = x => Math.sign(Math.round(x * 100));
+  if (m === 'time' || (e.bodyweight && !a.kg && !b.kg)) return sg((a.reps || 0) - (b.reps || 0));
+  if (m === 'dist') return sg((a.kg || 0) - (b.kg || 0));
+  const dk = e.assist ? (b.kg || 0) - (a.kg || 0) : (a.kg || 0) - (b.kg || 0);
+  return dk ? sg(dk) : sg((a.reps || 0) - (b.reps || 0));
+}
+function summaryData(h) {
+  const prev = S.history.filter(x => x.end < h.end);
+  const prevSame = [...prev].reverse().find(x => x.plan === h.plan) || null;
+  const rows = [], prs = [];
+  for (const e of exList(h)) {
+    const ss = (h.sets[e.id] || []).filter(s => s.done); if (!ss.length) continue;
+    const m = metric(e); const best = bestSet(e, ss);
+    let pSess = null;
+    for (let k = prev.length - 1; k >= 0; k--) { const x = (prev[k].sets[e.id] || []).filter(s => s.done); if (x.length) { pSess = x; break; } }
+    const pBest = pSess ? bestSet(e, pSess) : null;
+    rows.push({ e, best, pBest, cmp: cmpSet(e, best, pBest) });
+    const all = prev.flatMap(x => (x.sets[e.id] || []).filter(s => s.done));
+    if (!all.length || e.assist || m === 'dist') continue;
+    if (m === 'time' || (e.bodyweight && !ss.some(s => s.kg))) {
+      const pm = Math.max(...all.map(s => s.reps || 0)), tm = Math.max(...ss.map(s => s.reps || 0));
+      if (tm > pm) prs.push({ e, text: m === 'time' ? `Recorde de tempo: ${tm} s (antes ${pm} s)` : `Recorde de repetições: ${tm} (antes ${pm})` });
+      continue;
+    }
+    const pk = Math.max(...all.map(s => s.kg || 0)), tk = Math.max(...ss.map(s => s.kg || 0));
+    if (tk > pk) { prs.push({ e, text: `Nova carga máxima: ${fmtKg(tk)} kg (antes ${fmtKg(pk)} kg)` }); continue; }
+    const atK = all.filter(s => s.kg === tk);
+    if (tk && atK.length) {
+      const pr = Math.max(...atK.map(s => s.reps || 0)), tr = Math.max(...ss.filter(s => s.kg === tk).map(s => s.reps || 0));
+      if (tr > pr) prs.push({ e, text: `Recorde de repetições com ${fmtKg(tk)} kg: ${tr} (antes ${pr})` });
+    }
+  }
+  const sets = Object.values(h.sets).flat().filter(s => s.done).length;
+  return { prev: prevSame, rows, prs, sets, vol: sessionVolume(h), pVol: prevSame ? sessionVolume(prevSame) : null,
+    dur: Math.max(1, Math.round((h.end - h.start) / 60000)), pDur: prevSame ? Math.max(1, Math.round((prevSame.end - prevSame.start) / 60000)) : null };
+}
+function delta(cur, prev, neutral) {
+  if (prev == null || !prev) return '';
+  const d = cur - prev; if (!d) return '<span class="dl eq">= anterior</span>';
+  const pct = Math.round(d / prev * 100); const good = d > 0;
+  return `<span class="dl ${neutral ? 'eq' : good ? 'up' : 'down'}">${d > 0 ? '↑' : '↓'} ${Math.abs(pct)}%</span>`;
+}
+function viewSummary() {
+  const h = S.history.find(x => x.end === summaryEnd); const p = PLANS[h.plan]; const d = summaryData(h);
+  const ex = exList(h); const arrow = c => c == null ? '' : c > 0 ? '<span class="dl up">↑</span>' : c < 0 ? '<span class="dl down">↓</span>' : '<span class="dl eq">=</span>';
+  const isLatest = S.history[S.history.length - 1] === h;
+  return `<div class="wrap">
+    <div class="done-ico">${CHECK}</div>
+    <h1 style="text-align:center">${p.name} concluído</h1>
+    <p class="muted" style="text-align:center;margin-top:0">${new Date(h.end).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+    <div class="stats">
+      <div class="stat"><b>${d.dur} min</b><span>duração</span>${delta(d.dur, d.pDur, true)}</div>
+      <div class="stat"><b>${d.sets}</b><span>séries</span></div>
+      <div class="stat"><b>${d.vol.toLocaleString('pt-BR')}</b><span>kg de volume</span>${delta(d.vol, d.pVol)}</div>
+    </div>
+    ${d.prs.length ? `<h2>★ Recordes do dia</h2><div class="card pr-card">${d.prs.map(r => `<div class="kv"><span>${esc(r.e.name)}</span><b>${esc(r.text)}</b></div>`).join('')}</div>` : ''}
+    <h2>${d.prev ? `Comparado ao ${p.name} de ${fmtDate(d.prev.end)}` : 'Melhor série de cada exercício'}</h2>
+    <div class="card">
+      ${d.rows.map(r => `<div class="cmp-row"><div class="cmp-name">${esc(r.e.name)}</div>
+        <div class="cmp-vals"><b>${fmtSet(r.e, r.best)}</b> ${arrow(r.cmp)}${r.pBest ? `<span class="muted small">antes ${fmtSet(r.e, r.pBest)}</span>` : '<span class="muted small">primeira vez</span>'}</div></div>`).join('') || '<div class="muted">Nenhuma série registrada.</div>'}
+    </div>
+    ${(h.skipped || []).length ? `<p class="note">Pulados: ${h.skipped.map(i => esc(ex[i].name)).join(', ')}.</p>` : ''}
+    ${h.cardio ? `<p class="note"><b style="color:var(--text)">Aeróbico:</b> ${esc(h.cardio.type)} · ${h.cardio.min} min${h.cardio.km ? ' · ' + fmtKg(h.cardio.km) + ' km' : ''} · ${esc(h.cardio.int)}</p>` : ''}
+    ${!d.prev ? `<p class="note">Este é o seu primeiro ${p.name} registrado. Na próxima vez, o app compara cada exercício com hoje.</p>` : ''}
+    ${isLatest ? backupCard() : ''}
+    ${isLatest ? `<div class="card" style="margin-top:12px"><div class="muted small">Próximo treino</div><h3>${PLANS[S.next].name} · ${PLANS[S.next].focus}</h3></div>` : ''}
+    <div class="stack" style="margin-top:12px"><button class="btn" data-goto="home">Concluir</button><button class="btn ghost" data-goto="history">Ver histórico</button></div>
+  </div>`;
+}
+
+
+/* ============================== Backup ============================== */
+function backupPending() { return S.history.length - ((S.backup && S.backup.count) || 0); }
+function backupDue() {
+  return S.backupEvery > 0 && backupPending() >= S.backupEvery && S.history.length > (S.backupSnooze || 0);
+}
+function backupCard() {
+  if (!backupDue()) return '';
+  const n = backupPending(); const last = S.backup && S.backup.at;
+  return `<div class="card backup-card">
+    <b>Hora de fazer backup</b>
+    <div class="note" style="margin-top:4px">${last ? `${n} treinos desde o último backup (${fmtDate(last)}).` : `Você já tem ${n} treinos registrados e ainda não fez backup.`} Os dados ficam só neste iPhone: salve uma cópia no iCloud Drive ou no app Arquivos.</div>
+    <div class="row" style="gap:8px;margin-top:12px"><button class="btn" data-backup style="flex:1">Fazer backup agora</button><button class="btn ghost" data-snooze style="width:auto">Depois</button></div>
+  </div>`;
+}
+async function exportBackup() {
+  const name = `treino-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  const json = JSON.stringify(S, null, 2);
+  const done = () => { S.backup = { at: Date.now(), count: S.history.length }; save(); render(); };
+  try {
+    const file = new File([json], name, { type: 'application/json' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Backup do treino' });   // no iPhone: "Salvar em Arquivos"
+      return done();
+    }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  a.download = name; a.click(); done();
+}
+
 /* ============================== Eventos gerais ============================== */
 function bind() {
   document.querySelectorAll('[data-start]').forEach(b => b.onclick = () => startSession(b.dataset.start));
   document.querySelectorAll('[data-hist]').forEach(c => c.onclick = () => c.classList.toggle('open'));
+  document.querySelectorAll('[data-sum]').forEach(b => b.onclick = ev => { ev.stopPropagation(); summaryEnd = +b.dataset.sum; go('summary'); });
+  document.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => go(b.dataset.goto));
+  document.querySelectorAll('[data-backup]').forEach(b => b.onclick = exportBackup);
+  document.querySelectorAll('[data-snooze]').forEach(b => b.onclick = () => { S.backupSnooze = S.history.length; save(); render(); });
   document.querySelectorAll('[data-del]').forEach(b => b.onclick = ev => {
     ev.stopPropagation();
     if (!confirm('Excluir este treino do histórico?')) return;
@@ -1218,11 +1449,8 @@ function bind() {
     };
     ['#pIdade', '#pAltura', '#pPeso'].forEach(s => $(s).addEventListener('change', () => { upd(); render(); }));
     $('#pAtiv').onchange = () => { upd(); render(); };
-    $('#exportBtn').onclick = () => {
-      const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-      a.download = `treino-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click();
-    };
+    $('#exportBtn').onclick = exportBackup;
+    $('#bkEvery').onchange = ev => { S.backupEvery = +ev.target.value; save(); };
     $('#importIn').onchange = ev => {
       const f = ev.target.files[0]; if (!f) return;
       f.text().then(t => { const d = JSON.parse(t); if (!d.history) throw 0; S = Object.assign(structuredClone(DEFAULT), d); save(); alert('Backup importado.'); render(); })
