@@ -323,6 +323,22 @@
   .chips { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0; margin: 0 -16px; padding-left: 16px; padding-right: 16px; -webkit-overflow-scrolling: touch; }
   .chips button { flex: none; padding: 8px 12px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); font-size: 14px; }
   .chips button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .media { display: grid; gap: 10px; margin: 4px 0 12px; }
+  .photos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .photos img, .wger img { width: 100%; border-radius: 12px; display: block; background: var(--surface-2); }
+  .photos img { aspect-ratio: 3 / 2; object-fit: cover; }
+  .wger img { max-height: 220px; object-fit: contain; background: #fff; }
+  .credit { font-size: 11px; color: var(--muted); margin-top: -4px; } .credit a { color: var(--b); }
+  .mmap-in { display: grid; grid-template-columns: 1fr; gap: 6px; background: var(--surface-2); border-radius: 12px; padding: 10px; }
+  .bsvg { width: 100%; max-width: 300px; margin: 0 auto; display: block; }
+  .bsvg .body > * { fill: #2a303b; }
+  .bsvg .mu { fill: #343b48; stroke: var(--surface-2); stroke-width: 1; }
+  .bsvg .mu.p { fill: var(--accent); } .bsvg .mu.s { fill: rgba(61,220,151,.42); }
+  .bsvg .bl { fill: var(--muted); font-size: 10px; text-anchor: middle; }
+  .mleg { display: grid; gap: 4px; font-size: 13px; }
+  .mleg div { display: grid; grid-template-columns: 14px auto 1fr; gap: 6px; align-items: center; } .mleg span { color: var(--muted); }
+  .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; } .sw.p { background: var(--accent); } .sw.s { background: rgba(61,220,151,.42); }
+  .yt { text-decoration: none; font-size: 15px; padding: 12px; }
   .done-ico { width: 72px; height: 72px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; margin: 24px auto 4px; }
   @media (max-height: 740px) {
     .f-top { margin-top: 0; }
@@ -737,12 +753,13 @@ function render() {
   const app = $('#app');
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === (tab === 'report' ? 'coach' : tab)));
   document.body.classList.toggle('in-session', tab === 'session' && !!S.active);
-  if (tab === 'session' && S.active) { app.innerHTML = viewSession(); bindSession(); return; }
+  if (tab === 'session' && S.active) { app.innerHTML = viewSession(); bindSession(); hydrateMedia(); return; }
   if (tab === 'session') tab = 'home';
   if (tab === 'summary' && !S.history.some(h => h.end === summaryEnd)) tab = 'history';
   if (tab === 'report' && !reportYm) tab = 'coach';
   app.innerHTML = { home: viewHome, plans: viewPlans, history: viewHistory, profile: viewProfile, summary: viewSummary, coach: viewCoach, report: viewReport, onboard: viewOnboard, library: viewLibrary }[tab]();
   bind();
+  hydrateMedia();
   if (typeof updateRest === 'function') updateRest();
 }
 
@@ -860,6 +877,14 @@ function viewProfile() {
     <p class="note">Cálculos de referência: Mifflin-St Jeor (metabolismo basal), atividade leve 1–3x, moderada 3–5x e alta 6–7x por semana, 1,6–2,2 g/kg de proteína e 35 ml/kg de água. O IMC não diferencia massa muscular de gordura. São estimativas e não substituem a avaliação de um profissional de educação física, médico ou nutricionista.</p>
     <button class="btn ghost" data-redo style="margin-top:12px">Refazer avaliação e gerar novo treino</button>
     <p class="note">Ao mudar objetivo, tempo ou frequência, gere um novo treino para ajustar séries, repetições e exercícios.</p>
+    <h2>Mídia dos exercícios</h2>
+    <div class="card">
+      <div class="row between"><div><b>Fotos do free-exercise-db</b><div class="note">Início e fim do movimento. A origem dos direitos das fotos não é confirmada.</div></div>
+        <button class="switch ${mediaOn('photos') ? 'on' : ''}" data-media="photos" role="switch" aria-checked="${mediaOn('photos')}" aria-label="Mostrar fotos"></button></div>
+      <div class="row between" style="margin-top:14px"><div><b>Ilustrações do wger.de</b><div class="note">Licença aberta (CC-BY-SA), com crédito ao autor. Nem todo exercício tem.</div></div>
+        <button class="switch ${mediaOn('wger') ? 'on' : ''}" data-media="wger" role="switch" aria-checked="${mediaOn('wger')}" aria-label="Mostrar ilustrações do wger"></button></div>
+      <p class="note" style="margin:12px 0 0">O mapa muscular e o link para vídeos no YouTube aparecem sempre.</p>
+    </div>
     <h2>Conta</h2>
     <div class="card">${cloudBox()}</div>
     <h2>Dados</h2>
@@ -1270,6 +1295,7 @@ function sheet(html) {
   el.innerHTML = `<div class="sheet" role="dialog"><div class="sheet-grip"></div>${html}</div>`;
   document.body.appendChild(el);
   el.onclick = ev => { if (ev.target === el) el.remove(); };
+  hydrateMedia(el);
   return el;
 }
 function openActions(ei) {
@@ -2178,6 +2204,9 @@ function altsFor(base) {
   }).filter(Boolean);
 }
 function howHtml(e) {
+  return exMedia(e) + howText(e);
+}
+function howText(e) {
   const meta = e.equip ? `<div class="muted small" style="margin-bottom:6px">Equipamento: ${esc(e.equip)}</div>` : '';
   return meta + (e.how && e.how.length ? `<ol class="how">${e.how.map(s => `<li>${esc(s)}</li>`).join('')}</ol>` : esc(e.tip || ''));
 }
@@ -2330,6 +2359,7 @@ function openExDetail(id) {
     <p class="muted small" style="margin:4px 0 10px">${[CAT_PT[x.c], LVL_PT[x.l], EQ_PT[x.e]].filter(Boolean).map(esc).join(' · ')}</p>
     <div class="kv"><span>Músculos principais</span><b>${esc(x.p.map(m => MUSC_PT[m] || m).join(', '))}</b></div>
     ${x.s.length ? `<div class="kv"><span>Secundários</span><b>${esc(x.s.map(m => MUSC_PT[m] || m).join(', '))}</b></div>` : ''}
+    ${exMedia({ id, name: (EXMETA[id] || {}).name || x.n })}
     <h3 style="margin-top:14px">Como executar</h3><ol class="how">${x.i.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
     <button class="btn ghost" data-close style="margin-top:12px">Fechar</button>`);
   $('[data-close]', el).onclick = () => el.remove();
@@ -2350,11 +2380,125 @@ function libAltsFor(base) {
     ['barbell', 'dumbbell', 'cable', 'machine', 'body only', 'e-z curl bar', 'kettlebells'].includes(x.e)).slice(0, 12);
 }
 
+
+/* ============================================================
+   MÍDIA DOS EXERCÍCIOS
+   1) Vídeo: busca no YouTube           2) Mapa muscular (desenho próprio)
+   3) Fotos do free-exercise-db         4) Ilustrações do wger.de (CC-BY-SA)
+   ============================================================ */
+const PHOTO_BASE = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/';
+const dbId = e => (LIB && LIB.has(e.id)) || EXMETA[e.id] || /^[A-Z]/.test(e.id) ? e.id : LEGACY_MAP[e.id] || null;
+const mediaOn = k => !S.media || S.media[k] !== false;
+function ytUrl(e) { return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(`${e.name} como fazer execução`); }
+
+function exMedia(e) {
+  const id = dbId(e);
+  return `<div class="media">
+    ${id && mediaOn('photos') ? `<div class="photos"><img loading="lazy" src="${PHOTO_BASE}${encodeURIComponent(id)}/0.jpg" alt="Posição inicial" onerror="this.remove()">
+      <img loading="lazy" src="${PHOTO_BASE}${encodeURIComponent(id)}/1.jpg" alt="Posição final" onerror="this.remove()"></div>
+      <div class="credit">Fotos: free-exercise-db · origem dos direitos não confirmada</div>` : ''}
+    ${id && mediaOn('wger') ? `<div class="wger" data-wger="${esc(id)}"></div>` : ''}
+    ${id ? `<div class="mmap" data-map="${esc(id)}"></div>` : ''}
+    <a class="btn ghost yt" href="${ytUrl(e)}" target="_blank" rel="noopener">▶ Ver vídeo no YouTube</a>
+  </div>`;
+}
+
+/* ---------- Mapa muscular: frente e costas, principal x secundário ---------- */
+function bodySvg(prim, sec) {
+  const st = m => prim.includes(m) ? 'p' : sec.includes(m) ? 's' : '';
+  const sym = (cx, dx, f) => f(cx - dx) + f(cx + dx);
+  const ell = (m, x, y, rx, ry) => `<ellipse class="mu ${st(m)}" cx="${x}" cy="${y}" rx="${rx}" ry="${ry}"><title>${MUSC_PT[m]}</title></ellipse>`;
+  const rect = (m, x, y, w, h, r) => `<rect class="mu ${st(m)}" x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}"><title>${MUSC_PT[m]}</title></rect>`;
+  const base = cx => `<g class="body"><circle cx="${cx}" cy="16" r="11"/><rect x="${cx - 5}" y="25" width="10" height="9" rx="3"/>
+    <rect x="${cx - 21}" y="33" width="42" height="64" rx="12"/><rect x="${cx - 20}" y="92" width="40" height="20" rx="8"/>
+    ${sym(cx, 30, x => `<rect x="${x - 6}" y="38" width="12" height="66" rx="6"/>`)}${sym(cx, 10, x => `<rect x="${x - 9}" y="106" width="18" height="92" rx="8"/>`)}</g>`;
+  const front = cx => base(cx) + rect('neck', cx - 4, 26, 8, 7, 3) + sym(cx, 24, x => ell('shoulders', x, 42, 8, 7)) + sym(cx, 10, x => ell('chest', x, 51, 10, 8)) +
+    sym(cx, 30, x => ell('biceps', x, 62, 5, 10)) + sym(cx, 31, x => ell('forearms', x, 88, 4.5, 12)) + rect('abdominals', cx - 9, 61, 18, 33, 5) +
+    sym(cx, 18, x => ell('abductors', x, 104, 3.5, 8)) + sym(cx, 10, x => ell('quadriceps', x, 132, 7.5, 21)) + sym(cx, 3.5, x => ell('adductors', x, 122, 2.8, 12)) +
+    sym(cx, 10, x => ell('calves', x, 175, 5, 14));
+  const back = cx => base(cx) + `<path class="mu ${st('traps')}" d="M${cx} 30 L${cx + 17} 40 L${cx} 60 L${cx - 17} 40 Z"><title>Trapézio</title></path>` +
+    sym(cx, 24, x => ell('shoulders', x, 42, 8, 7)) + sym(cx, 14, x => ell('lats', x, 66, 7, 14)) + rect('middle back', cx - 6, 50, 12, 24, 4) +
+    rect('lower back', cx - 8, 76, 16, 15, 5) + sym(cx, 30, x => ell('triceps', x, 62, 5, 10)) + sym(cx, 31, x => ell('forearms', x, 88, 4.5, 12)) +
+    sym(cx, 9, x => ell('glutes', x, 104, 9.5, 9)) + sym(cx, 10, x => ell('hamstrings', x, 134, 7.5, 19)) + sym(cx, 10, x => ell('calves', x, 172, 6, 14));
+  return `<svg viewBox="0 0 240 214" class="bsvg" role="img" aria-label="Mapa muscular">
+    ${front(60)}${back(180)}<text x="60" y="211" class="bl">Frente</text><text x="180" y="211" class="bl">Costas</text></svg>`;
+}
+function fillMap(el) {
+  const id = el.dataset.map; const x = LIB && LIB.get(id);
+  if (!x) return;
+  const prim = x.p, sec = x.s.filter(m => !x.p.includes(m));
+  el.innerHTML = `<div class="mmap-in">${bodySvg(prim, sec)}<div class="mleg">
+      <div><i class="sw p"></i><b>Principal</b><span>${esc(prim.map(m => MUSC_PT[m] || m).join(', '))}</span></div>
+      ${sec.length ? `<div><i class="sw s"></i><b>Secundário</b><span>${esc(sec.map(m => MUSC_PT[m] || m).join(', '))}</span></div>` : ''}</div></div>`;
+}
+
+/* ---------- wger.de: imagem com autor e licença ---------- */
+const WGER = 'https://wger.de';
+const WSTOP = /\b(barbell|dumbbells?|cable|machine|seated|standing|lying|smith|leverage|with|the|on|one-arm|two-arm|alternate|alternating|medium|grip|close-grip|wide-grip|-)\b/gi;
+function wgerCache(id, v) {
+  const k = 'wger:' + id;
+  try {
+    if (v !== undefined) { localStorage.setItem(k, JSON.stringify({ t: Date.now(), v })); return v; }
+    const c = JSON.parse(localStorage.getItem(k)); if (c && Date.now() - c.t < 30 * DAY) return c;
+  } catch (e) {}
+  return null;
+}
+async function wgerFind(id) {
+  const terms = [id.replace(/_/g, ' '), id.replace(/_/g, ' ').replace(WSTOP, ' ').replace(/(^|\s)-(\s|$)/g, ' ').replace(/\s+/g, ' ').trim()].filter((t, i, a) => t && a.indexOf(t) === i);
+  for (const term of terms) {
+    // API atual: exerciseinfo com busca por nome
+    try {
+      const r = await fetch(`${WGER}/api/v2/exerciseinfo/?name__search=${encodeURIComponent(term)}&language__code=en&limit=8`);
+      if (r.ok) {
+        const j = await r.json();
+        for (const ex of j.results || []) {
+          const img = (ex.images || []).find(i => i.is_main) || (ex.images || [])[0];
+          if (img) {
+            const tr = (ex.translations || []).find(t => t.language === 2) || (ex.translations || [])[0] || {};
+            return { img: img.image, name: tr.name || '', author: img.license_author || (img.author_history || [])[0] || '', lic: img.license_title || 'CC-BY-SA', url: `${WGER}/en/exercise/${ex.id}/view-base` };
+          }
+        }
+      }
+    } catch (e) { if (!navigator.onLine) throw e; }
+    // API antiga: /exercise/search
+    try {
+      const r = await fetch(`${WGER}/api/v2/exercise/search/?term=${encodeURIComponent(term)}&language=english`);
+      if (r.ok) {
+        const j = await r.json(); const s = (j.suggestions || []).find(x => x.data && x.data.image);
+        if (s) return { img: WGER + s.data.image, name: s.data.name || s.value, author: '', lic: 'CC-BY-SA', url: `${WGER}/en/exercise/${s.data.base_id || s.data.id}/view-base` };
+      }
+    } catch (e) {}
+  }
+  return null;
+}
+function fillWger(el) {
+  const id = el.dataset.wger;
+  const show = v => { if (!v) { el.remove(); return; }
+    el.innerHTML = `<img loading="lazy" src="${esc(v.img)}" alt="Ilustração de ${esc(v.name)}" onerror="this.parentNode.remove()">
+      <div class="credit">Ilustração: ${v.author ? esc(v.author) + ' · ' : ''}${esc(v.lic)} · <a href="${esc(v.url)}" target="_blank" rel="noopener">wger.de</a></div>`; };
+  const c = wgerCache(id); if (c) return show(c.v);
+  el.innerHTML = '<div class="credit">Buscando ilustração no wger…</div>';
+  wgerFind(id).then(v => show(wgerCache(id, v))).catch(() => el.remove());
+}
+
+/* Carrega a mídia só quando aparece na tela (ex.: ao abrir "Como executar") */
+let mediaObs = null;
+function hydrateMedia(root = document) {
+  if (!('IntersectionObserver' in window)) return;
+  mediaObs = mediaObs || new IntersectionObserver(ents => ents.forEach(en => {
+    if (!en.isIntersecting) return; const el = en.target; mediaObs.unobserve(el);
+    if (el.dataset.wger) fillWger(el);
+    if (el.dataset.map) (LIB ? Promise.resolve() : loadLib()).then(() => fillMap(el)).catch(() => el.remove());
+  }));
+  root.querySelectorAll('[data-wger]:not([data-obs]), [data-map]:not([data-obs])').forEach(el => { el.dataset.obs = '1'; mediaObs.observe(el); });
+}
+
 /* ============================== Eventos gerais ============================== */
 function bind() {
   bindCoach(); bindCloud();
   if (tab === 'onboard') bindOnboard();
   if (tab === 'library') bindLibrary();
+  document.querySelectorAll('[data-media]').forEach(b => b.onclick = () => { S.media = { ...(S.media || {}), [b.dataset.media]: !mediaOn(b.dataset.media) }; save(); render(); });
   document.querySelectorAll('[data-redo]').forEach(b => b.onclick = () => { obRedo = true; obDraft = null; obStep = 1; go('onboard'); });
   document.querySelectorAll('[data-start]').forEach(b => b.onclick = () => startSession(b.dataset.start));
   document.querySelectorAll('[data-hist]').forEach(c => c.onclick = () => c.classList.toggle('open'));
