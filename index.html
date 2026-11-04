@@ -255,6 +255,9 @@
   .rest-track i { display: block; height: 100%; border-radius: 999px; transition: width .25s linear; }
   .adj { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .next-card { margin-top: 16px; } .next-card b { display: block; margin-top: 2px; font-weight: 500; }
+  .travel-card { border-color: rgba(185,128,46,.35); background: linear-gradient(160deg, var(--w82), rgba(255,236,206,.35)); }
+  .travel-pill { font-size: 11px; vertical-align: middle; color: var(--c); border-color: rgba(185,128,46,.35); }
+  .travel-ico { width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 10px; display: grid; place-items: center; font-size: 28px; background: var(--w85); border: 1px solid var(--edge); color: var(--c); }
   .done-ico { width: 76px; height: 76px; border-radius: 50%; background: var(--w80); border: 1px solid var(--edge); display: grid; place-items: center; margin: 24px auto 4px; box-shadow: var(--shadow-sm); }
   .done-ico svg { width: 34px; height: 34px; stroke: var(--ok); }
 
@@ -449,6 +452,7 @@
 :root:not([data-theme="light"]) .week .bar.on::before { background: #e9eef7; }
 :root:not([data-theme="light"]) .ob-hero img { box-shadow: 0 10px 30px rgba(0,0,0,.5); }
 :root:not([data-theme="light"]) .g-btn { border-color: transparent; }
+:root:not([data-theme="light"]) .travel-card { background: linear-gradient(160deg, rgba(255,255,255,.08), rgba(224,165,79,.1)); }
 :root:not([data-theme="light"]) nav.tabs .inner { background: rgba(16,26,44,.82); }
 :root:not([data-theme="light"]) .tip-toggle, :root:not([data-theme="light"]) nav.tabs button.on, :root:not([data-theme="light"]) .credit a, :root:not([data-theme="light"]) .opt svg, :root:not([data-theme="light"]) .sum-btn, :root:not([data-theme="light"]) .circle .ini, :root:not([data-theme="light"]) .big-clock.run, :root:not([data-theme="light"]) .info-btn, :root:not([data-theme="light"]) .hbtn.sel { color: var(--accent-fg); stroke: var(--accent-fg); }
 :root:not([data-theme="light"]) .opt.on { border-color: var(--accent-fg); box-shadow: 0 0 0 1px var(--accent-fg) inset; }
@@ -497,6 +501,7 @@
 :root[data-theme="dark"] .week .bar.on::before { background: #e9eef7; }
 :root[data-theme="dark"] .ob-hero img { box-shadow: 0 10px 30px rgba(0,0,0,.5); }
 :root[data-theme="dark"] .g-btn { border-color: transparent; }
+:root[data-theme="dark"] .travel-card { background: linear-gradient(160deg, rgba(255,255,255,.08), rgba(224,165,79,.1)); }
 :root[data-theme="dark"] nav.tabs .inner { background: rgba(16,26,44,.82); }
 :root[data-theme="dark"] .tip-toggle, :root[data-theme="dark"] nav.tabs button.on, :root[data-theme="dark"] .credit a, :root[data-theme="dark"] .opt svg, :root[data-theme="dark"] .sum-btn, :root[data-theme="dark"] .circle .ini, :root[data-theme="dark"] .big-clock.run, :root[data-theme="dark"] .info-btn, :root[data-theme="dark"] .hbtn.sel { color: var(--accent-fg); stroke: var(--accent-fg); }
 :root[data-theme="dark"] .opt.on { border-color: var(--accent-fg); box-shadow: 0 0 0 1px var(--accent-fg) inset; }
@@ -801,7 +806,7 @@ function openSwap(ei) {
       $('#libMore', el).innerHTML = `<div class="muted small" style="margin-top:14px">Outras opções para ${esc((MUSC_PT[base.prim] || '').toLowerCase())}</div>` + (more.map(x => `<button class="opt" data-lib="${esc(x.id)}"><span><b>${esc((EXMETA[x.id] || {}).name || x.n)}</b><br><span class="muted small">${esc(musclesPt(x))} · ${esc(EQ_PT[x.e] || '—')}</span></span><span class="info-btn" data-libinfo="${esc(x.id)}" role="button" aria-label="Ver execução">i</span></button>`).join('') || '<p class="note">Nenhuma outra opção encontrada.</p>');
       el.querySelectorAll('[data-libinfo]').forEach(b => b.onclick = ev => { ev.stopPropagation(); openExDetail(b.dataset.libinfo); });
       el.querySelectorAll('[data-lib]').forEach(b => b.onclick = () => {
-        const id = b.dataset.lib; S.plan.exdb[id] = libEx(id); S.plan.custom[base.id] = [...new Set([...(S.plan.custom[base.id] || []), id])];
+        const id = b.dataset.lib; const CP = curPlan(); CP.exdb[id] = libEx(id); CP.custom[base.id] = [...new Set([...(CP.custom[base.id] || []), id])];
         if (swapExercise(ei, id, $('#swRemember', el).checked)) { close(); render(); window.scrollTo(0, 0); }
       });
     }).catch(() => { $('#libMore', el).innerHTML = '<p class="note">Sem conexão para carregar a biblioteca.</p>'; });
@@ -925,6 +930,7 @@ function viewHome() {
   return `<div class="wrap">
     <div class="hello"><div><div class="muted">${greet()} · ${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
       <h1>${S.profile.nome ? esc(S.profile.nome.split(' ')[0]) : 'Bora treinar'}</h1></div>${avatarBtn()}</div>
+    ${travelBanner()}
     ${S.active ? '' : loginCard()}
     ${S.active ? '' : reportReadyCard()}
     ${(() => { const ms = coachMessages().filter(x => x.t !== 'info' || !S.history.length).slice(0, 2); return ms.length ? `<div class="stack" style="margin-top:12px">${ms.map(msgHtml).join('')}</div>` : ''; })()}
@@ -953,9 +959,10 @@ function viewHome() {
 }
 
 function viewPlans() {
-  const tp = S.plan ? `${TEMPLATES[S.plan.type].label} · ${GOALS[S.plan.goal] || ''} · ~${S.plan.tempo} min por treino` : '3 treinos full body (plano inicial)';
+  const CP = curPlan();
+  const tp = travelOn() ? `✈︎ Modo viagem · sem equipamento · ~${CP.tempo} min por treino` : CP ? `${TEMPLATES[CP.type].label} · ${GOALS[CP.goal] || ''} · ~${CP.tempo} min por treino` : '3 treinos full body (plano inicial)';
   return `<div class="wrap"><h1 class="page-title">Treinos</h1><p class="muted page-sub" style="margin-top:0">${tp}</p>
-    <div class="row" style="gap:8px;margin-bottom:12px"><button class="btn ghost" data-goto="library" style="flex:1">Biblioteca de exercícios</button><button class="btn ghost" data-redo style="flex:1">Gerar novo treino</button></div>
+    <div class="row" style="gap:8px;margin-bottom:12px"><button class="btn ghost" data-goto="library" style="flex:1">Biblioteca de exercícios</button>${travelOn() ? '<button class="btn ghost" data-travel="off" style="flex:1">Sair do modo viagem</button>' : '<button class="btn ghost" data-redo style="flex:1">Gerar novo treino</button>'}</div>
     ${ORDER.map(k => `<div class="card">
       <div class="row"><span class="tag ${k}">${k}</span><div><h3>${PLANS[k].name} · ${PLANS[k].focus}</h3>
       <div class="muted small">${PLANS[k].desc}</div></div></div>
@@ -977,7 +984,7 @@ function viewHistory() {
     }).join('');
     return `<div class="card hist-item" data-hist>
       <div class="row between"><div class="row"><span class="tag ${h.plan}">${h.plan}</span>
-        <div><h3>${p.name} · ${p.focus}</h3><div class="muted small">${fmtDate(h.end)} · ${mins} min${h.cardio ? ' · + aeróbico' : ''}</div></div></div>
+        <div><h3>${p.name} · ${p.focus}${h.travel ? ' <span class="pill travel-pill">✈︎ Viagem</span>' : ''}</h3><div class="muted small">${fmtDate(h.end)} · ${mins} min${h.cardio ? ' · + aeróbico' : ''}</div></div></div>
         <div style="text-align:right;white-space:nowrap"><b>${sessionVolume(h).toLocaleString('pt-BR')}</b><div class="muted small">kg volume</div></div></div>
       <div class="hist-sets">${detail || 'Sem séries registradas.'}
         ${h.cardio ? `<div><b style="color:var(--text)">Aeróbico</b>: ${esc(h.cardio.type)} · ${h.cardio.min ?? '–'} min${h.cardio.km ? ' · ' + String(h.cardio.km).replace('.', ',') + ' km' : ''} · ${esc(h.cardio.int)}</div>` : ''}
@@ -1030,6 +1037,10 @@ function viewProfile() {
     <p class="note">Cálculos de referência: Mifflin-St Jeor (metabolismo basal), atividade leve 1–3x, moderada 3–5x e alta 6–7x por semana, 1,6–2,2 g/kg de proteína e 35 ml/kg de água. O IMC não diferencia massa muscular de gordura. São estimativas e não substituem a avaliação de um profissional de educação física, médico ou nutricionista.</p>
     <button class="btn ghost" data-redo style="margin-top:12px">Refazer avaliação e gerar novo treino</button>
     <p class="note">Ao mudar objetivo, tempo ou frequência, gere um novo treino para ajustar séries, repetições e exercícios.</p>
+    <h2>Modo viagem</h2>
+    <div class="card"><div class="row between"><div><b>Treinar sem academia</b><div class="note" style="margin-top:2px">Mostra só exercícios para quarto de hotel e sugere aeróbicos. Os treinos ficam no histórico como Viagem.</div></div>
+      <button class="switch ${travelOn() ? 'on' : ''}" data-travel="toggle" role="switch" aria-checked="${travelOn()}" aria-label="Modo viagem"></button></div>
+      ${travelOn() ? `<button class="btn ghost" data-travel-ideas style="margin-top:12px">Ver treinos e aeróbicos sugeridos</button>` : ''}</div>
     <h2>Aparência</h2>
     <div class="card"><div class="seg">${[['auto', 'Automático'], ['light', 'Claro'], ['dark', 'Escuro']].map(([v, l]) => `<button class="${(S.theme || 'auto') === v ? 'on' : ''}" data-theme-set="${v}">${l}</button>`).join('')}</div>
       <p class="note" style="margin:10px 0 0">No automático, o app acompanha o modo claro ou escuro do iPhone.</p></div>
@@ -1090,19 +1101,21 @@ function startSession(k) {
     const swaps = prefSwaps(k); const sets = {};
     const deload = blockInfo().deload;
     for (const e of exList({ plan: k, swaps })) sets[e.id] = newSets(e, deload);
-    S.active = { plan: k, start: Date.now(), deload, sets, swaps, order: PLANS[k].exercises.map((_, i) => i), skipped: {}, cardio: newCardio(k), view: 'focus', cur: 0 };
+    S.active = { plan: k, start: Date.now(), travel: travelOn(), deload, sets, swaps, order: PLANS[k].exercises.map((_, i) => i), skipped: {}, cardio: newCardio(k), view: 'focus', cur: 0 };
     save();
   }
   go('session');
 }
 
 function newCardio(k) {
+  if (travelOn()) return { on: false, type: TRAVEL_CARDIO_TYPES[0], min: TRAVEL_CARDIO_SUG.min, km: null, int: TRAVEL_CARDIO_SUG.int };
   const prev = S.lastCardio || {};
   return { on: false, type: prev.type || 'Esteira', min: CARDIO_SUG[k].min, km: null, int: CARDIO_SUG[k].int };
 }
 
 function viewCardio(a) {
-  const c = a.cardio; const sug = CARDIO_SUG[a.plan];
+  const c = a.cardio; const sug = a.travel ? TRAVEL_CARDIO_SUG : CARDIO_SUG[a.plan];
+  const types = a.travel ? TRAVEL_CARDIO_TYPES : CARDIO_TYPES;
   const opt = (list, v) => list.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
   return `<div class="card cardio ${c.on ? '' : 'off'}" id="cardio">
     <div class="row between">
@@ -1113,7 +1126,7 @@ function viewCardio(a) {
     <div class="cardio-body">
       <div class="note" style="margin-top:10px"><b style="color:var(--text)">Sugestão:</b> ${esc(sug.txt)}</div>
       <div class="cardio-grid">
-        <label>Modalidade<select data-c="type">${opt(CARDIO_TYPES, c.type)}</select></label>
+        <label>Modalidade<select data-c="type">${opt(types.includes(c.type) ? types : [c.type, ...types], c.type)}</select></label>
         <label>Intensidade<select data-c="int">${opt(CARDIO_INT, c.int)}</select></label>
         <label>Tempo (min)<input data-c="min" inputmode="numeric" value="${c.min ?? ''}"></label>
         <label>Distância (km, opcional)<input data-c="km" inputmode="decimal" value="${c.km ?? ''}" placeholder="—"></label>
@@ -1523,7 +1536,7 @@ function finishSession() {
   const cardio = a.cardio && a.cardio.on && a.cardio.min ? { type: a.cardio.type, min: a.cardio.min, km: a.cardio.km, int: a.cardio.int } : null;
   if (cardio) S.lastCardio = { type: cardio.type };
   const end = Date.now();
-  S.history.push({ plan: a.plan, exs: exList(a).map(stripEx), pname: PLANS[a.plan].name, pfocus: PLANS[a.plan].focus, planId: (S.plan && S.plan.id) || 'legacy', start: a.start, end, mod: end, deload: !!a.deload, sets: a.sets, swaps: a.swaps || {}, skipped: Object.keys(a.skipped || {}).map(Number), cardio });
+  S.history.push({ plan: a.plan, exs: exList(a).map(stripEx), pname: PLANS[a.plan].name, pfocus: PLANS[a.plan].focus, planId: (curPlan() && curPlan().id) || 'legacy', travel: !!a.travel, start: a.start, end, mod: end, deload: !!a.deload, sets: a.sets, swaps: a.swaps || {}, skipped: Object.keys(a.skipped || {}).map(Number), cardio });
   S.next = ORDER[(ORDER.indexOf(a.plan) + 1) % 3];
   S.active = null; save(); endRest(false);
   runCoach(); summaryEnd = end; go('summary');
@@ -1692,7 +1705,7 @@ function viewSummary() {
   return `<div class="wrap">
     <div class="done-ico">${CHECK}</div>
     <h1 style="text-align:center">${p.name} concluído</h1>
-    <p class="muted" style="text-align:center;margin-top:0">${new Date(h.end).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+    <p class="muted" style="text-align:center;margin-top:0">${new Date(h.end).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}${h.travel ? ' · <span class="pill travel-pill">✈︎ Viagem</span>' : ''}</p>
     <div class="stats">
       <div class="stat"><b>${d.dur} min</b><span>duração</span>${delta(d.dur, d.pDur, true)}</div>
       <div class="stat"><b>${d.sets}</b><span>séries</span></div>
@@ -2249,7 +2262,7 @@ const EXMETA = {
   Barbell_Curl: { name: 'Rosca direta com barra' }, Dumbbell_Bicep_Curl: { name: 'Rosca bíceps com halteres' }, Hammer_Curls: { name: 'Rosca martelo' },
   'EZ-Bar_Curl': { name: 'Rosca direta com barra W' }, Standing_Biceps_Cable_Curl: { name: 'Rosca direta na polia' }, Preacher_Curl: { name: 'Rosca Scott' },
   'Triceps_Pushdown_-_Rope_Attachment': { name: 'Tríceps corda (polia)' }, Triceps_Pushdown: { name: 'Tríceps pulley (barra)' }, 'EZ-Bar_Skullcrusher': { name: 'Tríceps testa com barra W' },
-  Cable_Rope_Overhead_Triceps_Extension: { name: 'Tríceps francês na polia' }, Bench_Dips: { name: 'Mergulho no banco', bodyweight: true },
+  Cable_Rope_Overhead_Triceps_Extension: { name: 'Tríceps francês na polia' }, Bench_Dips: { name: 'Mergulho no banco ou cadeira', bodyweight: true },
   Plank: { name: 'Prancha abdominal', unit: 's' }, Side_Bridge: { name: 'Prancha lateral', unit: 's', each: 'cada lado' }, Cable_Crunch: { name: 'Abdominal na polia' },
   Hanging_Leg_Raise: { name: 'Elevação de pernas na barra', bodyweight: true }, Dead_Bug: { name: 'Dead bug', bodyweight: true, each: 'cada lado' },
   Pallof_Press: { name: 'Pallof press (antirrotação)', each: 'cada lado' }, Farmers_Walk: { name: 'Caminhada do fazendeiro', dist: true },
@@ -2294,7 +2307,52 @@ const TEMPLATES = {
       C: { focus: 'Pernas e glúteos', slots: ['squat', 'hinge', 'legpress', 'legcurl', 'legext', 'glute', 'calf', 'lunge'] },
     },
   },
+  travel: {
+    label: 'Viagem', short: 'Sem academia: peso do corpo, cadeira, cama ou toalha',
+    days: {
+      A: { focus: 'Quarto · corpo inteiro', slots: ['tsquat', 'tpush', 'tglute', 'tback', 'tcore', 'tcond', 'ttri', 'tlunge'] },
+      B: { focus: 'Quarto · pernas e core', slots: ['tlunge', 'tsquat:1', 'tglute:1', 'tcore:1', 'tcond:1', 'tcore:2', 'tback:1', 'tcond:2'] },
+      C: { focus: 'Quarto · empurrar e circuito', slots: ['tpush:1', 'ttri', 'tpush:2', 'tcore:3', 'tcond:2', 'tcond:3', 'ttri:1', 'tcore:4'] },
+    },
+  },
 };
+/* Modo viagem: só exercícios sem equipamento (peso do corpo, cadeira, cama ou toalha) */
+Object.assign(CATALOG, {
+  tsquat: { kind: 'bw', pool: ['Bodyweight_Squat', 'Freehand_Jump_Squat'] },
+  tlunge: { kind: 'bw', pool: ['Bodyweight_Walking_Lunge', 'Step-up_with_Knee_Raise', 'Split_Jump'] },
+  tglute: { kind: 'bw', pool: ['Butt_Lift_Bridge', 'Single_Leg_Glute_Bridge', 'Glute_Kickback'] },
+  tpush: { kind: 'bw', pool: ['Pushups', 'Incline_Push-Up', 'Push-Ups_With_Feet_Elevated', 'Push-Up_Wide'] },
+  ttri: { kind: 'bw', pool: ['Bench_Dips', 'Push-Ups_-_Close_Triceps_Position', 'Body_Tricep_Press', 'Standing_Towel_Triceps_Extension'] },
+  tback: { kind: 'bw', pool: ['Superman', 'Hyperextensions_With_No_Hyperextension_Bench'] },
+  tcore: { kind: 'core', pool: ['Plank', 'Side_Bridge', 'Dead_Bug', 'Reverse_Crunch', 'Russian_Twist', 'Flutter_Kicks', 'Crunches'] },
+  tcond: { kind: 'cond', pool: ['Mountain_Climbers', 'Star_Jump', 'Knee_Tuck_Jump', 'Fast_Skipping', 'Scissors_Jump', 'Inchworm'] },
+});
+Object.assign(EXMETA, {
+  Bodyweight_Squat: { name: 'Agachamento livre (peso do corpo)' }, Freehand_Jump_Squat: { name: 'Agachamento com salto' },
+  Bodyweight_Walking_Lunge: { name: 'Avanço (passada) sem peso', each: 'cada perna', bodyweight: true },
+  'Step-up_with_Knee_Raise': { name: 'Subida na cadeira ou degrau com joelho', each: 'cada perna' }, Split_Jump: { name: 'Afundo com salto alternado', each: 'cada perna' },
+  Butt_Lift_Bridge: { name: 'Ponte de glúteo' }, Single_Leg_Glute_Bridge: { name: 'Ponte de glúteo unilateral', each: 'cada perna' },
+  Glute_Kickback: { name: 'Coice de glúteo (quatro apoios)', each: 'cada perna' },
+  'Incline_Push-Up': { name: 'Flexão inclinada (mãos na cama ou mesa)' }, 'Push-Ups_With_Feet_Elevated': { name: 'Flexão com pés na cama' },
+  'Push-Up_Wide': { name: 'Flexão aberta' }, 'Push-Ups_-_Close_Triceps_Position': { name: 'Flexão fechada (tríceps)' },
+  Body_Tricep_Press: { name: 'Tríceps no chão (peso do corpo)' }, Standing_Towel_Triceps_Extension: { name: 'Tríceps com toalha' },
+  Superman: { name: 'Super-homem (lombar)' }, Hyperextensions_With_No_Hyperextension_Bench: { name: 'Extensão lombar no chão' },
+  Reverse_Crunch: { name: 'Abdominal inverso' }, Russian_Twist: { name: 'Twist russo', each: 'cada lado' }, Flutter_Kicks: { name: 'Chute alternado (abdômen)' },
+  Crunches: { name: 'Abdominal' }, Mountain_Climbers: { name: 'Escalador (mountain climber)', unit: 's' }, Star_Jump: { name: 'Polichinelo estrela', unit: 's' },
+  Knee_Tuck_Jump: { name: 'Salto com joelhos ao peito', unit: 's' }, Fast_Skipping: { name: 'Skipping (corrida no lugar)', unit: 's' },
+  Scissors_Jump: { name: 'Salto tesoura', unit: 's' }, Inchworm: { name: 'Inchworm (caminhada com as mãos)', unit: 's' },
+});
+const TRAVEL_CARDIO_TYPES = ['Caminhada/corrida na rua', 'Escada do hotel', 'HIIT no quarto', 'Polichinelo / pular corda', 'Bicicleta ou patinete de aluguel'];
+const TRAVEL_CARDIO_SUG = { min: 20, int: 'Moderado', txt: 'Sem academia: 20–30 min de caminhada ou corrida leve na rua; subir e descer a escada do hotel por 10–15 min; ou HIIT no quarto: 40 s de polichinelo ou escalador + 20 s de descanso, 8 a 10 vezes.' };
+const TRAVEL_IDEAS = [
+  ['Caminhada ou corrida leve', '20–40 min ao ar livre. Ótimo para conhecer o lugar.'],
+  ['Escada do hotel', '10–15 min subindo e descendo, em ritmo moderado.'],
+  ['HIIT no quarto', '40 s forte + 20 s de descanso, 8 a 10 vezes (polichinelo, escalador, skipping).'],
+  ['Mobilidade antes de dormir', '10 min de alongamentos para soltar o corpo depois de horas sentado.'],
+];
+const travelOn = () => !!(S.travel && S.travel.on && S.travelPlan);
+const curPlan = () => travelOn() ? S.travelPlan : S.plan;
+const NO_GYM = x => x.e === 'body only' || x.e === null || x.e === undefined;
 /* Séries, repetições e descanso por objetivo (referências gerais de prescrição) */
 const SCHEME = {
   hipertrofia: { big: ['6–10', 120], c: ['8–12', 90], i: ['10–12', 60] },
@@ -2325,6 +2383,8 @@ function libEx(id) {
 }
 function prescribe(ex, kind, g, tempo) {
   const sc = SCHEME[g] || SCHEME.recomp;
+  if (kind === 'cond') return { sets: 3, reps: '30s', rest: 30 };
+  if (kind === 'bw') return { sets: 3, reps: (g === 'forca' ? '8–12' : g === 'hipertrofia' ? '12–20' : '15–20') + (ex.each ? ` ${ex.each}` : ''), rest: 60 };
   if (ex.unit === 's') return { sets: 3, reps: (g === 'saude' || g === 'emagrecimento' ? '30s' : '40s') + (ex.each ? ' cada lado' : ''), rest: 60 };
   if (ex.dist) return { sets: 3, reps: '30 m', rest: 75 };
   const [reps, rest] = kind === 'core' ? ['12–15', 60] : sc[kind] || sc.c;
@@ -2352,12 +2412,12 @@ function buildPlan(type, g, tempo) {
 function altsFor(base) {
   if (!base) return [];
   if (!base.slot) return ALTS[base.id] || [];                         // treino antigo (fixo)
-  const P = S.plan || {}; const db = P.exdb || {};
+  const P = curPlan() || {}; const db = P.exdb || {};
   const ids = [...CATALOG[base.slot].pool, ...((P.custom || {})[base.id] || [])].filter(id => id !== base.id);
   return ids.map(id => {
     const x = db[id] || libEx(id); if (!x) return null;
     const a = { ...x, slot: base.slot };
-    if (metric(a) !== metric(base)) Object.assign(a, prescribe(a, CATALOG[base.slot].kind, (S.plan && S.plan.goal) || goal(), (S.plan && S.plan.tempo) || 60));
+    if (metric(a) !== metric(base)) Object.assign(a, prescribe(a, CATALOG[base.slot].kind, (curPlan() && curPlan().goal) || goal(), (curPlan() && curPlan().tempo) || 60));
     return a;
   }).filter(Boolean);
 }
@@ -2388,7 +2448,7 @@ const stripEx = ({ how, tip, base, ...r }) => ({ ...r, ...(base ? { base: { id: 
 const planMeta = h => ({ name: h.pname || (PLANS[h.plan] || {}).name || `Treino ${h.plan}`, focus: h.pfocus || (PLANS[h.plan] || {}).focus || '' });
 /* Chamado a cada renderização: aplica o treino atual e torna o histórico antigo autossuficiente */
 function applyPlan() {
-  PLANS = (S.plan && S.plan.plans) || LEGACY_PLANS;
+  PLANS = (curPlan() && curPlan().plans) || LEGACY_PLANS;
   let changed = false;
   for (const h of S.history) if (!h.exs) {
     const P = PLANS; PLANS = LEGACY_PLANS;
@@ -2501,7 +2561,7 @@ const LIB_GROUPS = [['', 'Todos'], ['chest', 'Peito'], ['lats|middle back', 'Cos
 const norm = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 function libResults() {
   const q = norm(libQ.trim()); const ms = libM ? libM.split('|') : null;
-  return [...LIB.values()].filter(x => (!ms || x.p.some(m => ms.includes(m))) && (!q || norm((EXMETA[x.id] || {}).name || x.n).includes(q) || norm(x.n).includes(q)))
+  return [...LIB.values()].filter(x => (!travelOn() || NO_GYM(x)) && (!ms || x.p.some(m => ms.includes(m))) && (!q || norm((EXMETA[x.id] || {}).name || x.n).includes(q) || norm(x.n).includes(q)))
     .sort((a, b) => (EXMETA[b.id] ? 1 : 0) - (EXMETA[a.id] ? 1 : 0) || (a.l === 'beginner' ? -1 : 0) - (b.l === 'beginner' ? -1 : 0));
 }
 function libListHtml() {
@@ -2513,7 +2573,7 @@ function libListHtml() {
 function viewLibrary() {
   if (!LIB) { loadLib().then(() => tab === 'library' && render()).catch(() => {}); return `<div class="wrap"><h1 class="page-title">Biblioteca</h1><p class="note">Carregando exercícios…</p></div>`; }
   return `<div class="wrap"><button class="hbtn small" data-goto="plans" style="margin-top:4px">‹ Treinos</button><h1 class="page-title">Biblioteca</h1>
-    <p class="muted" style="margin-top:0">${LIB.size} exercícios com execução passo a passo</p>
+    <p class="muted page-sub" style="margin-top:0">${travelOn() ? '✈︎ Modo viagem: só exercícios sem equipamento' : `${LIB.size} exercícios com execução passo a passo`}</p>
     <input class="search" id="libQ" placeholder="Buscar exercício" value="${esc(libQ)}" autocomplete="off">
     <div class="chips">${LIB_GROUPS.map(([v, l]) => `<button class="${libM === v ? 'on' : ''}" data-libm="${v}">${l}</button>`).join('')}</div>
     <div id="libList" class="stack">${libListHtml()}</div></div>`;
@@ -2542,7 +2602,7 @@ function libAltsFor(base) {
   if (!LIB || !base.prim) return [];
   const have = new Set([base.id, ...altsFor(base).map(a => a.id)]);
   return [...LIB.values()].filter(x => x.p[0] === base.prim && !have.has(x.id) && ['strength', 'powerlifting'].includes(x.c) &&
-    ['barbell', 'dumbbell', 'cable', 'machine', 'body only', 'e-z curl bar', 'kettlebells'].includes(x.e)).slice(0, 12);
+    (travelOn() ? NO_GYM(x) : ['barbell', 'dumbbell', 'cable', 'machine', 'body only', 'e-z curl bar', 'kettlebells'].includes(x.e))).slice(0, 12);
 }
 
 
@@ -2751,11 +2811,44 @@ document.addEventListener('touchend', e => {
   lastTouch = now;
 }, { passive: false });
 
+/* ============================== Modo viagem ============================== */
+function setTravel(on) {
+  if (S.active) { alert('Finalize ou descarte o treino em andamento antes de mudar o modo viagem.'); return; }
+  if (!on) {
+    S.tnext = S.next; S.next = S.nextMain || S.next; S.travel = { ...(S.travel || {}), on: false, until: Date.now() };
+    save(); render(); return;
+  }
+  loadLib().then(() => {
+    const g = goal(), t = Math.min(45, (S.goal && S.goal.tempo) || 45);
+    if (!S.travelPlan || S.travelPlan.goal !== g || S.travelPlan.tempo !== t) S.travelPlan = { ...buildPlan('travel', g, t), id: 't' + Date.now() };
+    S.nextMain = S.next; S.next = S.tnext || 'A'; S.travel = { on: true, since: Date.now() };
+    save(); render(); openTravelSheet();
+  }).catch(() => alert('Não foi possível carregar a biblioteca de exercícios. Conecte-se à internet e tente de novo.'));
+}
+function openTravelSheet() {
+  const P = S.travelPlan; if (!P) return;
+  const el = sheet(`<div class="travel-ico">✈︎</div><h3 style="text-align:center">Modo viagem ativado</h3>
+    <p class="note" style="text-align:center;margin:6px 0 14px">Treinos só com o peso do corpo, uma cadeira firme, a cama ou uma toalha. Tudo fica registrado no histórico como <b>Viagem</b>.</p>
+    <div class="muted small" style="margin-bottom:6px">Treinos no quarto (~${P.plans.A.mins} min)</div>
+    ${ORDER.map(k => `<div class="opt" style="display:block"><b>${P.plans[k].name} · ${esc(P.plans[k].focus)}</b><div class="muted small" style="margin-top:3px">${P.plans[k].exercises.map(e => esc(e.name)).join(' · ')}</div></div>`).join('')}
+    <div class="muted small" style="margin:16px 0 6px">Aeróbico sugerido</div>
+    ${TRAVEL_IDEAS.map(([t, d]) => `<div class="opt" style="display:block"><b>${t}</b><div class="muted small" style="margin-top:3px">${d}</div></div>`).join('')}
+    <button class="btn" data-start="${S.next}" style="margin-top:14px">Começar ${P.plans[S.next].name}</button>`);
+  el.querySelectorAll('[data-start]').forEach(b => b.onclick = () => { el.remove(); startSession(b.dataset.start); });
+}
+function travelBanner() {
+  if (!travelOn()) return '';
+  return `<div class="card travel-card"><div class="row between"><div><b>✈︎ Modo viagem ativo</b><div class="note" style="margin-top:2px">Treinos sem academia, registrados como Viagem.</div></div></div>
+    <div class="row" style="gap:8px;margin-top:12px"><button class="btn ghost" data-travel-ideas style="flex:1">Ver sugestões</button><button class="btn ghost" data-travel="off" style="flex:1">Desativar</button></div></div>`;
+}
+
 /* ============================== Eventos gerais ============================== */
 function bind() {
   bindCoach(); bindCloud();
   if (tab === 'onboard') bindOnboard();
   if (tab === 'library') bindLibrary();
+  document.querySelectorAll('[data-travel]').forEach(b => b.onclick = () => setTravel(b.dataset.travel === 'on' || (b.dataset.travel === 'toggle' && !travelOn())));
+  document.querySelectorAll('[data-travel-ideas]').forEach(b => b.onclick = openTravelSheet);
   document.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => { S.theme = b.dataset.themeSet; save(); render(); });
   document.querySelectorAll('[data-media]').forEach(b => b.onclick = () => { S.media = { ...(S.media || {}), [b.dataset.media]: !mediaOn(b.dataset.media) }; save(); render(); });
   document.querySelectorAll('[data-redo]').forEach(b => b.onclick = () => { obRedo = true; obDraft = null; obStep = 1; go('onboard'); });
