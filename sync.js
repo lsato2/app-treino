@@ -55,6 +55,7 @@ async function init() {
     saveLocal();
     // Marca como já enviados os treinos que vieram iguais do servidor
     const pushed = getPushed(); hs.docs.forEach(d => { pushed[d.id] = hash(d.data().json); }); setPushed(pushed);
+    cloud.pulled = true;
     if (window.safeRender) window.safeRender();
   }
   let pushing = null, again = false;
@@ -88,7 +89,7 @@ async function init() {
   async function pullThenPush() {
     if (!cloud.user) return;
     try { setStatus('syncing'); await pull(); await push(); }
-    catch (e) { setStatus(navigator.onLine ? 'error' : 'offline', navigator.onLine ? friendly(e) : null); }
+    catch (e) { cloud.pulled = true; setStatus(navigator.onLine ? 'error' : 'offline', navigator.onLine ? friendly(e) : null); }
   }
   let timer = null;
   window.cloudPush = () => { if (!cloud.user) return; clearTimeout(timer); timer = setTimeout(push, 2500); };
@@ -97,7 +98,7 @@ async function init() {
 
   A.onAuthStateChanged(auth, u => {
     cloud.user = u ? { uid: u.uid, email: u.email, name: u.displayName, photo: u.photoURL } : null;
-    if (u) pullThenPush(); else setStatus('signed-out');
+    if (u) { cloud.pulled = false; pullThenPush(); } else { cloud.pulled = false; setStatus('signed-out'); }
   });
 }
 
