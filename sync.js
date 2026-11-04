@@ -12,7 +12,7 @@ const setStatus = (status, error = null) => {
   window.onCloudStatus && window.onCloudStatus();
 };
 
-if (firebaseConfig) init().catch(e => setStatus('error', e.message || String(e)));
+if (firebaseConfig) init().catch(() => setStatus('error', 'Sem conexão com o Google agora. Você pode continuar sem login e entrar depois pelo Perfil.'));
 else window.onCloudStatus && window.onCloudStatus();
 
 async function init() {
