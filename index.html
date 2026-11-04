@@ -301,6 +301,10 @@
   .feel button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); } .feel button.on span { color: var(--accent-ink); }
   .hbtn.sel { border-color: var(--accent); color: var(--accent); } .hbtn.sel.warn { border-color: var(--c); color: var(--c); }
   .deload-bar { margin-top: 8px; font-size: 12px; text-align: center; color: var(--b); }
+  .g-btn { background: #fff; color: #1f1f1f; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .avatar { width: 44px; height: 44px; border-radius: 50%; flex: none; }
+  .cloud-st.ok { color: var(--accent); } .cloud-st.error { color: var(--danger); } .cloud-st.offline { color: var(--c); }
+  .login-card { margin-top: 12px; border-color: rgba(90,169,255,.45); }
   .done-ico { width: 72px; height: 72px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; margin: 24px auto 4px; }
   @media (max-height: 740px) {
     .f-top { margin-top: 0; }
@@ -643,7 +647,24 @@ const DEFAULT = { next: 'A', history: [], last: {}, active: null, backupEvery: 5
 let S;
 try { S = Object.assign(structuredClone(DEFAULT), JSON.parse(localStorage.getItem(KEY)) || {}); }
 catch (e) { S = structuredClone(DEFAULT); }
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+const save = () => { S.updatedAt = Date.now(); saveLocal(); if (window.cloudPush) window.cloudPush(); };
+
+/* Junta os dados do aparelho com os da nuvem: treinos pela união (excluídos não voltam),
+   configurações e cargas pela versão mais recente */
+function mergeStates(local, rMeta, rHist) {
+  const tomb = new Set([...(local.deleted || []), ...((rMeta && rMeta.deleted) || [])].map(Number));
+  const by = new Map();
+  for (const h of [...(rHist || []), ...(local.history || [])]) {
+    if (tomb.has(h.end)) continue;
+    const c = by.get(h.end);
+    if (!c || (h.mod || h.end) >= (c.mod || c.end)) by.set(h.end, h);
+  }
+  const history = [...by.values()].sort((a, b) => a.end - b.end);
+  const base = rMeta && (rMeta.updatedAt || 0) > (local.updatedAt || 0) ? rMeta : local;
+  const { history: _h, ...meta } = base;
+  return Object.assign(structuredClone(DEFAULT), meta, { history, deleted: [...tomb] });
+}
 
 /* ============================== Utilidades ============================== */
 const $ = (s, el = document) => el.querySelector(s);
@@ -697,6 +718,7 @@ function viewHome() {
   return `<div class="wrap">
     <p class="muted small" style="margin:8px 0 0">${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
     <h1>Bora treinar, Lucas</h1>
+    ${S.active ? '' : loginCard()}
     ${S.active ? '' : reportReadyCard()}
     ${(() => { const ms = coachMessages().filter(x => x.t !== 'info' || !S.history.length).slice(0, 2); return ms.length ? `<div class="stack" style="margin-top:12px">${ms.map(msgHtml).join('')}</div>` : ''; })()}
     <div class="card hero ${k}" style="margin-top:16px">
@@ -792,6 +814,8 @@ function viewProfile() {
       <div class="kv"><span>Água</span><b>~${(c.agua / 1000).toFixed(1).replace('.', ',')} L/dia</b></div>
     </div>
     <p class="note">Cálculos de referência: Mifflin-St Jeor (metabolismo basal), atividade leve 1–3x, moderada 3–5x e alta 6–7x por semana, 1,6–2,2 g/kg de proteína e 35 ml/kg de água. O IMC não diferencia massa muscular de gordura. São estimativas e não substituem a avaliação de um profissional de educação física, médico ou nutricionista.</p>
+    <h2>Conta</h2>
+    <div class="card">${cloudBox()}</div>
     <h2>Dados</h2>
     <div class="stack">
       <div class="card" style="margin:0">
@@ -1269,7 +1293,7 @@ function finishSession() {
   const cardio = a.cardio && a.cardio.on && a.cardio.min ? { type: a.cardio.type, min: a.cardio.min, km: a.cardio.km, int: a.cardio.int } : null;
   if (cardio) S.lastCardio = { type: cardio.type };
   const end = Date.now();
-  S.history.push({ plan: a.plan, start: a.start, end, deload: !!a.deload, sets: a.sets, swaps: a.swaps || {}, skipped: Object.keys(a.skipped || {}).map(Number), cardio });
+  S.history.push({ plan: a.plan, start: a.start, end, mod: end, deload: !!a.deload, sets: a.sets, swaps: a.swaps || {}, skipped: Object.keys(a.skipped || {}).map(Number), cardio });
   S.next = ORDER[(ORDER.indexOf(a.plan) + 1) % 3];
   S.active = null; save(); endRest(false);
   runCoach(); summaryEnd = end; go('summary');
@@ -1464,6 +1488,7 @@ function viewSummary() {
 /* ============================== Backup ============================== */
 function backupPending() { return S.history.length - ((S.backup && S.backup.count) || 0); }
 function backupDue() {
+  if (window.cloud && window.cloud.user) return false;   // com login, o backup é automático
   return S.backupEvery > 0 && backupPending() >= S.backupEvery && S.history.length > (S.backupSnooze || 0);
 }
 function backupCard() {
@@ -1903,15 +1928,59 @@ function bindCoach() {
   if ($('#calNext')) $('#calNext').onclick = () => { calOff = Math.min(0, calOff + 1); render(); };
   const h = S.history.find(x => x.end === summaryEnd);
   if (h && tab === 'summary') {
-    document.querySelectorAll('[data-feel]').forEach(b => b.onclick = () => { h.feel = +b.dataset.feel; save(); runCoach(); render(); });
-    document.querySelectorAll('[data-pain]').forEach(b => b.onclick = () => { h.pain = b.dataset.pain === '1'; if (!h.pain) delete h.painTxt; save(); runCoach(); render(); });
-    if ($('#painTxt')) $('#painTxt').addEventListener('change', ev => { h.painTxt = ev.target.value; save(); });
+    document.querySelectorAll('[data-feel]').forEach(b => b.onclick = () => { h.feel = +b.dataset.feel; h.mod = Date.now(); save(); runCoach(); render(); });
+    document.querySelectorAll('[data-pain]').forEach(b => b.onclick = () => { h.pain = b.dataset.pain === '1'; if (!h.pain) delete h.painTxt; h.mod = Date.now(); save(); runCoach(); render(); });
+    if ($('#painTxt')) $('#painTxt').addEventListener('change', ev => { h.painTxt = ev.target.value; h.mod = Date.now(); save(); });
   }
 }
 
+
+/* ============================== Conta e nuvem ============================== */
+const cloudOn = () => !!(window.cloud && window.cloud.configured);
+function cloudStatusText() {
+  const c = window.cloud || {};
+  return { loading: 'Conectando…', syncing: 'Sincronizando…', offline: 'Sem conexão: as alterações sobem quando a internet voltar.',
+    error: `Erro: ${c.error || 'falha na sincronização'}`, ok: `Sincronizado às ${new Date(c.lastSync || Date.now()).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` }[c.status] || '';
+}
+function cloudBox() {
+  const c = window.cloud;
+  if (!cloudOn()) return `<p class="note" style="margin:0">Login com Google ainda não configurado. Os dados ficam só neste aparelho.</p>`;
+  if (c.status === 'loading' && !c.user) return `<p class="note" style="margin:0">Conectando…</p>`;
+  if (!c.user) return `<b>Entre com sua conta Google</b>
+    <p class="note" style="margin:4px 0 12px">Seus treinos ficam salvos na nuvem: backup automático e acesso em qualquer aparelho.</p>
+    ${c.status === 'error' ? `<p class="note" style="color:var(--danger);margin:0 0 10px">${esc(c.error || '')}</p>` : ''}
+    <button class="btn g-btn" data-login>${GLOGO} Entrar com Google</button>`;
+  return `<div class="row" style="gap:12px">${c.user.photo ? `<img src="${esc(c.user.photo)}" alt="" class="avatar" referrerpolicy="no-referrer">` : ''}
+      <div style="min-width:0"><b>${esc(c.user.name || 'Conta Google')}</b><div class="muted small" style="overflow:hidden;text-overflow:ellipsis">${esc(c.user.email || '')}</div></div></div>
+    <p class="note cloud-st ${c.status}" style="margin:10px 0 12px">${esc(cloudStatusText())}</p>
+    <div class="row" style="gap:8px"><button class="btn ghost" data-syncnow style="flex:1">Sincronizar agora</button><button class="btn ghost" data-logout style="width:auto">Sair</button></div>`;
+}
+function loginCard() {
+  const c = window.cloud;
+  if (!cloudOn() || c.user || c.status === 'loading' || S.loginDismissed) return '';
+  return `<div class="card login-card">${cloudBox()}<button class="hbtn small" data-login-dismiss style="margin-top:10px">Agora não</button></div>`;
+}
+const GLOGO = '<svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
+function bindCloud() {
+  document.querySelectorAll('[data-login]').forEach(b => b.onclick = () => window.cloud.signIn && window.cloud.signIn());
+  document.querySelectorAll('[data-syncnow]').forEach(b => b.onclick = () => window.cloud.syncNow && window.cloud.syncNow());
+  document.querySelectorAll('[data-logout]').forEach(b => b.onclick = () => { if (confirm('Sair da conta Google? Os dados continuam neste aparelho, mas param de sincronizar.')) window.cloud.signOut(); });
+  document.querySelectorAll('[data-login-dismiss]').forEach(b => b.onclick = () => { S.loginDismissed = true; saveLocal(); render(); });
+}
+/* Atualiza a tela quando a nuvem muda, sem atrapalhar um treino em andamento ou um campo sendo digitado */
+window.safeRender = () => {
+  if (tab === 'session' || document.querySelector('.sheet-bg')) return;
+  const ae = document.activeElement; if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'SELECT')) return;
+  render();
+};
+window.onCloudStatus = () => {
+  document.querySelectorAll('.cloud-st').forEach(el => { el.textContent = cloudStatusText(); el.className = `note cloud-st ${window.cloud.status}`; });
+  if (tab === 'profile' || tab === 'home') window.safeRender();
+};
+
 /* ============================== Eventos gerais ============================== */
 function bind() {
-  bindCoach();
+  bindCoach(); bindCloud();
   document.querySelectorAll('[data-start]').forEach(b => b.onclick = () => startSession(b.dataset.start));
   document.querySelectorAll('[data-hist]').forEach(c => c.onclick = () => c.classList.toggle('open'));
   document.querySelectorAll('[data-sum]').forEach(b => b.onclick = ev => { ev.stopPropagation(); summaryEnd = +b.dataset.sum; go('summary'); });
@@ -1921,10 +1990,10 @@ function bind() {
   document.querySelectorAll('[data-del]').forEach(b => b.onclick = ev => {
     ev.stopPropagation();
     if (!confirm('Excluir este treino do histórico?')) return;
-    S.history = S.history.filter(h => String(h.end) !== b.dataset.del); save(); render();
+    S.deleted = [...(S.deleted || []), +b.dataset.del]; S.history = S.history.filter(h => String(h.end) !== b.dataset.del); save(); render();
   });
   const ch = $('#clearHist');
-  if (ch) ch.onclick = () => { if (confirm('Excluir TODO o histórico de treinos? Essa ação não pode ser desfeita.')) { S.history = []; save(); render(); } };
+  if (ch) ch.onclick = () => { if (confirm('Excluir TODO o histórico de treinos? Essa ação não pode ser desfeita.')) { S.deleted = [...(S.deleted || []), ...S.history.map(h => h.end)]; S.history = []; save(); render(); } };
   if (tab === 'profile') {
     const upd = () => {
       const p = S.profile;
@@ -1943,7 +2012,7 @@ function bind() {
       f.text().then(t => { const d = JSON.parse(t); if (!d.history) throw 0; S = Object.assign(structuredClone(DEFAULT), d); save(); alert('Backup importado.'); render(); })
         .catch(() => alert('Arquivo inválido.'));
     };
-    $('#resetBtn').onclick = () => { if (confirm('Apagar histórico, cargas e perfil? Essa ação não pode ser desfeita.')) { S = structuredClone(DEFAULT); save(); render(); } };
+    $('#resetBtn').onclick = () => { if (confirm(`Apagar histórico, cargas e perfil?${window.cloud && window.cloud.user ? ' Os dados também serão apagados da nuvem.' : ''} Essa ação não pode ser desfeita.`)) { const del = [...(S.deleted || []), ...S.history.map(h => h.end)]; S = structuredClone(DEFAULT); S.deleted = del; save(); render(); } };
   }
 }
 document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => go(b.dataset.tab));
@@ -1954,5 +2023,6 @@ render();
 
 if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 </script>
+<script type="module" src="sync.js"></script>
 </body>
 </html>
