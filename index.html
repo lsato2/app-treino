@@ -232,6 +232,9 @@
   .sug .hbtn { flex: none; background: var(--accent); color: var(--accent-ink); border: 0; }
   .sheet-bg { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.55); display: flex; align-items: flex-end; justify-content: center; }
   .sheet { width: 100%; max-width: 560px; max-height: 85vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 22px 22px 0 0; padding: 10px 16px calc(16px + var(--safe-b)); }
+  .sheet { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+  .sheet-bg { overscroll-behavior: contain; }
+  .opt-r { display: flex; align-items: center; gap: 8px; flex: none; }
   .sheet-grip { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto 12px; }
   .opt { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; text-align: left; padding: 12px 14px; min-height: 56px; margin-top: 8px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); }
   .opt.on { border-color: var(--accent); }
@@ -635,7 +638,7 @@ function openSwap(ei) {
     <p class="muted small" style="margin:4px 0 12px">Aparelho ocupado ou indisponível? Escolha uma alternativa para os mesmos músculos.</p>
     ${opts.map(o => `<button class="opt ${o.id === cur.id ? 'on' : ''}" data-alt="${o.isBase ? '' : o.id}">
         <span><b>${esc(o.name)}</b>${o.isBase ? ' <span class="pill">original</span>' : ''}<br><span class="muted small">${esc(o.muscles)}${o.equip ? ' · ' + esc(o.equip) : ''} · ${o.sets} × ${esc(o.reps)}</span></span>
-        ${o.id === cur.id ? CHECK : o.how ? `<span class="info-btn" data-info="${esc(o.id)}" role="button" aria-label="Ver execução">i</span>` : ''}</button>`).join('')}
+        <span class="opt-r">${o.how ? `<span class="info-btn" data-info="${esc(o.id)}" role="button" aria-label="Ver execução de ${esc(o.name)}">i</span>` : ''}${o.id === cur.id ? CHECK : ''}</span></button>`).join('')}
     ${base.slot ? `<div id="libMore"><button class="btn ghost" id="libMoreBtn" style="margin-top:10px">Mais opções da biblioteca</button></div>` : ''}
     <label class="remember"><input type="checkbox" id="swRemember" ${fixed ? 'checked' : ''}> Usar sempre esta escolha no ${PLANS[a.plan].name}</label>
     <button class="btn ghost" id="swCancel" style="margin-top:8px">Cancelar</button>
@@ -2492,6 +2495,20 @@ function hydrateMedia(root = document) {
   }));
   root.querySelectorAll('[data-wger]:not([data-obs]), [data-map]:not([data-obs])').forEach(el => { el.dataset.obs = '1'; mediaObs.observe(el); });
 }
+
+/* ============================== Painéis: trava a rolagem da página de trás ============================== */
+let lockedY = null;
+function syncScrollLock() {
+  const open = !!document.querySelector('.sheet-bg');
+  if (open && lockedY === null) {
+    lockedY = window.scrollY;
+    Object.assign(document.body.style, { position: 'fixed', top: `-${lockedY}px`, left: '0', right: '0', width: '100%' });
+  } else if (!open && lockedY !== null) {
+    Object.assign(document.body.style, { position: '', top: '', left: '', right: '', width: '' });
+    window.scrollTo(0, lockedY); lockedY = null;
+  }
+}
+new MutationObserver(syncScrollLock).observe(document.body, { childList: true });
 
 /* ============================== Eventos gerais ============================== */
 function bind() {
