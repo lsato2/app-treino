@@ -174,6 +174,72 @@
   .switch.on::after { left: 23px; background: #fff; }
   .del-btn { margin-top: 12px; padding: 8px 12px; border-radius: 10px; font-size: 14px; color: var(--danger); border: 1px solid #4a2a2e; }
   .stack > * + * { margin-top: 10px; }
+
+  /* Sessão: sem menu inferior, botões de topo */
+  body.in-session { padding-bottom: var(--safe-b); }
+  body.in-session nav.tabs { display: none; }
+  body.in-session .rest { bottom: calc(12px + var(--safe-b)); }
+  body.has-rest .wrap { padding-bottom: 120px; }
+  .hbtn { padding: 10px 12px; min-height: 44px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); font-weight: 600; font-size: 15px; white-space: nowrap; }
+  .hbtn.small { min-height: 36px; padding: 6px 12px; font-size: 13px; }
+  .need, .stepper.need input { outline: 2px solid var(--danger) !important; outline-offset: -1px; }
+  .set input { padding: 11px 8px; }
+  .check { height: 44px; }
+
+  /* Modo Foco */
+  .focus { max-width: 560px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; min-height: calc(100vh - 92px - var(--safe-t) - var(--safe-b)); min-height: calc(100dvh - 92px - var(--safe-t) - var(--safe-b)); }
+  .f-top { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-top: 6px; }
+  .f-name { font-size: 30px; margin: 6px 0 6px; }
+  .f-meta { color: var(--muted); font-size: 16px; }
+  .f-meta b { color: var(--text); }
+  .dots { display: flex; gap: 6px; margin: 14px 0 12px; }
+  .dots i { flex: 1; height: 6px; border-radius: 3px; background: var(--surface-2); }
+  .dots i.done { background: var(--accent); }
+  .dots i.cur { background: var(--b); }
+  .f-last { font-size: 14px; color: var(--muted); }
+  .focus .tip { margin-top: 8px; }
+  .focus .tip.show { display: block; }
+  .stepper { display: grid; grid-template-columns: 68px 1fr 68px; gap: 10px; align-items: center; margin-top: 18px; }
+  .stepper button { height: 68px; border-radius: 18px; background: var(--surface-2); border: 1px solid var(--line); font-size: 30px; font-weight: 600; }
+  .stepper button:active { background: var(--line); }
+  .stepper .val { display: grid; text-align: center; }
+  .stepper input { width: 100%; background: transparent; border: 0; border-radius: 12px; text-align: center; font-size: 44px; font-weight: 800; font-variant-numeric: tabular-nums; padding: 0; color: var(--text); }
+  .stepper input:focus { outline: 2px solid var(--b); }
+  .stepper .u { font-size: 13px; color: var(--muted); }
+  .f-cta { margin-top: auto; padding-top: 20px; }
+  .btn.xl { padding: 20px; font-size: 20px; border-radius: 18px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .btn.xl svg { width: 24px; height: 24px; stroke: currentColor; fill: none; }
+  .play-xl svg, .play-xl.stop svg { fill: currentColor; stroke: none; }
+  .play-xl { background: var(--b); color: #06182b; }
+  .play-xl.stop { background: var(--danger); color: #2b0606; }
+  .f-nav { display: grid; grid-template-columns: 1fr auto 1fr; margin-top: 8px; }
+  .f-nav button { padding: 14px 4px; color: var(--muted); font-size: 15px; min-height: 44px; }
+  .f-nav button:first-child { text-align: left; } .f-nav button:last-child { text-align: right; }
+  .f-nav button:disabled { opacity: .3; }
+  .big-clock { font-size: 96px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; line-height: 1; margin: 28px 0 10px; }
+  .big-clock.run { color: var(--b); } .big-clock.hit { color: var(--accent); } .big-clock.count { color: var(--c); }
+  .rest-screen .big-clock { font-size: 112px; margin-top: 36px; }
+  .rest-track { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; margin: 6px 0 18px; }
+  .rest-track i { display: block; height: 100%; background: var(--accent); transition: width .25s linear; }
+  .adj { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .next-card { margin-top: 16px; }
+  .next-card b { display: block; margin-top: 2px; }
+  .done-ico { width: 72px; height: 72px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; margin: 24px auto 4px; }
+  @media (max-height: 740px) {
+    .f-top { margin-top: 0; }
+    .f-name { font-size: 24px; margin: 4px 0; }
+    .f-meta { font-size: 14px; }
+    .dots { margin: 10px 0 8px; }
+    .stepper { grid-template-columns: 58px 1fr 58px; margin-top: 10px; }
+    .stepper button { height: 56px; font-size: 26px; }
+    .stepper input { font-size: 34px; }
+    .f-cta { padding-top: 12px; }
+    .btn.xl { padding: 16px; font-size: 18px; }
+    .f-nav button { padding: 10px 4px; }
+    .big-clock { font-size: 76px; margin: 18px 0 8px; }
+    .rest-screen .big-clock { font-size: 88px; margin-top: 20px; }
+  }
+  .done-ico svg { width: 36px; height: 36px; stroke: var(--accent-ink); }
 </style>
 </head>
 <body>
@@ -183,6 +249,7 @@
 <div class="rest" id="rest" role="status" aria-live="polite">
   <div class="time" id="restTime">0:00</div>
   <div class="lbl" id="restLbl">Descanso</div>
+  <button id="restMinus">−15s</button>
   <button id="restPlus">+15s</button>
   <button id="restSkip">Pular</button>
 </div>
@@ -214,7 +281,7 @@ const PLANS = {
         tip: 'Escápulas retraídas e pés firmes no chão. Desça a barra até a linha do peito, com cotovelos a ~45° do tronco.' },
       { id: 'remada-curvada', name: 'Remada curvada com barra', muscles: 'Dorsais, trapézio, bíceps', sets: 4, reps: '6–8', rest: 120,
         tip: 'Tronco inclinado a ~45°, coluna neutra. Puxe a barra em direção ao umbigo, apertando as escápulas.' },
-      { id: 'desenvolvimento', name: 'Desenvolvimento com halteres', muscles: 'Ombros, tríceps', sets: 3, reps: '8–10', rest: 90,
+      { id: 'desenvolvimento', name: 'Desenvolvimento com halteres', muscles: 'Ombros, tríceps', sets: 3, reps: '8–10', rest: 90, step: 2,
         tip: 'Sentado com encosto, empurre os halteres acima da cabeça sem arquear a lombar.' },
       { id: 'stiff', name: 'Stiff com barra', muscles: 'Posteriores de coxa, glúteos, lombar', sets: 3, reps: '8–10', rest: 90,
         tip: 'Joelhos levemente flexionados, leve o quadril para trás e desça a barra rente às pernas até sentir alongar o posterior.' },
@@ -228,13 +295,13 @@ const PLANS = {
     exercises: [
       { id: 'terra', name: 'Levantamento terra', muscles: 'Posteriores, glúteos, lombar, costas', sets: 3, reps: '6–8', rest: 120,
         tip: 'Barra próxima à canela, coluna neutra. Empurre o chão com os pés e estenda quadril e joelhos juntos.' },
-      { id: 'supino-inclinado', name: 'Supino inclinado com halteres', muscles: 'Peitoral superior, ombros, tríceps', sets: 3, reps: '8–12', rest: 90,
+      { id: 'supino-inclinado', name: 'Supino inclinado com halteres', muscles: 'Peitoral superior, ombros, tríceps', sets: 3, reps: '8–12', rest: 90, step: 2,
         tip: 'Banco a 30°. Desça os halteres de forma controlada (2–3 s) e suba sem bater um no outro.' },
       { id: 'puxada', name: 'Puxada frontal (pulldown)', muscles: 'Dorsais, bíceps', sets: 3, reps: '10–12', rest: 90,
         tip: 'Pegada um pouco mais larga que os ombros. Puxe a barra até o alto do peito, levando os cotovelos para baixo.' },
       { id: 'bulgaro', name: 'Agachamento búlgaro', muscles: 'Quadríceps, glúteos', sets: 3, reps: '10 cada perna', rest: 90,
         tip: 'Pé de trás apoiado no banco. Desça até o joelho de trás quase tocar o chão, tronco levemente inclinado.' },
-      { id: 'elevacao-lateral', name: 'Elevação lateral com halteres', muscles: 'Ombro lateral', sets: 3, reps: '12–15', rest: 60,
+      { id: 'elevacao-lateral', name: 'Elevação lateral com halteres', muscles: 'Ombro lateral', sets: 3, reps: '12–15', rest: 60, step: 2,
         tip: 'Cotovelos levemente flexionados, eleve até a altura dos ombros sem balançar o tronco.' },
       { id: 'rosca-triceps', name: 'Rosca direta + tríceps corda (bi-set)', muscles: 'Bíceps, tríceps', sets: 3, reps: '12 + 12', rest: 60,
         tip: 'Faça a rosca e, sem descanso, o tríceps na polia. Registre a carga da rosca no campo kg.' },
@@ -246,15 +313,15 @@ const PLANS = {
     exercises: [
       { id: 'leg-press', name: 'Leg press 45°', muscles: 'Quadríceps, glúteos', sets: 3, reps: '12–15', rest: 60,
         tip: 'Pés no meio da plataforma, desça até ~90° de joelho sem tirar a lombar do encosto.' },
-      { id: 'barra-fixa', name: 'Barra fixa (ou graviton)', muscles: 'Dorsais, bíceps', sets: 3, reps: 'máx.', rest: 60,
+      { id: 'barra-fixa', name: 'Barra fixa (ou graviton)', muscles: 'Dorsais, bíceps', sets: 3, reps: 'máx.', rest: 60, assist: true,
         tip: 'Se ainda não fizer 6 repetições livres, use o graviton/elástico. No graviton, registre o contrapeso em kg.' },
       { id: 'flexao', name: 'Flexão de braço', muscles: 'Peitoral, tríceps, core', sets: 3, reps: '12–20', rest: 60, bodyweight: true,
         tip: 'Mãos um pouco mais abertas que os ombros, corpo alinhado. Se necessário, apoie as mãos num banco.' },
       { id: 'mesa-flexora', name: 'Mesa flexora', muscles: 'Posteriores de coxa', sets: 3, reps: '12–15', rest: 60,
         tip: 'Quadril colado no banco; flexione os joelhos com controle e segure 1 s no topo.' },
-      { id: 'remada-unilateral', name: 'Remada unilateral com halter', muscles: 'Dorsais, romboides', sets: 3, reps: '12 cada lado', rest: 60,
+      { id: 'remada-unilateral', name: 'Remada unilateral com halter', muscles: 'Dorsais, romboides', sets: 3, reps: '12 cada lado', rest: 60, step: 2,
         tip: 'Mão e joelho apoiados no banco. Puxe o halter em direção ao quadril, sem girar o tronco.' },
-      { id: 'farmer', name: 'Caminhada do fazendeiro', muscles: 'Antebraço, trapézio, core', sets: 3, reps: '40 m', rest: 60,
+      { id: 'farmer', name: 'Caminhada do fazendeiro', muscles: 'Antebraço, trapézio, core', sets: 3, reps: '40 m', rest: 60, dist: true, step: 2,
         tip: 'Um halter pesado em cada mão, ombros para trás, passos curtos e firmes. Registre o peso de cada halter.' },
     ]
   }
@@ -296,7 +363,10 @@ function weekCount() {
 }
 function sessionVolume(h) {
   let v = 0;
-  for (const id in h.sets) for (const s of h.sets[id]) if (s.done && s.kg && s.reps) v += s.kg * s.reps;
+  for (const e of PLANS[h.plan].exercises) {
+    if (metric(e) !== 'reps' || e.assist) continue;   // tempo, distância e contrapeso não entram no volume
+    for (const s of h.sets[e.id] || []) if (s.done && s.kg && s.reps) v += s.kg * s.reps;
+  }
   return Math.round(v);
 }
 
@@ -307,10 +377,12 @@ function go(t) { if (sw) stopWatch(false); tab = t; render(); window.scrollTo(0,
 function render() {
   const app = $('#app');
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  document.body.classList.toggle('in-session', tab === 'session' && !!S.active);
   if (tab === 'session' && S.active) { app.innerHTML = viewSession(); bindSession(); return; }
   if (tab === 'session') tab = 'home';
   app.innerHTML = { home: viewHome, plans: viewPlans, history: viewHistory, profile: viewProfile }[tab]();
   bind();
+  if (typeof updateRest === 'function') updateRest();
 }
 
 function planList(k) {
@@ -338,7 +410,7 @@ function viewHome() {
     <h2>Como funciona</h2>
     <div class="card note stack">
       <div>Alterne os treinos na sequência <b>A → B → C</b>, com pelo menos um dia de descanso entre eles (ex.: seg, qua, sex).</div>
-      <div>Ao marcar uma série como feita, o cronômetro de descanso começa sozinho.</div>
+      <div>O treino abre no <b>Modo Foco</b>: um exercício e uma série por vez. Ao concluir a série, o descanso começa sozinho. Toque em <b>Lista</b> para ver tudo.</div>
       <div><b>Progressão:</b> quando conseguir fazer todas as séries no topo da faixa de repetições, aumente a carga em 2–5%.</div>
     </div>
   </div>`;
@@ -363,7 +435,7 @@ function viewHistory() {
     const detail = p.exercises.map(e => {
       const ss = (h.sets[e.id] || []).filter(s => s.done);
       if (!ss.length) return '';
-      return `<div><b style="color:var(--text)">${esc(e.name)}</b>: ${ss.map(s => `${s.kg ?? '–'}kg×${s.reps ?? '–'}`).join(', ')}</div>`;
+      return `<div><b style="color:var(--text)">${esc(e.name)}</b>: ${ss.map(s => fmtSet(e, s)).join(', ')}</div>`;
     }).join('');
     return `<div class="card hist-item" data-hist>
       <div class="row between"><div class="row"><span class="tag ${h.plan}">${h.plan}</span>
@@ -420,6 +492,26 @@ function viewProfile() {
 }
 
 /* ============================== Sessão de treino ============================== */
+/* Tipo de registro de cada exercício: repetições, tempo (seg) ou distância (m) */
+const metric = e => e.unit === 's' ? 'time' : e.dist ? 'dist' : 'reps';
+const repsUnit = e => ({ time: 'seg', dist: 'metros', reps: 'reps' })[metric(e)];
+const kgUnit = e => e.assist ? 'kg de contrapeso' : 'kg';
+const fmtKg = v => v == null || v === '' ? '–' : String(+(+v).toFixed(2)).replace('.', ',');
+function fmtSet(e, s) {
+  if (!s) return '–';
+  const m = metric(e);
+  if (m === 'time') return `${s.reps ?? '–'} s${s.kg ? ` · ${fmtKg(s.kg)} kg` : ''}`;
+  if (m === 'dist') return `${fmtKg(s.kg)} kg × ${s.reps ?? '–'} m`;
+  if (e.bodyweight && !s.kg) return `${s.reps ?? '–'} reps`;
+  return `${fmtKg(s.kg)} ${e.assist ? 'kg contrapeso' : 'kg'} × ${s.reps ?? '–'}`;
+}
+function defaultReps(e) {
+  const last = S.last[e.id];
+  if (last && last.reps) return last.reps;
+  const n = parseInt(e.reps, 10);
+  return isNaN(n) ? null : n;
+}
+
 function startSession(k) {
   if (S.active && S.active.plan !== k) {
     if (!confirm(`Há um ${PLANS[S.active.plan].name} em andamento. Descartar e iniciar o ${PLANS[k].name}?`)) return;
@@ -431,7 +523,7 @@ function startSession(k) {
       const last = S.last[e.id] || {};
       sets[e.id] = Array.from({ length: e.sets }, () => ({ kg: last.kg ?? null, reps: null, done: false }));
     }
-    S.active = { plan: k, start: Date.now(), sets, cardio: newCardio(k) };
+    S.active = { plan: k, start: Date.now(), sets, cardio: newCardio(k), view: 'focus', cur: 0 };
     save();
   }
   go('session');
@@ -463,62 +555,8 @@ function viewCardio(a) {
     </div>
   </div>`;
 }
-
-function progressPct() {
-  let t = 0, d = 0;
-  for (const id in S.active.sets) for (const s of S.active.sets[id]) { t++; if (s.done) d++; }
-  return t ? Math.round(d / t * 100) : 0;
-}
-
-function viewSession() {
-  const a = S.active; const p = PLANS[a.plan];
-  if (!a.cardio) a.cardio = newCardio(a.plan);
-  const cards = p.exercises.map((e, ei) => {
-    const last = S.last[e.id];
-    const lastTxt = last ? `Última vez: ${last.kg ?? '–'} kg × ${last.reps ?? '–'}` : 'Primeira vez neste exercício';
-    const rows = a.sets[e.id].map((s, si) => `
-      <div class="set ${e.unit === 's' ? 'timed' : ''} ${s.done ? 'done' : ''}" data-ex="${e.id}" data-i="${si}">
-        <div class="n">${si + 1}</div>
-        <input inputmode="decimal" placeholder="${e.bodyweight ? 'peso corp.' : 'kg'}" value="${s.kg ?? ''}" data-f="kg" aria-label="Carga série ${si + 1}">
-        ${e.unit === 's'
-          ? `<div class="tcell"><input inputmode="numeric" placeholder="seg" value="${s.reps ?? ''}" data-f="reps" aria-label="Segundos série ${si + 1}"><button class="play" data-play aria-label="Cronometrar série ${si + 1}">${PLAY}</button></div>`
-          : `<input inputmode="numeric" placeholder="${esc(e.reps)}" value="${s.reps ?? ''}" data-f="reps" aria-label="Repetições série ${si + 1}">`}
-        <button class="check" data-done aria-label="Marcar série ${si + 1} como feita">${CHECK}</button>
-      </div>`).join('');
-    return `<div class="card ex" id="ex-${e.id}">
-      <div class="ex-top">
-        <div class="row between" style="align-items:flex-start"><h3>${ei + 1}. ${esc(e.name)}</h3></div>
-        <div class="muted small" style="margin-top:2px">${esc(e.muscles)}</div>
-        <div class="ex-meta"><span class="pill">${e.sets} séries</span><span class="pill">${esc(e.reps)}</span><span class="pill">descanso ${fmtTime(e.rest)}</span></div>
-        <div class="last" style="margin-top:8px">${lastTxt}</div>
-        <button class="tip-toggle" data-tip>Como executar</button>
-        <div class="tip">${esc(e.tip)}</div>
-      </div>
-      <div class="sets">
-        <div class="set set-h ${e.unit === 's' ? 'timed' : ''}"><div>Série</div><div style="text-align:center">kg</div><div style="text-align:center">${e.unit === 's' ? 'seg' : 'reps'}</div><div></div></div>
-        ${rows}
-      </div>
-    </div>`;
-  }).join('');
-  return `<div class="session-head"><div class="inner">
-      <div class="row between">
-        <div class="row"><span class="tag ${a.plan}" style="width:34px;height:34px;font-size:16px">${a.plan}</span>
-          <div><h3>${p.name} · ${p.focus}</h3><div class="muted small" id="elapsed">0:00</div></div></div>
-        <button class="btn ghost" style="width:auto;padding:8px 14px;font-size:15px" id="backBtn">Sair</button>
-      </div>
-      <div class="progress"><i id="prog" style="width:${progressPct()}%"></i></div>
-    </div></div>
-    <div class="wrap">${cards}
-      ${viewCardio(a)}
-      <button class="btn" id="finishBtn" style="margin-top:8px">Finalizar treino</button>
-      <button class="btn danger" id="discardBtn" style="margin-top:10px">Descartar treino</button>
-    </div>`;
-}
-
-function bindSession() {
-  const a = S.active;
-  $('#backBtn').onclick = () => go('home');
-  $('#finishBtn').onclick = finishSession;
+function bindCardio(a) {
+  if (!$('#cardio')) return;
   $('#cardioSw').onclick = () => {
     a.cardio.on = !a.cardio.on; save();
     $('#cardio').classList.toggle('off', !a.cardio.on);
@@ -529,66 +567,299 @@ function bindSession() {
     if (f === 'min') $('#cardioTimer').textContent = `Iniciar cronômetro de ${a.cardio.min || 0} min`;
     save();
   }));
-  $('#cardioTimer').onclick = () => { if (a.cardio.min) startRest(a.cardio.min * 60, `Aeróbico · ${a.cardio.type}`); };
-  $('#discardBtn').onclick = () => { if (confirm('Descartar este treino? Nada será salvo.')) { S.active = null; save(); stopRest(); go('home'); } };
+  $('#cardioTimer').onclick = () => { if (a.cardio.min) startRest(a.cardio.min * 60, `${a.cardio.type} · ${a.cardio.int}`, 'Aeróbico'); };
+}
+
+function progressPct() {
+  let t = 0, d = 0;
+  for (const id in S.active.sets) for (const s of S.active.sets[id]) { t++; if (s.done) d++; }
+  return t ? Math.round(d / t * 100) : 0;
+}
+
+/* Próxima série pendente: primeiro no exercício atual, depois nos seguintes (dando a volta) */
+function nextPending(a, fromEi) {
+  const ex = PLANS[a.plan].exercises;
+  for (let k = 0; k < ex.length; k++) {
+    const ei = (fromEi + k) % ex.length;
+    const si = a.sets[ex[ei].id].findIndex(s => !s.done);
+    if (si >= 0) return { ei, si };
+  }
+  return null;
+}
+function nextLabel(a, pos) {
+  if (!pos) return '';
+  const e = PLANS[a.plan].exercises[pos.ei]; const s = a.sets[e.id][pos.si];
+  const load = metric(e) === 'time' ? `meta ${e.reps}` : `${s.kg != null ? fmtKg(s.kg) + ' kg · ' : ''}meta ${e.reps}`;
+  return `${e.name} · série ${pos.si + 1} de ${e.sets} · ${load}`;
+}
+
+/* Conclui uma série (comum aos modos Foco e Lista) */
+function completeSet(ei, si) {
+  const a = S.active; const e = PLANS[a.plan].exercises[ei]; const sets = a.sets[e.id]; const s = sets[si];
+  s.done = true;
+  sets.forEach((o, j) => { if (j > si && !o.done) o.kg = s.kg; });   // repete a carga nas próximas séries
+  const nxt = nextPending(a, ei);
+  if (nxt) a.cur = nxt.ei;
+  save();
+  if (navigator.vibrate) navigator.vibrate(30);
+  if (nxt) startRest(e.rest, nextLabel(a, nxt));       // sem descanso depois da última série do treino
+  else endRest(false);
+  return nxt;
+}
+
+function viewSession() {
+  const a = S.active; const p = PLANS[a.plan];
+  if (!a.cardio) a.cardio = newCardio(a.plan);
+  if (!a.view) a.view = 'focus';
+  if (a.cur == null) { const n = nextPending(a, 0); a.cur = n ? n.ei : 0; }
+  const head = `<div class="session-head"><div class="inner">
+      <div class="row between">
+        <button class="hbtn" id="pauseBtn" aria-label="Pausar e voltar ao início">‹ Pausar</button>
+        <div style="text-align:center;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><b>${p.name}</b> <span class="muted small">${p.focus}</span><div class="muted small" id="elapsed">${elapsedTxt()}</div></div>
+        <button class="hbtn" id="viewBtn">${a.view === 'focus' ? 'Lista' : 'Foco'}</button>
+      </div>
+      <div class="progress"><i id="prog" style="width:${progressPct()}%"></i></div>
+    </div></div>`;
+  return head + (a.view === 'focus' ? viewFocus(a) : viewList(a));
+}
+
+/* ---------- Modo Foco ---------- */
+function viewFocus(a) {
+  const ex = PLANS[a.plan].exercises;
+  if (rest) {
+    const total = Math.max(1, rest.total);
+    return `<div class="focus rest-screen">
+      <div class="f-top">${esc(rest.title)}</div>
+      <div class="big-clock" data-rest-time>${fmtTime(Math.max(0, Math.ceil((rest.end - Date.now()) / 1000)))}</div>
+      <div class="rest-track"><i data-rest-bar style="width:${Math.min(100, (rest.end - Date.now()) / total * 100)}%"></i></div>
+      <div class="adj"><button class="btn ghost" id="fMinus">−15s</button><button class="btn ghost" id="fPlus">+15s</button></div>
+      ${rest.label ? `<div class="card next-card"><div class="muted small">${rest.title === 'Aeróbico' ? 'Atividade' : 'Próximo'}</div><b>${esc(rest.label)}</b></div>` : ''}
+      <div class="f-cta"><button class="btn xl" id="fSkip">${rest.title === 'Aeróbico' ? 'Encerrar cronômetro' : 'Pular descanso'}</button></div>
+    </div>`;
+  }
+  if (!nextPending(a, 0)) {
+    const n = Object.values(a.sets).flat().filter(s => s.done).length;
+    return `<div class="focus">
+      <div class="done-ico">${CHECK}</div>
+      <h1 style="text-align:center">Musculação concluída!</h1>
+      <p class="muted" style="text-align:center;margin-top:0">${n} séries · ${elapsedTxt(true)}</p>
+      ${viewCardio(a)}
+      <div class="f-cta stack"><button class="btn xl" id="finishBtn">Finalizar treino</button>
+      <button class="btn ghost" id="toList">Revisar séries</button></div>
+    </div>`;
+  }
+  const ei = Math.min(a.cur, ex.length - 1); const e = ex[ei]; const sets = a.sets[e.id];
+  const si = sets.findIndex(s => !s.done); const m = metric(e);
+  const dots = sets.map((s, j) => `<i class="${s.done ? 'done' : j === si ? 'cur' : ''}"></i>`).join('');
+  const last = S.last[e.id];
+  const nav = `<div class="f-nav">
+      <button id="fPrev" ${ei === 0 ? 'disabled' : ''}>‹ Anterior</button>
+      <button id="toList">Ver lista</button>
+      <button id="fNext" ${ei === ex.length - 1 ? 'disabled' : ''}>Próximo ›</button></div>`;
+  const header = `<div class="f-top">Exercício ${ei + 1} de ${ex.length} · ${esc(e.muscles)}</div>
+      <h1 class="f-name">${esc(e.name)}</h1>`;
+  if (si < 0) {
+    return `<div class="focus">${header}
+      <div class="f-meta">Exercício concluído ✓</div>
+      <div class="dots">${dots}</div>
+      <div class="card" style="margin-top:8px">${sets.map((s, j) => `<div class="kv"><span>Série ${j + 1}</span><b>${fmtSet(e, s)}</b></div>`).join('')}</div>
+      <div class="f-cta"><button class="btn xl" id="fGoNext">Ir para a próxima série pendente</button>${nav}</div>
+    </div>`;
+  }
+  const s = sets[si];
+  const repsVal = s.reps ?? defaultReps(e);
+  const step = e.step || (m === 'dist' ? 5 : 2.5);
+  const stepper = (f, val, unit, st) => `<div class="stepper" data-f="${f}" data-step="${st}">
+      <button data-d="-1" aria-label="Diminuir ${unit}">−</button>
+      <label class="val"><input inputmode="decimal" value="${val == null ? '' : String(val).replace('.', ',')}" placeholder="—" aria-label="${unit}"><span class="u">${unit}</span></label>
+      <button data-d="1" aria-label="Aumentar ${unit}">+</button></div>`;
+  let body;
+  if (m === 'time') {
+    body = `<div class="big-clock" id="fClock">0:00</div>
+      <div class="f-meta" style="text-align:center">meta <b>${esc(e.reps)}</b></div>
+      <div class="f-cta"><button class="btn xl play-xl" id="fPlay">${PLAY} Iniciar cronômetro</button>${nav}</div>`;
+  } else {
+    body = `${e.bodyweight ? '' : stepper('kg', s.kg, kgUnit(e), step)}
+      ${stepper('reps', repsVal, repsUnit(e), m === 'dist' ? 5 : 1)}
+      ${e.bodyweight ? '<p class="note" style="text-align:center">Peso corporal</p>' : ''}
+      <div class="f-cta"><button class="btn xl" id="fDone">${CHECK} Série concluída</button>${nav}</div>`;
+  }
+  return `<div class="focus">${header}
+      <div class="f-meta">Série <b>${si + 1}</b> de ${sets.length} · meta <b>${esc(e.reps)}</b> · descanso ${fmtTime(e.rest)}</div>
+      <div class="dots">${dots}</div>
+      <div class="f-last">${last ? `Última vez: ${fmtSet(e, last)}` : 'Primeira vez neste exercício'}
+        · <button class="tip-toggle" id="fTipBtn" style="margin:0">Como executar</button></div>
+      <div class="tip" id="fTip">${esc(e.tip)}</div>
+      ${body}
+    </div>`;
+}
+
+function bindFocus(a) {
+  const ex = PLANS[a.plan].exercises;
+  const rr = () => { render(); window.scrollTo(0, 0); };
+  if ($('#toList')) $('#toList').onclick = () => { a.view = 'list'; save(); rr(); };
+  if ($('#fPrev')) $('#fPrev').onclick = () => { a.cur = Math.max(0, a.cur - 1); save(); rr(); };
+  if ($('#fNext')) $('#fNext').onclick = () => { a.cur = Math.min(ex.length - 1, a.cur + 1); save(); rr(); };
+  if ($('#fGoNext')) $('#fGoNext').onclick = () => { const n = nextPending(a, a.cur); if (n) a.cur = n.ei; save(); rr(); };
+  if ($('#fTipBtn')) $('#fTipBtn').onclick = () => {
+    const t = $('#fTip'); t.classList.toggle('show'); $('#fTipBtn').textContent = t.classList.contains('show') ? 'Ocultar dica' : 'Como executar';
+  };
+  if ($('#fSkip')) $('#fSkip').onclick = () => endRest(true);
+  if ($('#fPlus')) $('#fPlus').onclick = () => adjustRest(15);
+  if ($('#fMinus')) $('#fMinus').onclick = () => adjustRest(-15);
+  if ($('#finishBtn')) $('#finishBtn').onclick = finishSession;
+  bindCardio(a);
+
+  const e = ex[a.cur]; if (!e) return;
+  const si = a.sets[e.id].findIndex(s => !s.done); if (si < 0) return;
+  const s = a.sets[e.id][si];
+
+  document.querySelectorAll('.stepper').forEach(st => {
+    const inp = $('input', st); const step = +st.dataset.step;
+    st.querySelectorAll('[data-d]').forEach(b => b.onclick = () => {
+      const cur = num(inp.value) ?? 0;
+      const v = Math.max(0, Math.round((cur + step * +b.dataset.d) * 100) / 100);
+      inp.value = String(v).replace('.', ','); st.classList.remove('need');
+    });
+    inp.addEventListener('input', () => st.classList.remove('need'));
+    inp.addEventListener('focus', () => inp.select());
+  });
+
+  if ($('#fDone')) $('#fDone').onclick = () => {
+    const kgSt = $('.stepper[data-f="kg"]'), rSt = $('.stepper[data-f="reps"]');
+    const reps = num($('input', rSt).value);
+    if (!reps) { rSt.classList.add('need'); $('input', rSt).focus(); return; }   // não grava valor que você não informou
+    s.reps = reps; s.kg = kgSt ? num($('input', kgSt).value) : null;
+    completeSet(a.cur, si); rr();
+  };
+
+  if ($('#fPlay')) {
+    const clock = $('#fClock'), btn = $('#fPlay');
+    const ui = {
+      show(mode, v) {
+        clock.classList.toggle('run', mode === 'run'); clock.classList.toggle('hit', mode === 'hit'); clock.classList.toggle('count', mode === 'count');
+        clock.textContent = mode === 'count' ? String(v) : mode === 'idle' ? '0:00' : fmtTime(v);
+        btn.innerHTML = mode === 'idle' ? `${PLAY} Iniciar cronômetro` : `${STOP} Parar e registrar`;
+        btn.classList.toggle('stop', mode !== 'idle');
+      }
+    };
+    btn.onclick = () => {
+      if (sw) return stopWatch(true);
+      startWatch(s, parseInt(e.reps, 10), () => { completeSet(a.cur, si); rr(); }, ui);
+    };
+  }
+}
+
+/* ---------- Modo Lista ---------- */
+function viewList(a) {
+  const p = PLANS[a.plan];
+  const cards = p.exercises.map((e, ei) => {
+    const last = S.last[e.id]; const m = metric(e);
+    const lastTxt = last ? `Última vez: ${fmtSet(e, last)}` : 'Primeira vez neste exercício';
+    const rows = a.sets[e.id].map((s, si) => `
+      <div class="set ${m === 'time' ? 'timed' : ''} ${s.done ? 'done' : ''}" data-ex="${e.id}" data-ei="${ei}" data-i="${si}">
+        <div class="n">${si + 1}</div>
+        <input inputmode="decimal" placeholder="${e.bodyweight ? 'corporal' : 'kg'}" value="${s.kg ?? ''}" data-f="kg" aria-label="Carga série ${si + 1}">
+        ${m === 'time'
+          ? `<div class="tcell"><input inputmode="numeric" placeholder="seg" value="${s.reps ?? ''}" data-f="reps" aria-label="Segundos série ${si + 1}"><button class="play" data-play aria-label="Cronometrar série ${si + 1}">${PLAY}</button></div>`
+          : `<input inputmode="numeric" placeholder="${esc(e.reps)}" value="${s.reps ?? ''}" data-f="reps" aria-label="${repsUnit(e)} série ${si + 1}">`}
+        <button class="check" data-done aria-label="Marcar série ${si + 1} como feita">${CHECK}</button>
+      </div>`).join('');
+    return `<div class="card ex" id="ex-${e.id}">
+      <div class="ex-top">
+        <div class="row between" style="align-items:flex-start"><h3>${ei + 1}. ${esc(e.name)}</h3>
+          <button class="hbtn small" data-focus="${ei}">Focar</button></div>
+        <div class="muted small" style="margin-top:2px">${esc(e.muscles)}</div>
+        <div class="ex-meta"><span class="pill">${e.sets} séries</span><span class="pill">${esc(e.reps)}</span><span class="pill">descanso ${fmtTime(e.rest)}</span></div>
+        <div class="last" style="margin-top:8px">${lastTxt}</div>
+        <button class="tip-toggle" data-tip>Como executar</button>
+        <div class="tip">${esc(e.tip)}</div>
+      </div>
+      <div class="sets">
+        <div class="set set-h ${m === 'time' ? 'timed' : ''}"><div>Série</div><div style="text-align:center">${e.assist ? 'contrap.' : 'kg'}</div><div style="text-align:center">${repsUnit(e)}</div><div></div></div>
+        ${rows}
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="wrap">${cards}
+      ${viewCardio(a)}
+      <button class="btn" id="finishBtn" style="margin-top:8px">Finalizar treino</button>
+      <button class="btn danger" id="discardBtn" style="margin-top:10px">Descartar treino</button>
+    </div>`;
+}
+
+function bindList(a) {
+  $('#finishBtn').onclick = finishSession;
+  bindCardio(a);
+  $('#discardBtn').onclick = () => { if (confirm('Descartar este treino? Nada será salvo.')) { S.active = null; save(); endRest(false); go('home'); } };
+  document.querySelectorAll('[data-focus]').forEach(b => b.onclick = () => { a.view = 'focus'; a.cur = +b.dataset.focus; save(); render(); window.scrollTo(0, 0); });
   document.querySelectorAll('[data-tip]').forEach(b => b.onclick = () => {
     const c = b.closest('.ex'); c.classList.toggle('open'); b.textContent = c.classList.contains('open') ? 'Ocultar dica' : 'Como executar';
   });
   document.querySelectorAll('.set[data-ex]').forEach(row => {
-    const id = row.dataset.ex, i = +row.dataset.i; const s = a.sets[id][i];
+    const id = row.dataset.ex, ei = +row.dataset.ei, i = +row.dataset.i; const s = a.sets[id][i];
+    const ex = PLANS[a.plan].exercises[ei];
+    const repsInp = $('input[data-f="reps"]', row);
     row.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => {
-      s[inp.dataset.f] = num(inp.value);
-      // repete a carga nas séries seguintes ainda não feitas
+      s[inp.dataset.f] = num(inp.value); inp.classList.remove('need');
       if (inp.dataset.f === 'kg') a.sets[id].forEach((o, j) => {
         if (j > i && !o.done) { o.kg = s.kg; const el = $(`.set[data-ex="${id}"][data-i="${j}"] input[data-f="kg"]`); if (el) el.value = s.kg ?? ''; }
       });
       save();
     }));
-    const ex = PLANS[a.plan].exercises.find(e => e.id === id);
-    const play = $('[data-play]', row);
-    if (play) play.onclick = () => {
-      if (sw && sw.row === row) return stopWatch(true);
-      if (s.done) return;
-      startWatch(row, s, parseInt(ex.reps, 10), () => toggleDone());
-    };
-    $('[data-done]', row).onclick = () => { if (sw && sw.row === row) return stopWatch(true); toggleDone(); };
-    function toggleDone() {
-      s.done = !s.done;
-      if (s.done && s.reps == null) {
-        const def = parseInt(ex.reps, 10); // usa o início da faixa como padrão
-        if (!isNaN(def)) { s.reps = def; $('input[data-f="reps"]', row).value = def; }
-      }
-      row.classList.toggle('done', s.done);
+    const refresh = () => {
+      a.sets[id].forEach((o, j) => { const r = $(`.set[data-ex="${id}"][data-i="${j}"]`); r.classList.toggle('done', o.done); $('input[data-f="kg"]', r).value = o.kg ?? ''; });
       $('#prog').style.width = progressPct() + '%';
-      save();
-      if (s.done) {
-        if (navigator.vibrate) navigator.vibrate(30);
-        const allDone = a.sets[id].every(x => x.done);
-        const idx = PLANS[a.plan].exercises.indexOf(ex); const nxt = PLANS[a.plan].exercises[idx + 1];
-        startRest(ex.rest, allDone ? (nxt ? `Próximo: ${nxt.name}` : 'Último exercício concluído!') : `${ex.name} · série ${i + 2}`);
-      }
+    };
+    const done = () => {
+      if (s.done) { s.done = false; save(); refresh(); return; }
+      if (s.reps == null) { repsInp.classList.add('need'); repsInp.focus(); return; }   // não grava valor que você não informou
+      completeSet(ei, i); refresh();
+    };
+    const play = $('[data-play]', row);
+    if (play) {
+      const ui = {
+        show(mode, v) {
+          repsInp.value = mode === 'count' ? '' : mode === 'idle' ? (s.reps ?? '') : v;
+          repsInp.placeholder = mode === 'count' ? `em ${v}…` : 'seg';
+          row.classList.toggle('running', mode !== 'idle'); row.classList.toggle('hit', mode === 'hit');
+          play.innerHTML = mode === 'idle' ? PLAY : STOP;
+        }
+      };
+      play.onclick = () => { if (sw) return stopWatch(true); if (!s.done) startWatch(s, parseInt(ex.reps, 10), () => { completeSet(ei, i); refresh(); }, ui); };
     }
+    $('[data-done]', row).onclick = () => { if (sw && sw.s === s) return stopWatch(true); done(); };
   });
+}
+
+function bindSession() {
+  const a = S.active;
+  $('#pauseBtn').onclick = () => go('home');
+  $('#viewBtn').onclick = () => { a.view = a.view === 'focus' ? 'list' : 'focus'; save(); render(); window.scrollTo(0, 0); };
+  if (a.view === 'focus') bindFocus(a); else bindList(a);
 }
 
 function finishSession() {
   const a = S.active; const doneCount = Object.values(a.sets).flat().filter(s => s.done).length;
   if (!doneCount && !(a.cardio && a.cardio.on) && !confirm('Nenhuma série foi marcada. Finalizar mesmo assim?')) return;
-  for (const id in a.sets) {
-    const done = a.sets[id].filter(s => s.done);
-    if (done.length) { const best = done.reduce((m, s) => (s.kg ?? 0) >= (m.kg ?? 0) ? s : m, done[0]); S.last[id] = { kg: best.kg, reps: best.reps }; }
+  for (const e of PLANS[a.plan].exercises) {
+    const done = (a.sets[e.id] || []).filter(s => s.done);
+    if (!done.length) continue;
+    const key = metric(e) === 'reps' ? (s => s.kg ?? 0) : (s => s.reps ?? 0);
+    const best = done.reduce((m, s) => key(s) >= key(m) ? s : m, done[0]);
+    S.last[e.id] = { kg: best.kg, reps: best.reps };
   }
   const cardio = a.cardio && a.cardio.on && a.cardio.min ? { type: a.cardio.type, min: a.cardio.min, km: a.cardio.km, int: a.cardio.int } : null;
   if (cardio) S.lastCardio = { type: cardio.type };
   S.history.push({ plan: a.plan, start: a.start, end: Date.now(), sets: a.sets, cardio });
   S.next = ORDER[(ORDER.indexOf(a.plan) + 1) % 3];
-  S.active = null; save(); stopRest();
+  S.active = null; save(); endRest(false);
   alert(`Treino concluído! ${doneCount} séries registradas. Próximo: ${PLANS[S.next].name}.`);
   go('history');
 }
 
 /* ============================== Cronômetro de exercício (ex.: prancha) ============================== */
-let sw = null; // { row, s, start, tick, target, hit, onDone }
+let sw = null; // { s, start, tick, target, hit, onDone, ui }
 function tone(freq, dur = 0.15) {
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume();
@@ -597,42 +868,45 @@ function tone(freq, dur = 0.15) {
     g.gain.setValueAtTime(0.2, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); o.start(t); o.stop(t + dur);
   } catch (e) {}
 }
-function startWatch(row, s, target, onDone) {
-  if (sw) stopWatch(true);           // só um cronômetro por vez
-  stopRest();
-  const inp = $('input[data-f="reps"]', row), btn = $('[data-play]', row);
-  sw = { row, s, target, onDone, hit: false, start: Date.now() + 3000 };   // 3 s para se posicionar
-  row.classList.add('running'); btn.innerHTML = STOP; btn.setAttribute('aria-label', 'Parar cronômetro');
+function startWatch(s, target, onDone, ui) {
+  if (sw) stopWatch(false);
+  endRest(false);
+  sw = { s, target, onDone, ui, hit: false, start: Date.now() + 3000 };   // 3 s para se posicionar
   let lastCount = null;
   const upd = () => {
     const ms = Date.now() - sw.start;
     if (ms < 0) {                    // contagem regressiva 3-2-1
       const c = Math.ceil(-ms / 1000);
       if (c !== lastCount) { lastCount = c; tone(660); }
-      inp.value = ''; inp.placeholder = `em ${c}…`; return;
+      ui.show('count', c); return;
     }
     if (lastCount !== 0) { lastCount = 0; tone(990, 0.3); }
-    const sec = Math.floor(ms / 1000); inp.value = sec;
-    if (!sw.hit && target && sec >= target) { sw.hit = true; row.classList.add('hit'); beep(); }
+    const sec = Math.floor(ms / 1000);
+    if (!sw.hit && target && sec >= target) { sw.hit = true; beep(); }
+    ui.show(sw.hit ? 'hit' : 'run', sec);
   };
   upd(); sw.tick = setInterval(upd, 200);
-  try { navigator.wakeLock && navigator.wakeLock.request('screen').then(l => { if (sw) sw.lock = l; else l.release(); }).catch(() => {}); } catch (e) {}
+  wakeLock(true);
 }
 function stopWatch(record) {
   if (!sw) return;
-  const { row, s, onDone, tick } = sw; clearInterval(tick);
-  try { sw.lock && sw.lock.release(); } catch (e) {}
+  const { s, onDone, tick, ui } = sw; clearInterval(tick); wakeLock(false);
   const sec = Math.max(0, Math.floor((Date.now() - sw.start) / 1000));
-  const inp = $('input[data-f="reps"]', row), btn = $('[data-play]', row);
-  row.classList.remove('running', 'hit'); inp.placeholder = 'seg';
-  if (btn) { btn.innerHTML = PLAY; btn.setAttribute('aria-label', 'Cronometrar série'); }
   const started = Date.now() >= sw.start; sw = null;
-  if (record && started && sec > 0) { s.reps = sec; inp.value = sec; save(); if (!s.done) onDone(); }
-  else { inp.value = s.reps ?? ''; }
+  ui.show('idle');
+  if (record && started && sec > 0) { s.reps = sec; save(); if (!s.done) onDone(); }
+}
+let lock = null;
+function wakeLock(on) {
+  try {
+    if (on && navigator.wakeLock && !lock) navigator.wakeLock.request('screen').then(l => { lock = l; l.addEventListener('release', () => { lock = null; }); }).catch(() => {});
+    if (!on && lock) { lock.release(); lock = null; }
+  } catch (e) {}
 }
 
 /* ============================== Timer de descanso ============================== */
-let restEnd = 0, restTick = null, beeped = false, audioCtx = null;
+let rest = null, restTick = null, audioCtx = null; // rest = { end, total, label, title, beeped }
+const inFocus = () => tab === 'session' && S.active && S.active.view === 'focus';
 function beep() {
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
@@ -645,26 +919,46 @@ function beep() {
   } catch (e) {}
   if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 }
-function startRest(sec, label) {
+function startRest(sec, label, title = 'Descanso') {
   try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch (e) {}
-  restEnd = Date.now() + sec * 1000; beeped = false;
-  $('#restLbl').textContent = label; $('#rest').classList.add('show'); $('#rest').classList.remove('over');
+  rest = { end: Date.now() + sec * 1000, total: sec * 1000, label, title, beeped: false };
   clearInterval(restTick); restTick = setInterval(updateRest, 250); updateRest();
+  if (inFocus()) { render(); window.scrollTo(0, 0); }
+}
+function adjustRest(d) {
+  if (!rest) return;
+  rest.end = Math.max(Date.now() + 1000, rest.end + d * 1000); rest.total = Math.max(rest.total, rest.end - Date.now());
+  updateRest();
 }
 function updateRest() {
-  const left = Math.round((restEnd - Date.now()) / 1000);
-  if (left <= 0) {
-    $('#restTime').textContent = '0:00'; $('#rest').classList.add('over');
-    if (!beeped) { beeped = true; beep(); $('#restLbl').textContent = 'Descanso finalizado — próxima série!'; setTimeout(stopRest, 6000); }
-    return;
+  const bar = $('#rest');
+  if (!rest) { bar.classList.remove('show'); document.body.classList.remove('has-rest'); return; }
+  const left = Math.ceil((rest.end - Date.now()) / 1000);
+  const show = !inFocus();
+  bar.classList.toggle('show', show); document.body.classList.toggle('has-rest', show);
+  $('#restLbl').textContent = rest.beeped ? 'Descanso finalizado. Próxima série!' : (rest.label || rest.title);
+  document.querySelectorAll('[data-rest-time], #restTime').forEach(el => el.textContent = fmtTime(Math.max(0, left)));
+  document.querySelectorAll('[data-rest-bar]').forEach(el => el.style.width = Math.max(0, (rest.end - Date.now()) / rest.total * 100) + '%');
+  if (left <= 0 && !rest.beeped) {
+    rest.beeped = true; beep(); bar.classList.add('over');
+    if (inFocus()) endRest(true); else setTimeout(() => { if (rest && rest.beeped) endRest(false); }, 6000);
   }
-  $('#restTime').textContent = fmtTime(left);
 }
-function stopRest() { clearInterval(restTick); $('#rest').classList.remove('show'); }
-$('#restSkip').onclick = stopRest;
-$('#restPlus').onclick = () => { restEnd += 15000; if (beeped) { beeped = false; $('#rest').classList.remove('over'); clearInterval(restTick); restTick = setInterval(updateRest, 250); } updateRest(); };
+function endRest(rerender) {
+  clearInterval(restTick); rest = null;
+  $('#rest').classList.remove('show', 'over'); document.body.classList.remove('has-rest');
+  if (rerender && inFocus()) { render(); window.scrollTo(0, 0); }
+}
+$('#restSkip').onclick = () => endRest(true);
+$('#restPlus').onclick = () => adjustRest(15);
+$('#restMinus').onclick = () => adjustRest(-15);
 
-setInterval(() => { const el = $('#elapsed'); if (el && S.active) el.textContent = `${fmtTime(Math.floor((Date.now() - S.active.start) / 1000))} · ${progressPct()}% concluído`; }, 1000);
+function elapsedTxt(short) {
+  if (!S.active) return '';
+  const t = fmtTime(Math.floor((Date.now() - S.active.start) / 1000));
+  return short ? t : `${t} · ${progressPct()}%`;
+}
+setInterval(() => { const el = $('#elapsed'); if (el && S.active) el.textContent = elapsedTxt(); }, 1000);
 
 /* ============================== Eventos gerais ============================== */
 function bind() {
