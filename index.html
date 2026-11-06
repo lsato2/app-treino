@@ -982,7 +982,7 @@ function strengthCards(n = 4, until = Date.now()) {
 
 /* ============================== Telas ============================== */
 let tab = 'home';
-function go(t) { if (sw) stopWatch(false); tab = t; render(); window.scrollTo(0, 0); }
+function go(t) { if (sw) stopWatch(false); if (window.updatePending && !S.active && t === 'home') { location.reload(); return; } tab = t; render(); window.scrollTo(0, 0); }
 
 function render() {
   applyPlan(); applyTheme();
@@ -1155,6 +1155,7 @@ function viewProfile() {
     </div>
     <p class="note">${window.cloud && window.cloud.user ? 'Os dados ficam salvos neste aparelho e na sua conta Google.' : 'Os dados ficam salvos apenas neste aparelho/navegador.'}</p>
     <p class="note">Exercícios e instruções: biblioteca exercicios-bd-ptbr (domínio público, CC0), tradução do free-exercise-db.</p>
+    <p class="note">Versão do app: <span id="appVer">${esc(window.appVersion || '—')}</span></p>
   </div>`;
 }
 
@@ -2687,7 +2688,7 @@ function bindOnboard() {
   const d = draft();
   document.querySelectorAll('[data-d]').forEach(i => i.addEventListener('input', () => { d[i.dataset.d] = i.value; }));
   document.querySelectorAll('[data-set]').forEach(b => b.onclick = () => { const f = b.dataset.set; d[f] = ['tempo', 'freq'].includes(f) ? +b.dataset.v : b.dataset.v; render(); });
-  document.querySelectorAll('[data-olim]').forEach(b => b.onclick = () => { const k = b.dataset.olim; const l = d.limits || []; d.limits = l.includes(k) ? l.filter(x => x !== k) : [...l, k]; render(); });
+  document.querySelectorAll('[data-olim]').forEach(b => b.onclick = () => { const k = b.dataset.olim; const l = d.limits || []; d.limits = !k ? [] : l.includes(k) ? l.filter(x => x !== k) : [...l, k]; render(); });
   document.querySelectorAll('[data-prio]').forEach(b => b.onclick = () => { d.prio = togglePrio(d.prio || [], b.dataset.prio); render(); });
   document.querySelectorAll('[data-ob-back]').forEach(b => b.onclick = () => { obStep = Math.max(obRedo ? 1 : 0, obStep - 1); render(); window.scrollTo(0, 0); });
   document.querySelectorAll('[data-ob-cancel]').forEach(b => b.onclick = () => { obRedo = false; obDraft = null; obStep = 0; go('profile'); });
@@ -3141,7 +3142,7 @@ function prioChips(sel, attr) {
   return `<div class="chips wrap-chips"><button class="none-chip ${sel.length ? '' : 'on'}" ${attr}="">Sem preferência</button>${Object.entries(RG).map(([k, l]) => `<button class="${sel.includes(k) ? 'on' : ''}" ${attr}="${k}">${l}</button>`).join('')}</div>`;
 }
 function limitChips(sel, attr) {
-  return `<div class="chips wrap-chips">${Object.entries(LIMITS).map(([k, o]) => `<button class="${sel.includes(k) ? 'on' : ''}" ${attr}="${k}">${o.label}</button>`).join('')}</div>`;
+  return `<div class="chips wrap-chips"><button class="none-chip ${sel.length ? '' : 'on'}" ${attr}="">Nenhuma</button>${Object.entries(LIMITS).map(([k, o]) => `<button class="${sel.includes(k) ? 'on' : ''}" ${attr}="${k}">${o.label}</button>`).join('')}</div>`;
 }
 const togglePrio = (list, g) => !g ? [] : list.includes(g) ? list.filter(x => x !== g) : list.length >= MAX_PRIO ? list : [...list, g];
 const NO_TRAVEL = /pull-?up|chin-?up|muscle.?up/i;    // sem barra no quarto
@@ -3565,7 +3566,7 @@ function bind() {
     $('#pNome').onchange = ev => { S.profile.nome = ev.target.value.trim(); save(); };
     $('#pSexo').onchange = ev => { S.profile.sexo = ev.target.value; save(); render(); };
     $('#pFreq').onchange = ev => { S.goal = { ...(S.goal || {}), freq: +ev.target.value }; save(); render(); };
-    document.querySelectorAll('[data-plim]').forEach(b => b.onclick = () => { const k = b.dataset.plim; const l = limitList(); S.profile.limits = l.includes(k) ? l.filter(x => x !== k) : [...l, k]; save(); render(); });
+    document.querySelectorAll('[data-plim]').forEach(b => b.onclick = () => { const k = b.dataset.plim; const l = limitList(); S.profile.limits = !k ? [] : l.includes(k) ? l.filter(x => x !== k) : [...l, k]; save(); render(); });
     document.querySelectorAll('[data-pprio]').forEach(b => b.onclick = () => { S.goal = { ...(S.goal || {}), prio: togglePrio(prioGroups(), b.dataset.pprio) }; save(); render(); });
     $('#exportBtn').onclick = exportBackup;
     $('#bkEvery').onchange = ev => { S.backupEvery = +ev.target.value; save(); };
@@ -3589,7 +3590,21 @@ runCoach();
 render();
 loadLib().then(() => { applyPlan(); if (['home', 'coach', 'plans'].includes(tab)) window.safeRender(); }).catch(() => {});
 
-if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+/* Atualização: ao achar versão nova, recarrega sozinho (se não houver treino em andamento); confere de novo sempre que o app volta para a frente */
+if ('serviceWorker' in navigator) {
+  let reloading = false; const hadSW = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadSW || reloading) return;
+    if (S.active) { window.updatePending = true; return; }             // no meio do treino não recarrega; aplica ao terminar
+    reloading = true; location.reload();
+  });
+  navigator.serviceWorker.addEventListener('message', ev => { if (ev.data && ev.data.version) { window.appVersion = ev.data.version.replace('treino-', ''); const el = $('#appVer'); if (el) el.textContent = window.appVersion; } });
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+    const check = () => reg.update().catch(() => {});
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+    if (navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage('version');
+  }).catch(() => {}));
+}
 </script>
 <script type="module" src="sync.js"></script>
 </body>
