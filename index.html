@@ -352,6 +352,8 @@
   .gsets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; } .gs { font-size: 13px; min-width: 0; } .gs b { font-weight: 500; }
   .gs .gtrack { display: block; margin-top: 4px; height: 6px; } .gtrack i.full { background: var(--ok); }
   .calc-ref { margin-top: 10px; } .calc-ref summary { cursor: pointer; list-style: none; } .calc-ref summary::-webkit-details-marker { display: none; } .calc-ref summary::after { content: " ›"; }
+.why-sec { padding: 12px 0; border-top: 1px solid var(--line); } .why-sec .pill { font-size: 11px; white-space: nowrap; flex: none; margin-left: 8px; }
+  .why-ref { font-size: 12px; color: var(--muted); margin-top: 6px; font-style: italic; }
   .pr-mini { font-size: 11px; color: var(--accent); margin-top: 2px; font-weight: 600; }
   .gbar { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; align-items: center; padding: 5px 0; font-size: 14px; }
   .gtrack { height: 10px; background: var(--w85); border: 1px solid var(--edge); border-radius: 999px; overflow: hidden; }
@@ -1001,7 +1003,7 @@ function viewHome() {
       <h1>${S.profile.nome ? esc(S.profile.nome.split(' ')[0]) : 'Bora treinar'}</h1></div>${avatarBtn()}</div>
     ${travelBanner()}
     ${todayCard()}
-    ${S.active || rotina() ? '' : '<button class="card report-card" data-goto="profile"><b>Como é o seu dia a dia?</b><span class="note">Responda no Perfil para ajustar o aeróbico e o gasto calórico.</span></button>'}
+    ${S.active || (rotina() && nivel()) ? '' : `<button class="card report-card" data-goto="profile"><b>Complete seu perfil</b><span class="note">${[nivel() ? '' : 'experiência', rotina() ? '' : 'dia a dia'].filter(Boolean).join(' e ')}: ajusta o volume do treino e o aeróbico.</span></button>`}
     ${S.active ? '' : loginCard()}
     ${S.active ? '' : reportReadyCard()}
     ${(() => { const ms = coachMessages().filter(x => (x.t !== 'info' || !S.history.length) && x.t !== 'deload').slice(0, 2); return ms.length ? `<div class="stack" style="margin-top:12px">${ms.map(msgHtml).join('')}</div>` : ''; })()}
@@ -1092,6 +1094,9 @@ function viewProfile() {
       <div class="field"><label for="pFreq">Treinos por semana</label>
         <select id="pFreq" style="padding:10px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);width:100%">
         ${[2, 3, 4, 5].map(v => `<option value="${v}" ${freq() === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+      <div class="field"><label for="pNivel">Experiência</label>
+        <select id="pNivel" style="padding:10px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);width:100%">
+        ${nivel() ? '' : '<option value="" selected>Escolha…</option>'}${Object.entries(NIVEL).map(([v, o]) => `<option value="${v}" ${nivel() === v ? 'selected' : ''}>${o.label}</option>`).join('')}</select></div>
       <div class="field"><label for="pRot">Dia a dia</label>
         <select id="pRot" style="padding:10px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);width:100%">
         ${rotina() ? '' : '<option value="" selected>Escolha…</option>'}${Object.entries(ROTINA).map(([v, o]) => `<option value="${v}" ${rotina() === v ? 'selected' : ''}>${o.label.replace(' a maior parte do dia', '').replace(' boa parte do dia', '')}</option>`).join('')}</select></div>
@@ -2500,7 +2505,7 @@ function prescribe(ex, kind, g, tempo) {
   if (ex.unit === 's') return { sets: 3, reps: (g === 'saude' || g === 'emagrecimento' ? '30s' : '40s') + (ex.each ? ' cada lado' : ''), rest: 60 };
   if (ex.dist) return { sets: 3, reps: '30 m', rest: 75 };
   const [reps, rest] = kind === 'core' ? ['12–15', 60] : sc[kind] || sc.c;
-  const sets = kind === 'big' && tempo >= 60 && ['hipertrofia', 'forca', 'recomp'].includes(g) ? 4 : 3;
+  const nv = nivel(); const sets = nv === 'iniciante' ? 3 : kind === 'big' && (tempo >= 60 || nv === 'avancado') && ['hipertrofia', 'forca', 'recomp'].includes(g) ? 4 : 3;
   return { sets, reps: reps + (ex.each ? ` ${ex.each}` : ''), rest };
 }
 const exMinutes = e => (e.sets * (45 + e.rest) + 60) / 60;      // execução + descanso + preparo
@@ -2592,7 +2597,7 @@ function draft() {
   const P = S.profile; const mine = S.onboarded || !!(P.nome && String(P.nome).trim());   // só preenche com dados que a pessoa já informou
   const gname = (window.cloud && window.cloud.user && window.cloud.user.name || '').split(' ')[0];
   if (!obDraft) obDraft = { nome: mine ? P.nome : gname, sexo: mine ? P.sexo || '' : '', idade: mine ? P.idade || '' : '', altura: mine ? P.altura || '' : '', peso: mine ? P.peso || '' : '',
-    obj: goal(), tempo: (S.goal && S.goal.tempo) || 60, freq: freq(), prio: prioGroups(), rotina: rotina() || '' };
+    obj: goal(), tempo: (S.goal && S.goal.tempo) || 60, freq: freq(), prio: prioGroups(), rotina: rotina() || '', nivel: nivel() || '' };
   return obDraft;
 }
 function viewOnboard() {
@@ -2628,6 +2633,8 @@ function viewOnboard() {
   if (obStep === 2) return `<div class="wrap ob">${back}${head(2, 'Objetivo e rotina')}
     <div class="ob-label">Qual é o seu objetivo?</div>
     <div class="stack">${Object.entries(GOALS).map(([v, l]) => `<button class="opt ${d.obj === v ? 'on' : ''}" data-set="obj" data-v="${v}"><span><b>${l}</b><br><span class="muted small">${GOAL_DESC[v]}</span></span>${d.obj === v ? CHECK : ''}</button>`).join('')}</div>
+    <div class="ob-label">Há quanto tempo você treina?</div>
+    <div class="stack">${Object.entries(NIVEL).map(([v, o]) => `<button class="opt ${d.nivel === v ? 'on' : ''}" data-set="nivel" data-v="${v}"><span><b>${o.label}</b><br><span class="muted small">${o.sub}</span></span>${d.nivel === v ? CHECK : ''}</button>`).join('')}</div>
     <div class="ob-label">Como é o seu dia a dia?</div>
     <div class="stack">${Object.entries(ROTINA).map(([v, o]) => `<button class="opt ${d.rotina === v ? 'on' : ''}" data-set="rotina" data-v="${v}"><span><b>${o.label}</b><br><span class="muted small">${o.sub}</span></span>${d.rotina === v ? CHECK : ''}</button>`).join('')}</div>
     <div class="ob-label">Quanto tempo você tem por treino?</div>
@@ -2670,8 +2677,9 @@ function bindOnboard() {
       save();
     }
     if (obStep === 2) {
-      if (!d.rotina) { const el = $('#obErr2'); if (el) el.textContent = 'Conte como é o seu dia a dia.'; return; }
-      S.goal = { ...(S.goal || {}), obj: d.obj, tempo: d.tempo, freq: d.freq, prio: d.prio }; S.profile.rotina = d.rotina; save(); loadLib().catch(() => {});
+      const miss = !d.nivel ? 'Conte há quanto tempo você treina.' : !d.rotina ? 'Conte como é o seu dia a dia.' : '';
+      if (miss) { const el = $('#obErr2'); if (el) el.textContent = miss; return; }
+      S.goal = { ...(S.goal || {}), obj: d.obj, tempo: d.tempo, freq: d.freq, prio: d.prio, nivel: d.nivel }; S.profile.rotina = d.rotina; save(); loadLib().catch(() => {});
     }
     obStep++; render(); window.scrollTo(0, 0);
   });
@@ -2872,13 +2880,14 @@ function weekCard() {
     const hs = S.history.filter(h => h.end >= a && h.end < b); return { hs, n: hs.reduce((t, h) => t + setsDone(h) + (h.cardio ? 4 : 0), 0) }; });
   const max = Math.max(1, ...days.map(d => d.n)); const n = days.filter(d => d.hs.some(isStrength)).length;
   const tot = days.reduce((t, d) => t + d.hs.reduce((u, h) => u + setsDone(h), 0), 0);
-  const G = groupSets(ws, ws + 7 * DAY);
+  const G = groupSets(ws, ws + 7 * DAY); const F = {};
+  for (const h of S.history) if (h.end >= ws && h.end < ws + 7 * DAY) for (const [g, v] of Object.entries(sessionLoad(h))) if (v >= 2) F[g] = (F[g] || 0) + 1;
   return `<div class="card"><div class="row between"><span class="muted small">Esta semana</span><span class="pill">${n} de ${freq()} treinos</span></div>
     <div class="week-sum" style="margin-top:6px"><b>${tot}</b><span class="muted small">série${tot === 1 ? '' : 's'}</span></div>
     <div class="week">${days.map((d, i) => `<div class="day"><div class="bar ${d.hs.length ? 'on' : ''} ${i === today ? 'today' : ''}" style="height:${d.hs.length ? 34 + 50 * d.n / max : 30}px" title="${d.hs.map(h => planMeta(h).name).join(', ')}"></div>
       <span class="d">${'STQQSSD'[i]}</span></div>`).join('')}</div>
-    <div class="muted small" style="margin:14px 0 4px">Séries por grupo muscular</div>
-    <div class="gsets">${Object.keys(RG).map(g => { const v = Math.round(G[g] || 0), t = WEEK_TARGET[g]; return `<div class="gs"><div class="row between"><span>${RG[g] === 'Posterior e glúteos' ? 'Posterior' : RG[g]}</span><b>${v}<span class="muted">/${t}</span></b></div>
+    <div class="row between" style="margin:14px 0 4px"><span class="muted small">Séries por grupo · vezes na semana</span><button class="hbtn small" data-why>Por quê?</button></div>
+    <div class="gsets">${Object.keys(RG).map(g => { const v = Math.round(G[g] || 0), t = WEEK_TARGET[g]; return `<div class="gs"><div class="row between"><span>${volMode(g) === 'prio' ? '★ ' : ''}${RG[g] === 'Posterior e glúteos' ? 'Posterior' : RG[g]}<span class="muted"> · ${F[g] || 0}×</span></span><b>${v}<span class="muted">/${t}</span></b></div>
       <span class="gtrack"><i class="${v >= t ? 'full' : ''}" style="width:${Math.min(100, v / t * 100)}%"></i></span></div>`; }).join('')}</div></div>`;
 }
 function openKeypad(inp, unit, decimal, onOk) {
@@ -3000,12 +3009,12 @@ function sessionLoad(h) {
 /* Estado de cada grupo: horas desde o último treino com pelo menos 3 séries */
 function groupStatus(now = Date.now()) {
   const out = {};
-  for (const g of Object.keys(RG)) out[g] = { hours: null, week: 0 };
+  for (const g of Object.keys(RG)) out[g] = { hours: null, week: 0, sess: 0 };
   for (const h of S.history) {
     const L = sessionLoad(h);
     for (const [g, v] of Object.entries(L)) {
       if (!out[g]) continue;
-      if (now - h.end < 7 * DAY) out[g].week += v;
+      if (now - h.end < 7 * DAY) { out[g].week += v; if (v >= 2) out[g].sess++; }
       if (v >= 3) out[g].hours = (now - h.end) / 3.6e6;
     }
   }
@@ -3038,12 +3047,27 @@ const SESSION_TYPES = {
 };
 const TYPE_KEYS = Object.keys(SESSION_TYPES);
 const tagOf = k => (SESSION_TYPES[k] || {}).tag || k;
-const WEEK_BASE = { peito: 10, costas: 10, pernas: 10, posterior: 10, ombros: 8, biceps: 6, triceps: 6, core: 6 };   // séries por semana (referência geral)
-/* Grupos que a pessoa quer priorizar (até 3): meta semanal ~40% maior, foco do dia favorecido e um exercício a mais */
+/* Nível de experiência: define o volume semanal (séries por grupo) */
+const NIVEL = {
+  iniciante: { label: 'Iniciante', sub: 'Menos de 6 meses de treino, ou voltando depois de uma pausa longa' },
+  intermediario: { label: 'Intermediário', sub: '6 meses a 2 anos de treino regular' },
+  avancado: { label: 'Avançado', sub: 'Mais de 2 anos, com boa técnica nos exercícios básicos' },
+};
+const nivel = () => (S.goal && NIVEL[S.goal.nivel]) ? S.goal.nivel : null;
+const LEVEL_VOL = {                                                          // séries por semana por grupo
+  iniciante: { peito: 8, costas: 8, pernas: 8, posterior: 8, ombros: 6, biceps: 4, triceps: 4, core: 4 },
+  intermediario: { peito: 12, costas: 12, pernas: 12, posterior: 10, ombros: 10, biceps: 8, triceps: 8, core: 6 },
+  avancado: { peito: 16, costas: 16, pernas: 14, posterior: 12, ombros: 12, biceps: 10, triceps: 10, core: 8 },
+};
+const WEEK_BASE = { peito: 10, costas: 10, pernas: 10, posterior: 10, ombros: 8, biceps: 6, triceps: 6, core: 6 };   // sem nível informado
+/* Grupos que a pessoa quer priorizar (até 3): meta ~30% maior; os demais ficam em manutenção (~70% da meta, acima do mínimo de 1/3) */
 const MAX_PRIO = 3;
 const prioGroups = () => ((S.goal && S.goal.prio) || []).filter(g => g in WEEK_BASE).slice(0, MAX_PRIO);
-const WEEK_TARGET = new Proxy(WEEK_BASE, { get: (t, g) => t[g] == null ? undefined : prioGroups().includes(g) ? Math.round(t[g] * 1.4) : t[g] });
-const PRIO_SLOT = { peito: 'fly', costas: 'hpull', ombros: 'lateral', biceps: 'biceps', triceps: 'triceps', pernas: 'legext', posterior: 'legcurl', core: 'core' };
+const baseVol = g => (LEVEL_VOL[nivel()] || WEEK_BASE)[g];
+const volMode = g => { const pr = prioGroups(); return !pr.length ? 'normal' : pr.includes(g) ? 'prio' : g === 'core' ? 'normal' : 'manut'; };
+const WEEK_TARGET = new Proxy(WEEK_BASE, { get: (t, g) => { if (t[g] == null) return undefined; const b = baseVol(g), m = volMode(g);
+  return m === 'prio' ? Math.round(b * 1.3) : m === 'manut' ? Math.max(Math.ceil(b / 3), Math.round(b * 0.7)) : b; } });
+const PRIO_SLOT = { peito: ['fly', 'ipush'], costas: ['hpull', 'vpull'], ombros: ['reardelt', 'lateral'], biceps: ['biceps'], triceps: ['triceps'], pernas: ['legext', 'lunge'], posterior: ['legcurl', 'glute'], core: ['core'] };
 function prioChips(sel, attr) {
   return `<div class="chips wrap-chips">${Object.entries(RG).map(([k, l]) => `<button class="${sel.includes(k) ? 'on' : ''}" ${attr}="${k}">${l}</button>`).join('')}</div>`;
 }
@@ -3127,13 +3151,13 @@ function generateWorkout(type, ctx) {
   ctx = { ...ctx, used: new Set() };
   const list = []; let mins = 5;                                  // 5 min de aquecimento
   const prio = prioGroups().filter(gp => T.groups.includes(gp) || (gp === 'core' && T.slots.includes('core')));
-  const slots = [...T.slots]; prio.forEach(gp => slots.splice(Math.min(3, slots.length), 0, PRIO_SLOT[gp]));   // um exercício a mais para cada prioridade do foco
+  const slots = [...T.slots]; prio.forEach(gp => slots.splice(Math.min(3, slots.length), 0, PRIO_SLOT[gp].find(x => !slots.includes(x)) || PRIO_SLOT[gp][0]));   // um exercício a mais para cada prioridade do foco
   for (const slot of ctx.travel ? [...slots, 'cond'] : slots) {
     const pk = pickExercise(slot, ctx); if (!pk) continue;
     let kind = (CATALOG[slot] || {}).kind || 'c';
     if (ctx.travel && ['big', 'c', 'i'].includes(kind)) kind = 'bw';
     const e = { ...pk.ex, slot, ...prescribe(pk.ex, kind, g, tempo) };
-    if (prio.some(gp => exGroups(e).p.includes(gp)) && e.sets < 4 && kind !== 'cond') e.sets += 1;   // +1 série nos grupos prioritários
+    if (prio.some(gp => exGroups(e).p.includes(gp)) && e.sets < 4 && kind !== 'cond' && nivel() !== 'iniciante') e.sets += 1;   // +1 série nos grupos prioritários
     if (list.length >= 4 && mins + exMinutes(e) > tempo) break;
     list.push(e); ctx.used.add(pk.id); mins += exMinutes(e);
   }
@@ -3155,8 +3179,9 @@ function rankTypes(st) {
     const ready = T.groups.reduce((a, gp) => a + Math.min(1.5, st[gp].score), 0) / T.groups.length;
     const fit = f <= 3 ? (type === 'full' ? 0.6 : type === 'upper' ? 0.2 : 0) : (type === 'full' ? -0.2 : 0.1);
     const pr = prioGroups(); const prioHit = pr.filter(gp => T.groups.includes(gp)).length;
+    const lowFreq = T.groups.filter(gp => st[gp].sess < 2);                     // meta: cada grupo ao menos 2x na semana
     const ok = !blockers.length && p && p.exercises.length >= 3;
-    return { k: type, T, ok, blockers, soft, need, main: T.groups, prioHit, score: (ok ? 0 : -10 - blockers.length) + ready + need - 0.5 * soft.length + fit + (pr.length ? 0.6 * prioHit / pr.length : 0) };
+    return { k: type, T, ok, blockers, soft, need, main: T.groups, prioHit, lowFreq, score: (ok ? 0 : -10 - blockers.length) + ready + need - 0.5 * soft.length + fit + (pr.length ? 0.6 * prioHit / pr.length : 0) + 0.4 * lowFreq.length / T.groups.length };
   }).sort((a, b) => b.score - a.score);
 }
 function dayKeyOf(t) { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
@@ -3223,14 +3248,35 @@ function todayCard() {
     return `<div class="card hero rest-hero" style="margin-top:16px"><div class="row"><span class="tag R">${t.type === 'done' ? '✓' : 'Zz'}</span>
       <div><div class="muted small">Personal do dia</div><h3>${t.type === 'done' ? 'Treino de hoje concluído' : 'Hoje é dia de descanso'}</h3></div></div>
       ${reasons}
-      <div class="row" style="gap:8px;margin-top:6px;flex-wrap:wrap"><button class="hbtn small" data-cardio-only>♥ Registrar aeróbico</button><button class="hbtn small" data-goto="plans">Treinar mesmo assim</button>${custom}</div></div>`;
+      <div class="row" style="gap:8px;margin-top:6px;flex-wrap:wrap"><button class="hbtn small" data-cardio-only>♥ Registrar aeróbico</button><button class="hbtn small" data-goto="plans">Treinar mesmo assim</button><button class="hbtn small" data-why>Por quê?</button>${custom}</div></div>`;
   }
   return `<div class="card hero ${k}" style="margin-top:16px">
     <div class="row between"><div class="row"><span class="tag ${k}">${tagOf(k)}</span>
       <div><div class="muted small">Treino de hoje${travelOn() ? ' · viagem' : ''}</div><h3 class="hero-t">${esc(p.name)}</h3><div class="hero-f">${esc(p.focus)}</div></div></div></div>
     ${reasons}${exPeek(k)}
     <button class="btn" style="margin-top:14px" data-start="${k}">Começar treino</button>
-    <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="hbtn small" data-goto="plans">Outro foco</button>${custom}</div></div>`;
+    <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="hbtn small" data-why>Por que este treino?</button><button class="hbtn small" data-goto="plans">Outro foco</button>${custom}</div></div>`;
+}
+/* "Por que este treino": cada decisão, com a regra e a referência por trás */
+function openWhy() {
+  const t = todayPlan(); const st = t.st; const k = t.best.k; const p = PLANS[k];
+  const nv = nivel(); const pr = prioGroups(); const g = (S.plan && S.plan.goal) || goal(); const sc = SCHEME[g] || SCHEME.recomp;
+  const ref = r => `<div class="why-ref">${r}</div>`; const app = '<span class="pill">regra do app</span>'; const ev = '<span class="pill rec-pill">com base em estudo</span>';
+  const stLbl = { cansado: 'treinado hoje', recuperando: 'treinado ontem', pronto: 'recuperado', parado: 'parado há mais de 7 dias', novo: 'sem registro', dor: 'com dor' };
+  const sec = (title, tag, body, r) => `<div class="why-sec"><div class="row between"><b>${title}</b>${tag}</div><div class="note" style="margin-top:4px">${body}</div>${r ? ref(r) : ''}</div>`;
+  const grp = Object.keys(RG).map(gp => `<div class="kv"><span>${volMode(gp) === 'prio' ? '★ ' : ''}${RG[gp]}${volMode(gp) === 'manut' ? ' <span class="muted small">manutenção</span>' : ''}</span><b>${Math.round(st[gp].week)}/${WEEK_TARGET[gp]} · ${st[gp].sess}×</b></div>`).join('');
+  const el = sheet(`<h3>Por que este treino</h3><p class="muted small" style="margin:2px 0 10px">${t.type === 'train' ? `Hoje: ${esc(p.name)}` : t.type === 'done' ? 'Treino de hoje concluído' : 'Hoje: descanso'}</p>
+    ${sec('Foco do dia', app, `${t.type === 'rest' ? esc(t.why[0]) + ' ' : ''}O foco só entra quando todos os grupos grandes dele tiveram ao menos um dia de descanso. Hoje: ${(SESSION_TYPES[k] || { groups: [] }).groups.map(gp => `${RG[gp]} ${stLbl[st[gp].state]}`).join(', ')}.`, 'Inspirado na prática comum de ~48 h entre sessões do mesmo grupo muscular.')}
+    ${sec('Volume da semana', ev, `Meta por grupo para o nível ${nv ? NIVEL[nv].label.toLowerCase() : 'não informado'}. O foco com mais séries faltando ganha pontos. Formato: séries feitas/meta · vezes nos últimos 7 dias.${grp ? `<div style="margin-top:6px">${grp}</div>` : ''}`, 'Mais séries semanais tendem a gerar mais hipertrofia: Schoenfeld, Ogborn e Krieger (2017), J Sports Sci; Baz-Valle et al. (2022), J Hum Kinet. Os números por nível são uma tradução do app dessas faixas.')}
+    ${sec('Frequência', ev, 'Grupos treinados menos de 2 vezes nos últimos 7 dias dão preferência ao foco que os inclui.', 'Treinar cada músculo pelo menos 2x por semana tende a superar 1x: Schoenfeld, Ogborn e Krieger (2016), Sports Med.')}
+    ${pr.length ? sec('Prioridades', ev, `${pr.map(gp => RG[gp]).join(', ')}: meta ~30% maior e um exercício a mais quando o foco inclui o grupo. Os demais ficam em manutenção (~70% da meta).`, 'Volume reduzido a cerca de 1/3 manteve os ganhos por meses: Bickel, Cross e Bamman (2011), Med Sci Sports Exerc. Os 30% e 70% são escolhas do app.') : ''}
+    ${sec('Exercícios', app, 'Entram primeiro os que você fez nos últimos 90 dias (academia e viagem contam separado), alternando quando você usa mais de um para o mesmo movimento. Preferências marcadas valem mais. A região com dor fica de fora.', '')}
+    ${sec('Séries, repetições e descanso', ev, `Pelo objetivo (${GOALS[g] || ''}): básicos ${sc.big[0]} reps com ${sc.big[1]} s de descanso, complementares ${sc.c[0]}, isolados ${sc.i[0]}.${nv === 'iniciante' ? ' Iniciante: até 3 séries por exercício.' : ''}`, 'Faixas de prescrição do posicionamento do ACSM sobre progressão no treino de força (2009), Med Sci Sports Exerc.')}
+    ${sec('Progressão e semana leve', app, 'Ao fazer todas as séries no topo da faixa, sobe a carga (progressão dupla). A cada 4 semanas, uma semana com menos séries e ~10% menos carga. Sem evolução em 3 treinos, o coach propõe troca ou redução de carga.', 'Prática consolidada no treino de força; não há um estudo único que fixe as 4 semanas.')}
+    ${sec('Aeróbico', ev, `Meta de ${cardioTarget()} dia(s) por semana, pelo objetivo e pelo seu dia a dia${rotina() ? ` (${ROTINA[rotina()].label.toLowerCase()})` : ''}.`, 'Recomendação geral de 150 a 300 min por semana de atividade aeróbica moderada para adultos: OMS (2020). Os dias por perfil são uma tradução do app.')}
+    <p class="note" style="margin-top:12px">Referências gerais, que podem ter sido atualizadas: confira nas fontes originais antes de citar. A forma de combinar as regras é do app, não um método validado.</p>
+    <button class="btn ghost" data-close style="margin-top:8px">Fechar</button>`);
+  $('[data-close]', el).onclick = () => el.remove();
 }
 /* Mapa de recuperação (Coach) */
 function recoveryCard() {
@@ -3403,6 +3449,7 @@ function bind() {
   if (tab === 'library') bindLibrary();
   document.querySelectorAll('[data-travel]').forEach(b => b.onclick = () => setTravel(b.dataset.travel === 'on' || (b.dataset.travel === 'toggle' && !travelOn())));
   document.querySelectorAll('[data-travel-ideas]').forEach(b => b.onclick = openTravelSheet);
+  document.querySelectorAll('[data-why]').forEach(b => b.onclick = openWhy);
   document.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => { S.theme = b.dataset.themeSet; save(); render(); });
   document.querySelectorAll('[data-media]').forEach(b => b.onclick = () => { S.media = { ...(S.media || {}), [b.dataset.media]: !mediaOn(b.dataset.media) }; save(); render(); });
   document.querySelectorAll('[data-redo]').forEach(b => b.onclick = () => { obRedo = true; obDraft = null; obStep = 1; go('onboard'); });
@@ -3427,6 +3474,7 @@ function bind() {
       save();
     };
     ['#pIdade', '#pAltura', '#pPeso'].forEach(s => $(s).addEventListener('change', () => { upd(); render(); }));
+    $('#pNivel').onchange = ev => { if (ev.target.value) { S.goal = { ...(S.goal || {}), nivel: ev.target.value }; save(); render(); } };
     $('#pRot').onchange = ev => { if (ev.target.value) { S.profile.rotina = ev.target.value; save(); render(); } };
     $('#pObj').onchange = ev => { S.goal = { ...(S.goal || {}), obj: ev.target.value }; save(); render(); };
     $('#pNome').onchange = ev => { S.profile.nome = ev.target.value.trim(); save(); };
