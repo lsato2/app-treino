@@ -357,6 +357,10 @@
   .calc-ref { margin-top: 10px; } .calc-ref summary { cursor: pointer; list-style: none; } .calc-ref summary::-webkit-details-marker { display: none; } .calc-ref summary::after { content: " ›"; }
 .why-sec { padding: 12px 0; border-top: 1px solid var(--line); } .why-sec .pill { font-size: 11px; white-space: nowrap; flex: none; margin-left: 8px; }
   .why-ref { font-size: 12px; color: var(--muted); margin-top: 6px; font-style: italic; }
+.act-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .act-grid .hbtn { width: 100%; padding: 6px 8px; justify-content: center; text-align: center; white-space: normal; line-height: 1.2; min-width: 0; }
+  .act-grid .hbtn:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .why-link { background: none; border: 0; padding: 2px 0; margin-top: 2px; color: var(--accent); font-size: 14px; font-weight: 500; cursor: pointer; }
   .pr-mini { font-size: 11px; color: var(--accent); margin-top: 2px; font-weight: 600; }
   .gbar { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; align-items: center; padding: 5px 0; font-size: 14px; }
   .gtrack { height: 10px; background: var(--w85); border: 1px solid var(--edge); border-radius: 999px; overflow: hidden; }
@@ -3307,19 +3311,19 @@ function todayCard() {
   }
   const t = todayPlan(); const k = t.best.k; const p = PLANS[k];
   const reasons = `<ul class="why">${t.why.slice(0, 2).map(w => `<li>${esc(w)}</li>`).join('')}</ul>`;
-  const custom = `<button class="hbtn small" data-custom>＋ Treino personalizado</button><button class="hbtn small" data-pain-sheet>${activePain().any ? 'Dor relatada' : 'Sentindo dor?'}</button>`;
+  const custom = `<button class="hbtn small" data-custom>＋ Personalizado</button><button class="hbtn small" data-pain-sheet>${activePain().any ? 'Dor relatada' : 'Sentindo dor?'}</button>`;
   if (t.type === 'rest' || t.type === 'done') {
     return `<div class="card hero rest-hero" style="margin-top:16px"><div class="row"><span class="tag R">${t.type === 'done' ? '✓' : 'Zz'}</span>
       <div><div class="muted small">Personal do dia</div><h3>${t.type === 'done' ? 'Treino de hoje concluído' : 'Hoje é dia de descanso'}</h3></div></div>
-      ${reasons}
-      <div class="row" style="gap:8px;margin-top:6px;flex-wrap:wrap"><button class="hbtn small" data-cardio-only>♥ Registrar aeróbico</button><button class="hbtn small" data-goto="plans">Treinar mesmo assim</button><button class="hbtn small" data-why>Por quê?</button>${custom}</div></div>`;
+      ${reasons}<button class="why-link" data-why>Por quê? ›</button>
+      <div class="act-grid"><button class="hbtn small" data-cardio-only>♥ Aeróbico</button><button class="hbtn small" data-goto="plans">Treinar mesmo assim</button>${custom}</div></div>`;
   }
   return `<div class="card hero ${k}" style="margin-top:16px">
     <div class="row between"><div class="row"><span class="tag ${k}">${tagOf(k)}</span>
       <div><div class="muted small">Treino de hoje${travelOn() ? ' · viagem' : ''}</div><h3 class="hero-t">${esc(p.name)}</h3><div class="hero-f">${esc(p.focus)}</div></div></div></div>
-    ${reasons}${exPeek(k)}
+    ${reasons}<button class="why-link" data-why>Por que este treino? ›</button>${exPeek(k)}
     <button class="btn" style="margin-top:14px" data-start="${k}">Começar treino</button>
-    <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="hbtn small" data-why>Por que este treino?</button><button class="hbtn small" data-goto="plans">Outro foco</button>${custom}</div></div>`;
+    <div class="act-grid"><button class="hbtn small" data-goto="plans">Outro foco</button>${custom}</div></div>`;
 }
 /* "Por que este treino": cada decisão, com a regra e a referência por trás */
 function openWhy() {
