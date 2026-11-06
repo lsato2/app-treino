@@ -290,6 +290,9 @@
   .ex-peek[open] summary::after { transform: rotate(180deg); }
   .ex-peek .ex-list { margin-top: 4px; }
   .done-pill { display: flex; align-items: center; gap: 8px; justify-content: center; margin: 22px auto 0; padding: 8px 14px; border-radius: 999px; background: rgba(46,158,91,.1); color: var(--ok); font-size: 14px; font-weight: 500; max-width: 100%; }
+  .rir { margin: 16px auto 0; text-align: center; } .rir-b { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
+  .rir-b button { width: 46px; height: 40px; border-radius: 12px; background: var(--w80); border: 1px solid var(--edge); font-size: 15px; color: var(--ink); }
+  .rir-b button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
   .done-pill svg { width: 16px; height: 16px; stroke: var(--ok); flex: none; } .done-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rest-screen .done-pill + .big-clock { margin-top: 18px; }
   .month-h { display: flex; justify-content: space-between; align-items: baseline; margin: 22px 4px 10px; }
@@ -790,9 +793,14 @@ function suggestion(e) {
   }
   const kg = Math.max(...ss.map(s => s.kg || 0)); if (!kg) return null;
   const atKg = ss.filter(s => s.kg === kg);
+  const rirs = ss.map(s => s.rir).filter(v => v != null); const minRir = rirs.length === ss.length ? Math.min(...rirs) : null;   // esforço informado em todas as séries
   if (full && atKg.length === ss.length && ss.every(s => (s.reps || 0) >= r.hi)) {
+    const big = minRir != null && minRir >= 3; const nkg = Math.round((kg + step * (big ? 2 : 1)) * 100) / 100;
+    return { type: 'up', kg: nkg, text: `Na última vez: ${fmtKg(kg)} kg × ${list}, todas no topo da faixa (${r.hi})${big ? ' e ainda sobravam 3+ repetições' : ''}. Suba para ${fmtKg(nkg)} kg.` };
+  }
+  if (full && minRir != null && minRir >= 3 && ss.every(s => (s.reps || 0) >= r.lo)) {
     const nkg = Math.round((kg + step) * 100) / 100;
-    return { type: 'up', kg: nkg, text: `Na última vez: ${fmtKg(kg)} kg × ${list}, todas no topo da faixa (${r.hi}). Suba para ${fmtKg(nkg)} kg.` };
+    return { type: 'up', kg: nkg, text: `Na última vez: ${fmtKg(kg)} kg × ${list}, e sobravam 3+ repetições em todas as séries. Está leve: suba para ${fmtKg(nkg)} kg.` };
   }
   if (ss.some(s => (s.reps || 0) < r.lo)) return { type: 'keep', kg, text: `Na última vez: ${fmtKg(kg)} kg × ${list}. Mantenha ${fmtKg(kg)} kg até fazer pelo menos ${r.lo} em todas as séries.` };
   return { type: 'keep', kg, text: `Na última vez: ${fmtKg(kg)} kg × ${list}. Mantenha ${fmtKg(kg)} kg e busque ${r.hi} repetições em todas.` };
@@ -1102,6 +1110,7 @@ function viewProfile() {
         ${rotina() ? '' : '<option value="" selected>Escolha…</option>'}${Object.entries(ROTINA).map(([v, o]) => `<option value="${v}" ${rotina() === v ? 'selected' : ''}>${o.label.replace(' a maior parte do dia', '').replace(' boa parte do dia', '')}</option>`).join('')}</select></div>
     </div>
     <div class="card"><b>Grupos para priorizar</b> <span class="muted small">até ${MAX_PRIO}</span>${prioChips(prioGroups(), 'data-pprio')}</div>
+    <div class="card"><b>Limitações permanentes</b>${limitChips(limitList(), 'data-plim')}${limitList().length ? `<div class="note" style="margin-top:8px">${limitList().map(k => `${LIMITS[k].label}: ${LIMITS[k].txt}.`).join(' ')}</div>` : ''}</div>
     <h2>Estimativas</h2>
     <div class="card">
       <div class="kv"><span>IMC</span><b>${c.imc.toFixed(1).replace('.', ',')} <span class="muted small">(${imcClass(c.imc)})</span></b></div>
@@ -1281,12 +1290,12 @@ function nextLabel(a, pos) {
 function completeSet(ei, si) {
   const a = S.active; const e = exList(a)[ei]; const sets = a.sets[e.id]; const s = sets[si];
   s.done = true;
-  sets.forEach((o, j) => { if (j > si && !o.done) o.kg = s.kg; });   // repete a carga nas próximas séries
+  sets.forEach((o, j) => { if (j > si && !o.done) { o.kg = s.kg; if (s.reps != null) o.reps = s.reps; } });   // repete carga e repetições nas próximas séries
   const nxt = nextPending(a, ei);
   if (nxt) a.cur = nxt.ei;
   save();
   if (navigator.vibrate) navigator.vibrate(30);
-  if (nxt && !a.past) startRest(e.rest, nextLabel(a, nxt), 'Descanso', `${e.name} · série ${si + 1}: ${fmtSet(e, s)}`);   // registro de outro dia: sem descanso       // sem descanso depois da última série do treino
+  if (nxt && !a.past) { startRest(e.rest, nextLabel(a, nxt), 'Descanso', `${e.name} · série ${si + 1}: ${fmtSet(e, s)}`); if (metric(e) === 'reps') { rest.rirFor = { id: e.id, si }; if (inFocus()) render(); } }   // registro de outro dia: sem descanso       // sem descanso depois da última série do treino
   else endRest(false);
   return nxt;
 }
@@ -1317,6 +1326,8 @@ function viewFocus(a) {
     return `<div class="focus rest-screen">
       <div class="f-top">${esc(rest.title)}</div>
       ${rest.done ? `<div class="done-pill">${CHECK}<span>${esc(rest.done)}</span></div>` : ''}
+      ${rest.rirFor ? (() => { const s0 = ((a.sets[rest.rirFor.id] || [])[rest.rirFor.si]) || {}; return `<div class="rir"><div class="muted small">Quantas repetições ainda sobravam?</div>
+        <div class="rir-b">${[0, 1, 2, 3, 4].map(v => `<button data-rir="${v}" class="${s0.rir === v ? 'on' : ''}">${v === 4 ? '4+' : v}</button>`).join('')}</div></div>`; })() : ''}
       <div class="big-clock" data-rest-time>${fmtTime(Math.max(0, Math.ceil((rest.end - Date.now()) / 1000)))}</div>
       <div class="rest-track"><i data-rest-bar style="width:${Math.min(100, (rest.end - Date.now()) / total * 100)}%"></i></div>
       <div class="adj"><button class="btn ghost" id="fMinus">−15s</button><button class="btn ghost" id="fPlus">+15s</button></div>
@@ -1415,6 +1426,8 @@ function bindFocus(a) {
     const t = $('#fTip'); t.classList.toggle('show'); $('#fTipBtn').textContent = t.classList.contains('show') ? 'Ocultar dica' : 'Como executar';
   };
   if ($('#fSkip')) $('#fSkip').onclick = () => endRest(true);
+  document.querySelectorAll('[data-rir]').forEach(b => b.onclick = () => { const f = rest && rest.rirFor; if (!f) return; const s0 = (a.sets[f.id] || [])[f.si]; if (!s0) return;
+    const v = +b.dataset.rir; s0.rir = s0.rir === v ? undefined : v; save(); document.querySelectorAll('[data-rir]').forEach(x => x.classList.toggle('on', +x.dataset.rir === s0.rir)); });
   if ($('#fPlus')) $('#fPlus').onclick = () => adjustRest(15);
   if ($('#fMinus')) $('#fMinus').onclick = () => adjustRest(-15);
   bindSwipe($('#finishBtn'), finishSession);
@@ -2030,6 +2043,7 @@ function pickAlt(e) {
 function runCoach() {
   if (S.pains && S.pains.length) S.pains = S.pains.filter(x => Date.now() - x.t < 60 * DAY);
   ensureBlock(); S.proposals = S.proposals || [];
+  try { autoVolume(); } catch (err) {}
   const bi = blockInfo();
   for (const e of recentExercises()) {
     const st = stagnation(e); if (!st) continue;
@@ -2097,6 +2111,8 @@ function coachMessages() {
   const ct = cardioTarget();
   if (ct && n >= 2 && cw < ct)
     m.push({ t: 'info', text: `Aeróbico em ${cw} dia${cw === 1 ? '' : 's'} nesta semana. ${rotina() === 'sentado' ? 'Como você passa o dia sentado' : `Para ${goal() === 'recomp' ? 'recomposição' : 'o seu objetivo'}`}, a referência é em pelo menos ${ct}.` });
+  const L = S.volAdjLog; if (L && Date.now() - L.t < 7 * DAY && L.items.length)
+    m.push({ t: 'info', text: `Volume ajustado esta semana: ${L.items.map(x => `${RG[x.g]} ${x.to > x.from ? '+' : '−'}${Math.round(Math.abs(x.to - x.from) * 100)}% (${x.why})`).join('; ')}.` });
   const wm = weightMessage(); if (wm) m.push(wm);
   return m;
 }
@@ -2517,7 +2533,7 @@ function altsFor(base) {
   const ids = [...new Set([...candidatesFor(base.slot, usage, tr), ...((P.custom || {})[base.slot] || []), ...((P.custom || {})[base.id] || [])])].filter(id => id !== base.id);
   const kind = (CATALOG[base.slot] || {}).kind || 'c';
   return ids.map(id => {
-    const x = exFor(id, (usage[id] || {}).ex); if (!x || (tr && !travelOk(id, x))) return null;
+    const x = exFor(id, (usage[id] || {}).ex); if (!x || (tr && !travelOk(id, x)) || limitHit(id)) return null;
     const a = { ...x, slot: base.slot };
     if (metric(a) !== metric(base)) Object.assign(a, prescribe(a, tr && ['big', 'c', 'i'].includes(kind) ? 'bw' : kind, P.goal || goal(), P.tempo || 60));
     return a;
@@ -2597,7 +2613,7 @@ function draft() {
   const P = S.profile; const mine = S.onboarded || !!(P.nome && String(P.nome).trim());   // só preenche com dados que a pessoa já informou
   const gname = (window.cloud && window.cloud.user && window.cloud.user.name || '').split(' ')[0];
   if (!obDraft) obDraft = { nome: mine ? P.nome : gname, sexo: mine ? P.sexo || '' : '', idade: mine ? P.idade || '' : '', altura: mine ? P.altura || '' : '', peso: mine ? P.peso || '' : '',
-    obj: goal(), tempo: (S.goal && S.goal.tempo) || 60, freq: freq(), prio: prioGroups(), rotina: rotina() || '', nivel: nivel() || '' };
+    obj: goal(), tempo: (S.goal && S.goal.tempo) || 60, freq: freq(), prio: prioGroups(), rotina: rotina() || '', nivel: nivel() || '', limits: limitList() };
   return obDraft;
 }
 function viewOnboard() {
@@ -2643,6 +2659,8 @@ function viewOnboard() {
     <div class="seg">${[2, 3, 4, 5, 6].map(v => `<button class="${d.freq === v ? 'on' : ''}" data-set="freq" data-v="${v}">${v}x</button>`).join('')}</div>
     <div class="ob-label">Quer priorizar algum grupo? <span class="muted small">(opcional, até ${MAX_PRIO})</span></div>
     ${prioChips(d.prio, 'data-prio')}
+    <div class="ob-label">Alguma limitação física permanente? <span class="muted small">(opcional)</span></div>
+    ${limitChips(d.limits || [], 'data-olim')}
     <p class="note" id="obErr2" style="color:var(--danger)"></p>
     <button class="btn xl" data-ob-next style="margin-top:20px">Continuar</button></div>`;
   // Passo 3: como o treino funciona + prévia do treino de hoje
@@ -2664,6 +2682,7 @@ function bindOnboard() {
   const d = draft();
   document.querySelectorAll('[data-d]').forEach(i => i.addEventListener('input', () => { d[i.dataset.d] = i.value; }));
   document.querySelectorAll('[data-set]').forEach(b => b.onclick = () => { const f = b.dataset.set; d[f] = ['tempo', 'freq'].includes(f) ? +b.dataset.v : b.dataset.v; render(); });
+  document.querySelectorAll('[data-olim]').forEach(b => b.onclick = () => { const k = b.dataset.olim; const l = d.limits || []; d.limits = l.includes(k) ? l.filter(x => x !== k) : [...l, k]; render(); });
   document.querySelectorAll('[data-prio]').forEach(b => b.onclick = () => { d.prio = togglePrio(d.prio || [], b.dataset.prio); render(); });
   document.querySelectorAll('[data-ob-back]').forEach(b => b.onclick = () => { obStep = Math.max(obRedo ? 1 : 0, obStep - 1); render(); window.scrollTo(0, 0); });
   document.querySelectorAll('[data-ob-cancel]').forEach(b => b.onclick = () => { obRedo = false; obDraft = null; obStep = 0; go('profile'); });
@@ -2679,7 +2698,7 @@ function bindOnboard() {
     if (obStep === 2) {
       const miss = !d.nivel ? 'Conte há quanto tempo você treina.' : !d.rotina ? 'Conte como é o seu dia a dia.' : '';
       if (miss) { const el = $('#obErr2'); if (el) el.textContent = miss; return; }
-      S.goal = { ...(S.goal || {}), obj: d.obj, tempo: d.tempo, freq: d.freq, prio: d.prio, nivel: d.nivel }; S.profile.rotina = d.rotina; save(); loadLib().catch(() => {});
+      S.goal = { ...(S.goal || {}), obj: d.obj, tempo: d.tempo, freq: d.freq, prio: d.prio, nivel: d.nivel }; S.profile.rotina = d.rotina; S.profile.limits = d.limits || []; save(); loadLib().catch(() => {});
     }
     obStep++; render(); window.scrollTo(0, 0);
   });
@@ -3065,14 +3084,58 @@ const MAX_PRIO = 3;
 const prioGroups = () => ((S.goal && S.goal.prio) || []).filter(g => g in WEEK_BASE).slice(0, MAX_PRIO);
 const baseVol = g => (LEVEL_VOL[nivel()] || WEEK_BASE)[g];
 const volMode = g => { const pr = prioGroups(); return !pr.length ? 'normal' : pr.includes(g) ? 'prio' : g === 'core' ? 'normal' : 'manut'; };
-const WEEK_TARGET = new Proxy(WEEK_BASE, { get: (t, g) => { if (t[g] == null) return undefined; const b = baseVol(g), m = volMode(g);
-  return m === 'prio' ? Math.round(b * 1.3) : m === 'manut' ? Math.max(Math.ceil(b / 3), Math.round(b * 0.7)) : b; } });
+const volAdj = g => ((S.volAdj || {})[g] || 1);
+const WEEK_TARGET = new Proxy(WEEK_BASE, { get: (t, g) => { if (t[g] == null) return undefined; const b = baseVol(g) * volAdj(g), m = volMode(g);
+  return m === 'prio' ? Math.round(b * 1.3) : m === 'manut' ? Math.max(Math.ceil(baseVol(g) / 3), Math.round(b * 0.7)) : Math.round(b); } });
+/* Uma vez por semana: compara o 1RM estimado das últimas 3 semanas com as 3 anteriores, por grupo, junto com o esforço (RIR) */
+function groupTrend(g, now = Date.now()) {
+  const A = now - 21 * DAY, B = now - 42 * DAY; const per = {}; const rirs = [];
+  for (const h of S.history) if (h.end >= B && !h.deload) for (const e of exList(h)) {
+    if (!e1rmOk(e) || !exGroups(e).p.includes(g)) continue;
+    const v = bestE1rm(h, e); if (!v) continue;
+    const o = per[e.id] = per[e.id] || { a: 0, b: 0 }; if (h.end >= A) o.a = Math.max(o.a, v); else o.b = Math.max(o.b, v);
+    if (h.end >= now - 14 * DAY) setsOf(h, e.id).forEach(s => { if (s.done && s.rir != null) rirs.push(s.rir); });
+  }
+  const ch = Object.values(per).filter(o => o.a && o.b).map(o => (o.a - o.b) / o.b * 100);
+  if (!ch.length) return null;
+  const pct = ch.reduce((x, y) => x + y, 0) / ch.length;
+  return { pct, rir: rirs.length >= 6 ? rirs.reduce((x, y) => x + y, 0) / rirs.length : null, n: ch.length };
+}
+function autoVolume() {
+  const wk = weekStart(Date.now()); if (S.volAdjWeek === wk) return; S.volAdjWeek = wk;
+  if (blockInfo().deload) return;                                        // na semana leve não mexe
+  S.volAdj = S.volAdj || {}; const log = [];
+  for (const g of Object.keys(RG)) {
+    const tr = groupTrend(g); if (!tr) continue;
+    const f = volAdj(g); let nf = f, why = '';
+    const done3 = Object.values(groupSets(Date.now() - 21 * DAY, Date.now())).length ? (groupSets(Date.now() - 21 * DAY, Date.now())[g] || 0) / 3 : 0;
+    if (tr.pct <= -3 && (tr.rir == null || tr.rir <= 1)) { nf = Math.max(0.8, f - 0.1); why = 'força estimada caiu' + (tr.rir != null ? ' com esforço alto' : ''); }
+    else if (Math.abs(tr.pct) < 2 && done3 >= WEEK_TARGET[g] * 0.9 && (tr.rir == null || tr.rir >= 2)) { nf = Math.min(1.2, f + 0.1); why = 'força estável com a meta cumprida'; }
+    else if (tr.pct >= 2 && f !== 1) { nf = f < 1 ? Math.min(1, f + 0.05) : f; why = nf !== f ? 'voltou a evoluir' : ''; }
+    nf = Math.round(nf * 100) / 100;
+    if (nf !== f) { S.volAdj[g] = nf; log.push({ g, from: f, to: nf, why, pct: Math.round(tr.pct * 10) / 10 }); }
+  }
+  if (log.length) S.volAdjLog = { t: Date.now(), items: log };
+}
 const PRIO_SLOT = { peito: ['fly', 'ipush'], costas: ['hpull', 'vpull'], ombros: ['reardelt', 'lateral'], biceps: ['biceps'], triceps: ['triceps'], pernas: ['legext', 'lunge'], posterior: ['legcurl', 'glute'], core: ['core'] };
 function prioChips(sel, attr) {
   return `<div class="chips wrap-chips">${Object.entries(RG).map(([k, l]) => `<button class="${sel.includes(k) ? 'on' : ''}" ${attr}="${k}">${l}</button>`).join('')}</div>`;
 }
+function limitChips(sel, attr) {
+  return `<div class="chips wrap-chips">${Object.entries(LIMITS).map(([k, o]) => `<button class="${sel.includes(k) ? 'on' : ''}" ${attr}="${k}">${o.label}</button>`).join('')}</div>`;
+}
 const togglePrio = (list, g) => list.includes(g) ? list.filter(x => x !== g) : list.length >= MAX_PRIO ? list : [...list, g];
 const NO_TRAVEL = /pull-?up|chin-?up|muscle.?up/i;    // sem barra no quarto
+/* Limitações permanentes: tira os exercícios que mais sobrecarregam a região (regra do app, não orientação médica) */
+const LIMITS = {
+  ombros: { label: 'Ombros', re: /Military|Shoulder_Press|Overhead|Upright|Behind|Dips?\b|Dip_|Dips_|Arnold|Handstand|Snatch|Jerk|Push_Press/i, txt: 'sem desenvolvimento acima da cabeça, mergulho e remada alta' },
+  lombar: { label: 'Lombar', re: /Deadlift|Good_Morning|Bent_Over|T-Bar|Barbell_Full_Squat|Barbell_Squat|Hyperextension|Superman|Clean|Snatch|Romanian/i, txt: 'sem terra, bom-dia, remada curvada e agachamento livre com barra' },
+  joelho: { label: 'Joelho', re: /Lunge|Jump|Split|Step|Sissy|Pistol|Barbell_Full_Squat|Leg_Extensions|Skipping|Scissors/i, txt: 'sem avanço, saltos, agachamento profundo e cadeira extensora' },
+  cotovelo: { label: 'Cotovelo', re: /Skull|Close-Grip|Triceps_Extension|Dips?\b|Dip_|Dips_|Preacher|Close_Triceps/i, txt: 'sem tríceps testa, extensões acima da cabeça e rosca Scott' },
+  punho: { label: 'Punho', re: /Barbell_Curl|EZ-Bar|Pushups|Push-U|Push_Up|Wrist|Front_Squat/i, txt: 'sem barra reta na rosca e sem flexão no chão' },
+};
+const limitList = () => ((S.profile && S.profile.limits) || []).filter(k => k in LIMITS);
+const limitHit = id => limitList().some(k => LIMITS[k].re.test(id));
 /* Padrão de movimento de qualquer exercício (do catálogo, da biblioteca ou criado por você) */
 function patternOf(e) {
   if (e.slot) return TRAVEL2P[e.slot] || e.slot;
@@ -3138,6 +3201,7 @@ function pickExercise(pattern, ctx) {
     const ex = exFor(id, (ctx.usage[id] || {}).ex); if (!ex) continue;
     if (ctx.travel && !travelOk(id, ex)) continue;
     if (ctx.pain.groups.size && hitsPain(ex, ctx.pain)) continue;
+    if (limitHit(id)) continue;
     const u = ctx.usage[id]; const idx = pool.indexOf(id);
     let sc = (id === pref ? 6 : 0) + (u ? 1 + Math.min(u.n, 4) : 0) + (idx >= 0 ? 0.6 * (pool.length - idx) / pool.length : 0);
     if (id === recent && id !== pref) sc -= 1.5;
@@ -3271,8 +3335,10 @@ function openWhy() {
     ${sec('Frequência', ev, 'Grupos treinados menos de 2 vezes nos últimos 7 dias dão preferência ao foco que os inclui.', 'Treinar cada músculo pelo menos 2x por semana tende a superar 1x: Schoenfeld, Ogborn e Krieger (2016), Sports Med.')}
     ${pr.length ? sec('Prioridades', ev, `${pr.map(gp => RG[gp]).join(', ')}: meta ~30% maior e um exercício a mais quando o foco inclui o grupo. Os demais ficam em manutenção (~70% da meta).`, 'Volume reduzido a cerca de 1/3 manteve os ganhos por meses: Bickel, Cross e Bamman (2011), Med Sci Sports Exerc. Os 30% e 70% são escolhas do app.') : ''}
     ${sec('Exercícios', app, 'Entram primeiro os que você fez nos últimos 90 dias (academia e viagem contam separado), alternando quando você usa mais de um para o mesmo movimento. Preferências marcadas valem mais. A região com dor fica de fora.', '')}
+    ${(() => { const L = S.volAdj || {}; const adj = Object.keys(RG).filter(gp => (L[gp] || 1) !== 1); return sec('Ajuste automático do volume', app, `Uma vez por semana o app compara o 1RM estimado das últimas 3 semanas com as 3 anteriores, por grupo, junto com quantas repetições sobravam. Força caindo com esforço alto: −10% de volume. Força parada com a meta cumprida: +10%. Limites de −20% a +20%.${adj.length ? ' Hoje: ' + adj.map(gp => `${RG[gp]} ${L[gp] > 1 ? '+' : '−'}${Math.round(Math.abs(L[gp] - 1) * 100)}%`).join(', ') + '.' : ' Nenhum ajuste ativo.'}`, 'Autorregulação por repetições em reserva (RIR): Helms et al. (2016), Strength Cond J; Zourdos et al. (2016), J Strength Cond Res. Os percentuais são do app.'); })()}
+    ${limitList().length ? sec('Limitações permanentes', app, limitList().map(k => `${LIMITS[k].label}: ${LIMITS[k].txt}.`).join(' '), 'Lista de exclusão do app, não orientação médica. Em caso de lesão, siga a orientação de um profissional.') : ''}
     ${sec('Séries, repetições e descanso', ev, `Pelo objetivo (${GOALS[g] || ''}): básicos ${sc.big[0]} reps com ${sc.big[1]} s de descanso, complementares ${sc.c[0]}, isolados ${sc.i[0]}.${nv === 'iniciante' ? ' Iniciante: até 3 séries por exercício.' : ''}`, 'Faixas de prescrição do posicionamento do ACSM sobre progressão no treino de força (2009), Med Sci Sports Exerc.')}
-    ${sec('Progressão e semana leve', app, 'Ao fazer todas as séries no topo da faixa, sobe a carga (progressão dupla). A cada 4 semanas, uma semana com menos séries e ~10% menos carga. Sem evolução em 3 treinos, o coach propõe troca ou redução de carga.', 'Prática consolidada no treino de força; não há um estudo único que fixe as 4 semanas.')}
+    ${sec('Progressão e semana leve', app, 'Ao fazer todas as séries no topo da faixa, sobe a carga (progressão dupla); se ainda sobravam 3+ repetições em todas, sobe o dobro ou sobe antes do topo. A cada 4 semanas, uma semana com menos séries e ~10% menos carga. Sem evolução em 3 treinos, o coach propõe troca ou redução de carga.', 'Prática consolidada no treino de força; não há um estudo único que fixe as 4 semanas.')}
     ${sec('Aeróbico', ev, `Meta de ${cardioTarget()} dia(s) por semana, pelo objetivo e pelo seu dia a dia${rotina() ? ` (${ROTINA[rotina()].label.toLowerCase()})` : ''}.`, 'Recomendação geral de 150 a 300 min por semana de atividade aeróbica moderada para adultos: OMS (2020). Os dias por perfil são uma tradução do app.')}
     <p class="note" style="margin-top:12px">Referências gerais, que podem ter sido atualizadas: confira nas fontes originais antes de citar. A forma de combinar as regras é do app, não um método validado.</p>
     <button class="btn ghost" data-close style="margin-top:8px">Fechar</button>`);
@@ -3480,6 +3546,7 @@ function bind() {
     $('#pNome').onchange = ev => { S.profile.nome = ev.target.value.trim(); save(); };
     $('#pSexo').onchange = ev => { S.profile.sexo = ev.target.value; save(); render(); };
     $('#pFreq').onchange = ev => { S.goal = { ...(S.goal || {}), freq: +ev.target.value }; save(); render(); };
+    document.querySelectorAll('[data-plim]').forEach(b => b.onclick = () => { const k = b.dataset.plim; const l = limitList(); S.profile.limits = l.includes(k) ? l.filter(x => x !== k) : [...l, k]; save(); render(); });
     document.querySelectorAll('[data-pprio]').forEach(b => b.onclick = () => { S.goal = { ...(S.goal || {}), prio: togglePrio(prioGroups(), b.dataset.pprio) }; save(); render(); });
     $('#exportBtn').onclick = exportBackup;
     $('#bkEvery').onchange = ev => { S.backupEvery = +ev.target.value; save(); };
