@@ -340,6 +340,9 @@
   .chart .pt { fill: var(--accent); stroke: #fff; stroke-width: 2; vector-effect: non-scaling-stroke; }
   .chart .cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
   .tip-pop { position: absolute; transform: translateX(-50%); background: rgba(27,38,64,.88); color: #fff; font-size: 12px; padding: 5px 9px; border-radius: 999px; white-space: nowrap; pointer-events: none; }
+  .gsets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; } .gs { font-size: 13px; min-width: 0; } .gs b { font-weight: 500; }
+  .gs .gtrack { display: block; margin-top: 4px; height: 6px; } .gtrack i.full { background: var(--ok); }
+  .pr-mini { font-size: 11px; color: var(--accent); margin-top: 2px; font-weight: 600; }
   .gbar { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; align-items: center; padding: 5px 0; font-size: 14px; }
   .gtrack { height: 10px; background: var(--w85); border: 1px solid var(--edge); border-radius: 999px; overflow: hidden; }
   .gtrack i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
@@ -926,6 +929,31 @@ function sessionVolume(h) {
   }
   return Math.round(v);
 }
+const setsDone = h => Object.values(h.sets || {}).flat().filter(s => s.done).length;
+/* 1RM estimado (Epley): carga × (1 + repetições / 30). Só para séries com carga e até 12 repetições */
+const e1rm = s => s && s.kg > 0 && s.reps > 0 && s.reps <= 12 ? s.kg * (1 + s.reps / 30) : 0;
+const e1rmOk = e => metric(e) === 'reps' && !e.assist;
+function bestE1rm(h, e) { return Math.max(0, ...setsOf(h, e.id).filter(s => s.done).map(e1rm)); }
+/* Séries por grupo muscular entre a e b (principal conta 1, secundário ½) */
+function groupSets(a, b) {
+  const L = {}; for (const h of S.history) if (h.end >= a && h.end < b) for (const [g, v] of Object.entries(sessionLoad(h))) L[g] = (L[g] || 0) + v;
+  return L;
+}
+/* Força estimada: exercícios com mais registros nos últimos 90 dias */
+function strengthCards(n = 4, until = Date.now()) {
+  const since = until - 90 * DAY; const map = {};
+  for (const h of S.history) if (h.end >= since && h.end < until && !h.deload) for (const e of exList(h)) {
+    if (!e1rmOk(e)) continue; const v = bestE1rm(h, e); if (!v) continue;
+    (map[e.id] = map[e.id] || { e, pts: [] }).pts.push({ t: h.end, v: Math.round(v * 10) / 10 });
+  }
+  const kindOf = e => (CATALOG[patternOf(e)] || {}).kind;                         // 1RM faz sentido nos multiarticulares
+  const list = Object.values(map).filter(x => x.pts.length >= 2 && ['big', 'c'].includes(kindOf(x.e)));
+  return list.sort((a, b) => (kindOf(b.e) === 'big') - (kindOf(a.e) === 'big') || b.pts.length - a.pts.length).slice(0, n).map(({ e, pts }) => {
+    const f = pts[0].v, l = pts[pts.length - 1].v; const d = f ? Math.round((l - f) / f * 100) : 0;
+    return `<div class="card"><div class="row between"><b>${esc(e.name)}</b><span class="dl ${d > 0 ? 'up' : d < 0 ? 'down' : 'eq'}">${d > 0 ? '↑' : d < 0 ? '↓' : '='} ${Math.abs(d)}%</span></div>
+      <div class="muted small">1RM estimado: ${fmtKg(Math.round(l))} kg</div>${lineChart(pts, 'kg', e.name)}</div>`;
+  }).join('');
+}
 
 /* ============================== Telas ============================== */
 let tab = 'home';
@@ -1020,7 +1048,7 @@ function viewHistory() {
     return head + `<div class="card hist-item" data-hist>
       <div class="row between"><div class="row" style="min-width:0;flex:1"><span class="tag ${h.custom ? 'P' : h.plan}">${h.custom ? 'P' : tagOf(h.plan)}</span>
         <div style="min-width:0"><h3>${p.name}${h.travel ? ' <span class="pill travel-pill">✈︎ Viagem</span>' : ''}</h3><div class="hist-f">${esc(p.focus)}</div><div class="muted small">${fmtDate(h.end)} · ${h.cardioOnly ? `${h.cardio ? h.cardio.min : '–'} min de aeróbico` : `${mins} min${h.cardio ? ' · + aeróbico' : ''}`}</div></div></div>
-        <div style="text-align:right;white-space:nowrap"><b>${sessionVolume(h).toLocaleString('pt-BR')}</b><div class="muted small">kg volume</div></div></div>
+        <div style="text-align:right;white-space:nowrap"><b>${setsDone(h)}</b><div class="muted small">séries</div>${(() => { const n = h.cardioOnly ? 0 : summaryData(h).prs.length; return n ? `<div class="pr-mini">★ ${n} recorde${n > 1 ? 's' : ''}</div>` : ''; })()}</div></div>
       <div class="hist-sets">${detail || 'Sem séries registradas.'}
         ${h.cardio ? `<div><b style="color:var(--text)">Aeróbico</b>: ${esc(h.cardio.type)} · ${h.cardio.min ?? '–'} min${h.cardio.km ? ' · ' + String(h.cardio.km).replace('.', ',') + ' km' : ''} · ${esc(h.cardio.int)}</div>` : ''}
         <div class="row" style="gap:8px"><button class="del-btn sum-btn" data-sum="${h.end}">Ver resumo</button><button class="del-btn" data-del="${h.end}">Excluir este treino</button></div>
@@ -1782,8 +1810,8 @@ function viewSummary() {
     <p class="muted" style="text-align:center;margin-top:0">${new Date(h.end).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}${h.travel ? ' · <span class="pill travel-pill">✈︎ Viagem</span>' : ''}</p>
     <div class="stats">
       <div class="stat"><b>${d.dur} min</b><span>duração</span>${delta(d.dur, d.pDur, true)}</div>
-      <div class="stat"><b>${d.sets}</b><span>séries</span></div>
-      <div class="stat"><b>${d.vol.toLocaleString('pt-BR')}</b><span>kg de volume</span>${delta(d.vol, d.pVol)}</div>
+      <div class="stat"><b>${d.sets}</b><span>séries</span>${d.prev ? delta(d.sets, setsDone(d.prev), true) : ''}</div>
+      <div class="stat"><b>${d.prs.length}</b><span>recorde${d.prs.length === 1 ? '' : 's'}</span></div>
     </div>
     ${checkinCard(h)}
     ${d.prs.length ? `<h2>★ Recordes do dia</h2><div class="card pr-card">${d.prs.map(r => `<div class="kv"><span>${esc(r.e.name)}</span><b>${esc(r.text)}</b></div>`).join('')}</div>` : ''}
@@ -1792,6 +1820,7 @@ function viewSummary() {
       ${d.rows.map(r => `<div class="cmp-row"><div class="cmp-name">${esc(r.e.name)}</div>
         <div class="cmp-vals"><b>${fmtSet(r.e, r.best)}</b> ${arrow(r.cmp)}${r.pBest ? `<span class="muted small">antes ${fmtSet(r.e, r.pBest)}</span>` : '<span class="muted small">primeira vez</span>'}</div></div>`).join('') || '<div class="muted">Nenhuma série registrada.</div>'}
     </div>
+    ${d.vol ? `<p class="note">Volume de carga (carga × repetições): ${d.vol.toLocaleString('pt-BR')} kg. Serve só para comparar o mesmo treino; entre treinos diferentes, compare as séries.</p>` : ''}
     ${(h.skipped || []).length ? `<p class="note">Pulados: ${h.skipped.map(i => esc(ex[i].name)).join(', ')}.</p>` : ''}
     ${h.cardio ? `<p class="note"><b style="color:var(--text)">Aeróbico:</b> ${esc(h.cardio.type)} · ${h.cardio.min} min${h.cardio.km ? ' · ' + fmtKg(h.cardio.km) + ' km' : ''} · ${esc(h.cardio.int)}</p>` : ''}
     ${!d.prev ? `<p class="note">Este é o seu primeiro ${p.name} registrado. Na próxima vez, o app compara cada exercício com hoje.</p>` : ''}
@@ -2142,8 +2171,10 @@ function viewCoach() {
     <h2>Bloco de treino</h2>
     <div class="card"><div class="row between"><b>Bloco ${bi.n} · semana ${bi.week} de 4</b><span class="muted small">${bi.deload ? 'semana leve' : 'progressão'}</span></div>
       <div class="blk">${[1, 2, 3, 4].map(i => `<i class="${i < bi.week ? 'past' : i === bi.week ? 'cur' : ''} ${i === 4 ? 'dl' : ''}">${i === 4 ? 'leve' : 'S' + i}</i>`).join('')}</div>
-      <p class="note" style="margin:8px 0 0">Semanas 1 a 3: progressão de carga. Semana 4: menos séries e ~10% menos carga para recuperar. A cada 2 blocos o coach propõe variações.</p>
+      <p class="note" style="margin:8px 0 0">Semanas 1 a 3: progressão de carga. Semana 4: menos séries e ~10% menos carga para recuperar. Quando um exercício para de evoluir, o coach propõe uma variação.</p>
       ${bi.deload ? '' : `<button class="btn ghost" id="antDeload" style="margin-top:12px">Antecipar semana leve</button>`}</div>
+    <h2>Força estimada</h2>
+    ${(() => { const c = strengthCards(); return c ? `<p class="note" style="margin-top:-6px">1RM estimado (fórmula de Epley) dos exercícios que você mais fez nos últimos 90 dias. Compara cada exercício com ele mesmo.</p>${c}` : '<div class="card"><p class="note" style="margin:0">Aparece depois de pelo menos 2 treinos com o mesmo exercício com carga.</p></div>'; })()}
     <h2>Peso corporal</h2>
     <div class="card">${lw ? `<div class="row between"><div><b style="font-size:24px">${fmtKg(lw.kg)} kg</b><div class="muted small">${fmtDate(lw.t)}</div></div>
       ${tr ? `<div style="text-align:right"><b>${tr.rate > 0 ? '+' : ''}${tr.rate.toFixed(1).replace('.', ',')}%</b><div class="muted small">por semana (4 sem.)</div></div>` : ''}</div>
@@ -2175,7 +2206,7 @@ function viewReport() {
   S.reportsSeen = S.reportsSeen || {}; S.reportsSeen[`${y}-${mo}`] = true; save();
   const ad = Math.min(100, Math.round(d.hs.length / d.target * 100));
   const pct = (c, q) => q ? Math.round((c - q) / q * 100) : null;
-  const dv = pct(d.vol, p.vol);
+  const sTot = Object.values(d.groups).reduce((a, b) => a + b, 0), pTot = Object.values(p.groups).reduce((a, b) => a + b, 0); const dv = pct(sTot, pTot);
   const prAll = d.hs.flatMap(h => summaryData(h).prs.map(r => ({ ...r, t: h.end })));
   const prMap = {}; prAll.forEach(r => { const k = r.e.id; prMap[k] = { ...r, n: ((prMap[k] && prMap[k].n) || 0) + 1 }; });   // fica o mais recente
   const prs = Object.values(prMap);
@@ -2185,9 +2216,10 @@ function viewReport() {
   d.hs.forEach(h => exList(h).forEach(e => { if ((h.sets[e.id] || []).some(s => s.done) && metric(e) !== 'dist' && !e.assist) exMap[e.id] = exMap[e.id] || { e, n: 0 }, exMap[e.id].n++; }));
   const tops = Object.values(exMap).filter(x => !(x.e.bodyweight) || metric(x.e) === 'time').sort((a, b) => b.n - a.n).slice(0, 4);
   const evo = tops.map(({ e }) => {
+    const rm = e1rmOk(e) && ['big', 'c'].includes((CATALOG[patternOf(e)] || {}).kind);
     const pts = S.history.filter(h => h.end < d.b && h.end >= d.b - 90 * DAY && !h.deload).map(h => { const ss = setsOf(h, e.id).filter(s => s.done); if (!ss.length) return null;
-      const bs = bestSet(e, ss); return { t: h.end, v: metric(e) === 'time' ? bs.reps : bs.kg || 0 }; }).filter(Boolean);
-    return `<div class="card"><b>${esc(e.name)}</b><div class="muted small">${metric(e) === 'time' ? 'Melhor tempo por treino (s)' : 'Maior carga por treino (kg)'}</div>${lineChart(pts, metric(e) === 'time' ? 's' : 'kg', e.name)}</div>`;
+      const bs = bestSet(e, ss); const v = metric(e) === 'time' ? bs.reps : rm ? Math.round(bestE1rm(h, e) * 10) / 10 || bs.kg || 0 : bs.kg || 0; return { t: h.end, v }; }).filter(Boolean);
+    return `<div class="card"><b>${esc(e.name)}</b><div class="muted small">${metric(e) === 'time' ? 'Melhor tempo por treino (s)' : rm ? '1RM estimado por treino (kg)' : 'Maior carga por treino (kg)'}</div>${lineChart(pts, metric(e) === 'time' ? 's' : 'kg', e.name)}</div>`;
   }).join('');
   const wsM = (S.weights || []).filter(w => w.t >= d.a && w.t < d.b);
   const feel = d.hs.filter(h => h.feel); const pain = d.hs.filter(h => h.pain).length;
@@ -2212,12 +2244,13 @@ function viewReport() {
     <h2>Pontos de atenção</h2>
     <div class="stack">${(att.length ? att.slice(0, 3).map(t => msgHtml({ t: 'warn', text: t })) : [msgHtml({ t: 'ok', text: 'Nenhum ponto de atenção. Mês consistente!' })]).join('')}</div>
     <h2>Volume</h2>
-    <div class="card"><div class="kv"><span>Volume total (carga × repetições)</span><b>${d.vol.toLocaleString('pt-BR')} kg ${dv == null ? '' : `<span class="dl ${dv >= 0 ? 'up' : 'down'}">${dv >= 0 ? '↑' : '↓'} ${Math.abs(dv)}%</span>`}</b></div>
+    <div class="card"><div class="kv"><span>Séries no mês</span><b>${sTot} ${dv == null ? '' : `<span class="dl ${dv >= 0 ? 'up' : 'down'}">${dv >= 0 ? '↑' : '↓'} ${Math.abs(dv)}%</span>`}</b></div>
+      <div class="kv"><span>Séries por semana</span><b>${d.weeks >= 1 ? Math.round(sTot / d.weeks) : sTot}</b></div>
       <div class="muted small" style="margin:10px 0 6px">Séries por grupo muscular${p.hs.length ? ` (entre parênteses: ${MONTHS[pm[1]]})` : ''}</div>
       ${GROUPS.map(([g]) => g).filter(g => d.groups[g] || p.groups[g]).map(g => `<div class="gbar"><span class="gname">${g}</span>
         <span class="gtrack"><i style="width:${(d.groups[g] || 0) / gmax * 100}%"></i></span><span class="gval">${d.groups[g] || 0}${p.hs.length ? ` <span class="muted">(${p.groups[g] || 0})</span>` : ''}</span></div>`).join('')}</div>
     ${prs.length ? `<h2>★ Recordes do mês</h2><div class="card pr-card">${prs.map(r => `<div class="kv"><span>${esc(r.e.name)}<br><span class="muted small">${r.n > 1 ? `${r.n} recordes no mês · último em ` : ''}${fmtDate(r.t)}</span></span><b>${esc(r.text)}</b></div>`).join('')}</div>` : ''}
-    ${evo ? `<h2>Evolução das cargas</h2><p class="note" style="margin-top:-6px">Últimos 90 dias. Toque no gráfico para ver cada treino.</p>${evo}` : ''}
+    ${evo ? `<h2>Evolução da força</h2><p class="note" style="margin-top:-6px">Últimos 90 dias. 1RM estimado = carga que você levantaria uma vez, calculada pela fórmula de Epley a partir da melhor série (até 12 repetições). Toque no gráfico para ver cada treino.</p>${evo}` : ''}
     <h2>Peso e check-in</h2>
     <div class="card">
       <div class="kv"><span>Peso no mês</span><b>${wsM.length ? (wsM.length > 1 ? `${fmtKg(wsM[0].kg)} → ${fmtKg(wsM[wsM.length - 1].kg)} kg` : `${fmtKg(wsM[0].kg)} kg`) : 'sem registro'}</b></div>
@@ -2802,19 +2835,23 @@ function avatarBtn() {
   const u = window.cloud && window.cloud.user; const n = (S.profile.nome || '').trim();
   return `<button class="circle" data-goto="profile" aria-label="Perfil">${u && u.photo ? `<img src="${esc(u.photo)}" alt="" referrerpolicy="no-referrer">` : n ? `<span class="ini">${esc(n[0].toUpperCase())}</span>` : '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>'}</button>`;
 }
-/* "Esta semana": uma barra por dia, altura pelo volume do treino */
+/* "Esta semana": uma barra por dia (altura pelas séries) e as séries de cada grupo muscular */
 function weekCard() {
   const ws = weekStart(Date.now()); const today = (new Date().getDay() + 6) % 7;
   const days = Array.from({ length: 7 }, (_, i) => { const a = addWeeks(ws, 0) + i * DAY, b = a + DAY;
-    const hs = S.history.filter(h => h.end >= a && h.end < b); return { hs, vol: hs.reduce((t, h) => t + sessionVolume(h) + (h.cardio ? 500 : 0), 0) }; });
-  const max = Math.max(1, ...days.map(d => d.vol)); const n = days.filter(d => d.hs.length).length;
-  const tot = days.reduce((t, d) => t + d.hs.reduce((u, h) => u + sessionVolume(h), 0), 0);
+    const hs = S.history.filter(h => h.end >= a && h.end < b); return { hs, n: hs.reduce((t, h) => t + setsDone(h) + (h.cardio ? 4 : 0), 0) }; });
+  const max = Math.max(1, ...days.map(d => d.n)); const n = days.filter(d => d.hs.some(isStrength)).length;
+  const tot = days.reduce((t, d) => t + d.hs.reduce((u, h) => u + setsDone(h), 0), 0);
+  const G = groupSets(ws, ws + 7 * DAY);
   return `<div class="card"><div class="row between"><span class="muted small">Esta semana</span><span class="pill">${n} de ${freq()} treinos</span></div>
-    <div class="week-sum" style="margin-top:6px"><b>${tot ? tot.toLocaleString('pt-BR') : n}</b><span class="muted small">${tot ? 'kg de volume' : 'treinos'}</span></div>
-    <div class="week">${days.map((d, i) => `<div class="day"><div class="bar ${d.hs.length ? 'on' : ''} ${i === today ? 'today' : ''}" style="height:${d.hs.length ? 34 + 50 * d.vol / max : 30}px" title="${d.hs.map(h => 'Treino ' + h.plan).join(', ')}"></div>
-      <span class="d">${'STQQSSD'[i]}</span></div>`).join('')}</div></div>`;
+    <div class="week-sum" style="margin-top:6px"><b>${tot}</b><span class="muted small">série${tot === 1 ? '' : 's'}</span></div>
+    <div class="week">${days.map((d, i) => `<div class="day"><div class="bar ${d.hs.length ? 'on' : ''} ${i === today ? 'today' : ''}" style="height:${d.hs.length ? 34 + 50 * d.n / max : 30}px" title="${d.hs.map(h => planMeta(h).name).join(', ')}"></div>
+      <span class="d">${'STQQSSD'[i]}</span></div>`).join('')}</div>
+    <div class="muted small" style="margin:14px 0 4px">Séries por grupo muscular</div>
+    <div class="gsets">${Object.keys(RG).map(g => { const v = Math.round(G[g] || 0), t = WEEK_TARGET[g]; return `<div class="gs"><div class="row between"><span>${RG[g] === 'Posterior e glúteos' ? 'Posterior' : RG[g]}</span><b>${v}<span class="muted">/${t}</span></b></div>
+      <span class="gtrack"><i class="${v >= t ? 'full' : ''}" style="width:${Math.min(100, v / t * 100)}%"></i></span></div>`; }).join('')}</div>
+    <p class="note" style="margin:8px 0 0">Referência geral de séries por semana (grupos grandes ~10). Exercício que trabalha o grupo como secundário conta meia série.</p></div>`;
 }
-/* Teclado numérico de vidro para carga e repetições */
 function openKeypad(inp, unit, decimal, onOk) {
   let v = String(inp.value || '').replace('.', ',');
   const el = sheet(`<div class="kp-val"><span id="kpV"></span><span class="cur"></span></div><div class="kp-unit">${esc(unit)}</div>
