@@ -204,7 +204,7 @@
   .hist-item.open .hist-sets { display: block; }
   .hist-sets div { padding: 3px 0; }
   .empty { text-align: center; padding: 32px 16px; color: var(--muted); }
-  .field { display: grid; grid-template-columns: 1fr 120px; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .field { display: grid; grid-template-columns: minmax(96px, 1fr) minmax(120px, 60%); align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
   .field:first-child { border-top: 0; }
   .field input, .field select { padding: 10px; border-radius: var(--r-sm); background: var(--w80) !important; border: 1px solid var(--edge) !important; text-align: center; width: 100%; color: var(--ink) !important; }
   .kv { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-top: 1px solid var(--line); font-size: 15px; }
@@ -271,6 +271,19 @@
   .pain-card { border-color: rgba(208,83,77,.35); }
   .pain-bar { color: var(--danger); }
   .wrap-chips { flex-wrap: wrap; overflow: visible; margin: 0; padding: 8px 0; }
+  .hero-t { font-size: 24px; font-weight: 400; letter-spacing: -0.02em; line-height: 1.15; } .hero-f { font-size: 14px; color: var(--ink-2); margin-top: 1px; }
+  .ex-peek { margin-top: 10px; border-top: 1px solid var(--line); }
+  .ex-peek summary { list-style: none; cursor: pointer; display: grid; gap: 2px; padding: 12px 26px 4px 0; position: relative; font-weight: 500; }
+  .ex-peek summary::-webkit-details-marker { display: none; }
+  .ex-peek summary::after { content: '⌄'; position: absolute; right: 4px; top: 10px; color: var(--muted); font-size: 18px; transition: transform .2s; }
+  .ex-peek[open] summary::after { transform: rotate(180deg); }
+  .ex-peek .ex-list { margin-top: 4px; }
+  .done-pill { display: flex; align-items: center; gap: 8px; justify-content: center; margin: 22px auto 0; padding: 8px 14px; border-radius: 999px; background: rgba(46,158,91,.1); color: var(--ok); font-size: 14px; font-weight: 500; max-width: 100%; }
+  .done-pill svg { width: 16px; height: 16px; stroke: var(--ok); flex: none; } .done-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rest-screen .done-pill + .big-clock { margin-top: 18px; }
+  .month-h { display: flex; justify-content: space-between; align-items: baseline; margin: 22px 4px 10px; }
+  .month-h .muted { font-weight: 400; }
+  .hist-f { font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .done-ico { width: 76px; height: 76px; border-radius: 50%; background: var(--w80); border: 1px solid var(--edge); display: grid; place-items: center; margin: 24px auto 4px; box-shadow: var(--shadow-sm); }
   .done-ico svg { width: 34px; height: 34px; stroke: var(--ok); }
 
@@ -285,7 +298,7 @@
   .msg-ico { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: rgba(27,38,64,.08); color: var(--ink-2); }
   .msg.ok .msg-ico { background: var(--ok); color: #fff; }
   .msg.warn .msg-ico { background: var(--c); color: #fff; } .msg.warn { border-color: rgba(185,128,46,.3); }
-  .msg.today .msg-ico { background: var(--accent); color: #fff; font-size: 10px; } .msg.rest .msg-ico { font-size: 9px; } .msg.today, .msg.rest { border-color: rgba(61,90,134,.3); }
+  .msg.today .msg-ico { background: var(--accent); color: #fff; font-size: 10px; } .msg.restday .msg-ico { font-size: 9px; } .msg.today, .msg.restday { border-color: rgba(61,90,134,.3); }
   .msg.deload .msg-ico, .msg.prop .msg-ico { background: var(--accent); color: #fff; } .msg.prop { border-color: rgba(61,90,134,.3); }
   .prop-card { border-color: rgba(61,90,134,.25); }
   .blk { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
@@ -870,6 +883,7 @@ const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } 
 if (!S.onboarded && !(S.profile.nome && String(S.profile.nome).trim()) && +S.profile.idade === 32 && +S.profile.altura === 178 && +S.profile.peso === 79) {
   S.profile = { ...S.profile, idade: '', altura: '', peso: '', sexo: '' };
 }
+if (!+S.profile.atividade) S.profile.atividade = 1.55;   // perfis antigos sem nível de atividade
 const save = (touch = true) => { if (touch) S.updatedAt = Date.now(); saveLocal(); if (window.cloudPush) window.cloudPush(); };
 
 /* Junta os dados do aparelho com os da nuvem: treinos pela união (excluídos não voltam),
@@ -955,16 +969,16 @@ function viewHome() {
     ${S.active ? '' : backupCard()}
     ${weekCard()}
     <div class="stats">
-      <div class="stat"><b>${weekCount()}</b><span>nesta semana</span></div>
-      <div class="stat"><b>${S.history.length}</b><span>treinos no total</span></div>
-      <div class="stat"><b>${last ? last.plan : '—'}</b><span>último treino</span></div>
+      <div class="stat"><b>${streakWeeks()}</b><span>semana${streakWeeks() === 1 ? '' : 's'} na meta</span></div>
+      <div class="stat"><b>${S.history.filter(isStrength).length}</b><span>treinos no total</span></div>
+      <div class="stat"><b>${last ? fmtDate(last.end).split(',')[0] : '—'}</b><span>último treino</span></div>
     </div>
-    <h2>Como funciona</h2>
+    ${S.history.filter(isStrength).length >= 3 ? '' : `<h2>Como funciona</h2>
     <div class="card note stack">
-      <div>Alterne os treinos na sequência <b>A → B → C</b>, com pelo menos um dia de descanso entre eles (ex.: seg, qua, sex).</div>
+      <div>O cartão <b>Treino de hoje</b> escolhe o treino pela recuperação de cada músculo; o botão ▶ começa direto.</div>
       <div>O treino abre no <b>Modo Foco</b>: um exercício e uma série por vez. Ao concluir a série, o descanso começa sozinho. Toque em <b>Lista</b> para ver tudo.</div>
-      <div><b>Progressão:</b> quando conseguir fazer todas as séries no topo da faixa de repetições, aumente a carga em 2–5%.</div>
-    </div>
+      <div><b>Progressão:</b> quando conseguir fazer todas as séries no topo da faixa de repetições, o coach sugere subir a carga.</div>
+    </div>`}
   </div>`;
 }
 
@@ -973,7 +987,7 @@ function viewPlans() {
   const tp = travelOn() ? `✈︎ Modo viagem · sem equipamento · ~${CP.tempo} min por treino` : CP ? `${TEMPLATES[CP.type].label} · ${GOALS[CP.goal] || ''} · ~${CP.tempo} min por treino` : '3 treinos full body (plano inicial)';
   return `<div class="wrap"><h1 class="page-title">Treinos</h1><p class="muted page-sub" style="margin-top:0">${tp}</p>
     <button class="card custom-card" data-custom><b>＋ Treino personalizado</b><span class="note">Monte na hora, por exemplo o treino do seu amigo. Fica no histórico e o treino de amanhã se ajusta.</span></button>
-    <div class="row" style="gap:8px;margin-bottom:12px"><button class="btn ghost" data-goto="library" style="flex:1">Biblioteca de exercícios</button>${travelOn() ? '<button class="btn ghost" data-travel="off" style="flex:1">Sair do modo viagem</button>' : '<button class="btn ghost" data-redo style="flex:1">Gerar novo treino</button>'}</div>
+    <div class="row" style="gap:8px;margin-bottom:12px"><button class="btn ghost" data-goto="library" style="flex:1">Biblioteca</button>${travelOn() ? '<button class="btn ghost" data-travel="off" style="flex:1">Sair do modo viagem</button>' : '<button class="btn ghost" data-redo style="flex:1">Gerar novo treino</button>'}</div>
     ${ORDER.map(k => `<div class="card">
       <div class="row"><span class="tag ${k}">${k}</span><div><h3>${PLANS[k].name} · ${PLANS[k].focus}</h3>
       <div class="muted small">${PLANS[k].desc}</div></div></div>
@@ -987,16 +1001,20 @@ function viewPlans() {
 function viewHistory() {
   if (!S.history.length) return `<div class="wrap"><h1 class="page-title">Histórico</h1><div class="card empty">Nenhum treino registrado ainda.<br>Finalize um treino para ele aparecer aqui.</div>
     <button class="btn ghost" data-custom-past>＋ Registrar treino de outro dia</button></div>`;
+  let lastMonth = '';
   const items = [...S.history].reverse().map((h, i) => {
+    const dm = new Date(h.end); const mk = `${MONTHS[dm.getMonth()][0].toUpperCase()}${MONTHS[dm.getMonth()].slice(1)} de ${dm.getFullYear()}`;
+    const head = mk !== lastMonth ? `<h2 class="month-h">${mk}<span class="muted small">${S.history.filter(x => { const d = new Date(x.end); return d.getMonth() === dm.getMonth() && d.getFullYear() === dm.getFullYear() && isStrength(x); }).length} treinos</span></h2>` : '';
+    lastMonth = mk;
     const p = planMeta(h); const mins = Math.max(1, Math.round((h.end - h.start) / 60000));
     const detail = exList(h).map(e => {
       const ss = (h.sets[e.id] || []).filter(s => s.done);
       if (!ss.length) return '';
       return `<div><b style="color:var(--text)">${esc(e.name)}</b>: ${ss.map(s => fmtSet(e, s)).join(', ')}</div>`;
     }).join('');
-    return `<div class="card hist-item" data-hist>
-      <div class="row between"><div class="row"><span class="tag ${h.plan}">${h.plan}</span>
-        <div><h3>${p.name} · ${p.focus}${h.travel ? ' <span class="pill travel-pill">✈︎ Viagem</span>' : ''}</h3><div class="muted small">${fmtDate(h.end)} · ${mins} min${h.cardio ? ' · + aeróbico' : ''}</div></div></div>
+    return head + `<div class="card hist-item" data-hist>
+      <div class="row between"><div class="row" style="min-width:0;flex:1"><span class="tag ${h.plan}">${h.plan}</span>
+        <div style="min-width:0"><h3>${p.name}${h.travel ? ' <span class="pill travel-pill">✈︎ Viagem</span>' : ''}</h3><div class="hist-f">${esc(p.focus)}</div><div class="muted small">${fmtDate(h.end)} · ${h.cardioOnly ? `${h.cardio ? h.cardio.min : '–'} min de aeróbico` : `${mins} min${h.cardio ? ' · + aeróbico' : ''}`}</div></div></div>
         <div style="text-align:right;white-space:nowrap"><b>${sessionVolume(h).toLocaleString('pt-BR')}</b><div class="muted small">kg volume</div></div></div>
       <div class="hist-sets">${detail || 'Sem séries registradas.'}
         ${h.cardio ? `<div><b style="color:var(--text)">Aeróbico</b>: ${esc(h.cardio.type)} · ${h.cardio.min ?? '–'} min${h.cardio.km ? ' · ' + String(h.cardio.km).replace('.', ',') + ' km' : ''} · ${esc(h.cardio.int)}</div>` : ''}
@@ -1014,7 +1032,7 @@ function calcProfile() {
   const p = S.profile; const h = p.altura / 100;
   const imc = p.peso / (h * h);
   const tmb = 10 * p.peso + 6.25 * p.altura - 5 * p.idade + (p.sexo === 'M' ? 5 : -161); // Mifflin-St Jeor
-  return { imc, tmb, get: tmb * p.atividade, protMin: p.peso * 1.6, protMax: p.peso * 2.2, agua: p.peso * 35 };
+  return { imc, tmb, get: tmb * (+p.atividade || 1.55), protMin: p.peso * 1.6, protMax: p.peso * 2.2, agua: p.peso * 35 };
 }
 function imcClass(v) { return v < 18.5 ? 'abaixo do peso' : v < 25 ? 'faixa normal' : v < 30 ? 'sobrepeso' : 'obesidade'; }
 
@@ -1223,7 +1241,7 @@ function completeSet(ei, si) {
   if (nxt) a.cur = nxt.ei;
   save();
   if (navigator.vibrate) navigator.vibrate(30);
-  if (nxt && !a.past) startRest(e.rest, nextLabel(a, nxt));   // registro de outro dia: sem descanso       // sem descanso depois da última série do treino
+  if (nxt && !a.past) startRest(e.rest, nextLabel(a, nxt), 'Descanso', `${e.name} · série ${si + 1}: ${fmtSet(e, s)}`);   // registro de outro dia: sem descanso       // sem descanso depois da última série do treino
   else endRest(false);
   return nxt;
 }
@@ -1253,6 +1271,7 @@ function viewFocus(a) {
     const total = Math.max(1, rest.total);
     return `<div class="focus rest-screen">
       <div class="f-top">${esc(rest.title)}</div>
+      ${rest.done ? `<div class="done-pill">${CHECK}<span>${esc(rest.done)}</span></div>` : ''}
       <div class="big-clock" data-rest-time>${fmtTime(Math.max(0, Math.ceil((rest.end - Date.now()) / 1000)))}</div>
       <div class="rest-track"><i data-rest-bar style="width:${Math.min(100, (rest.end - Date.now()) / total * 100)}%"></i></div>
       <div class="adj"><button class="btn ghost" id="fMinus">−15s</button><button class="btn ghost" id="fPlus">+15s</button></div>
@@ -1303,7 +1322,7 @@ function viewFocus(a) {
     return `<div class="focus">${header}
       <div class="f-meta">Exercício concluído ✓</div>
       <div class="dots">${dots}</div>
-      <div class="row" style="gap:6px;margin:-4px 0 8px"><button class="hbtn small" data-addset="${ei}">＋ Série</button>${a.custom ? '<button class="hbtn small" data-addex>＋ Exercício</button>' : ''}</div>
+      ${a.custom ? `<div class="row" style="gap:6px;margin:-4px 0 8px"><button class="hbtn small" data-addset="${ei}">＋ Série</button><button class="hbtn small" data-addex>＋ Exercício</button></div>` : ''}
       <div class="card" style="margin-top:8px">${sets.map((s, j) => `<div class="kv"><span>Série ${j + 1}</span><b>${fmtSet(e, s)}</b></div>`).join('')}</div>
       <div class="f-cta"><button class="btn xl" id="fGoNext">Ir para a próxima série pendente</button>${nav}</div>
     </div>`;
@@ -1329,7 +1348,7 @@ function viewFocus(a) {
   return `<div class="focus">${header}
       <div class="f-meta">Série <b>${si + 1}</b> de ${sets.length} · meta <b>${esc(e.reps)}</b> · descanso ${fmtTime(e.rest)}</div>
       <div class="dots">${dots}</div>
-      <div class="row" style="gap:6px;margin:-4px 0 8px"><button class="hbtn small" data-addset="${ei}">＋ Série</button>${a.custom ? '<button class="hbtn small" data-addex>＋ Exercício</button>' : ''}</div>
+      ${a.custom ? `<div class="row" style="gap:6px;margin:-4px 0 8px"><button class="hbtn small" data-addset="${ei}">＋ Série</button><button class="hbtn small" data-addex>＋ Exercício</button></div>` : ''}
       <div class="f-last">${last ? `Última vez: ${fmtSet(e, last)}` : 'Primeira vez neste exercício'}
         · <button class="tip-toggle" id="fTipBtn" style="margin:0">Como executar</button></div>
       <div class="tip" id="fTip">${howHtml(e)}</div>
@@ -1501,6 +1520,7 @@ function openActions(ei) {
     ${a.custom ? `<button class="opt" data-act="remove"><span><b>✕ Remover do treino</b><br><span class="muted small">Tira este exercício do treino personalizado</span></span></button>` : `<button class="opt" data-act="swap"><span><b>⇄ Trocar exercício</b><br><span class="muted small">Aparelho ocupado ou indisponível</span></span></button>`}
     ${sk ? '' : `<button class="opt" data-act="later"><span><b>↓ Fazer depois</b><br><span class="muted small">Move para o fim do treino e segue para o próximo</span></span></button>`}
     <button class="opt" data-act="skip"><span><b>${sk ? '↺ Retomar exercício' : '⤼ Pular hoje'}</b><br><span class="muted small">${sk ? 'Volta a fazer parte do treino de hoje' : 'Não entra no treino de hoje'}</span></span></button>
+    <button class="opt" data-act="addset"><span><b>＋ Adicionar série</b><br><span class="muted small">Fazer uma série a mais deste exercício hoje</span></span></button>
     <button class="opt" data-act="order"><span><b>⇅ Reordenar treino</b><br><span class="muted small">Mudar a sequência dos exercícios de hoje</span></span></button>
     <button class="btn ghost" data-act="close" style="margin-top:12px">Cancelar</button>`);
   el.querySelectorAll('[data-act]').forEach(b => b.onclick = () => {
@@ -1508,6 +1528,7 @@ function openActions(ei) {
     if (act === 'swap') return openSwap(ei);
     if (act === 'order') return openReorder();
     if (act === 'remove') removeFromCustom(ei);
+    if (act === 'addset') addSet(ei);
     if (act === 'later') moveLater(ei);
     if (act === 'skip') skipToday(ei, !sk);
     if (act !== 'close') { render(); window.scrollTo(0, 0); }
@@ -1648,9 +1669,9 @@ function beep() {
   } catch (e) {}
   if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 }
-function startRest(sec, label, title = 'Descanso') {
+function startRest(sec, label, title = 'Descanso', done = '') {
   try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch (e) {}
-  rest = { end: Date.now() + sec * 1000, total: sec * 1000, label, title, beeped: false };
+  rest = { end: Date.now() + sec * 1000, total: sec * 1000, label, title, done, beeped: false };
   clearInterval(restTick); restTick = setInterval(updateRest, 250); updateRest();
   if (inFocus()) { render(); window.scrollTo(0, 0); }
 }
@@ -2013,7 +2034,7 @@ function coachMessages() {
   if (bi.deload) m.push({ t: 'deload', text: `Semana leve (semana 4 do bloco ${bi.n}): menos séries e cerca de 10% menos carga. É quando o corpo assimila o treino.` });
   if (!S.active && tab !== 'home' && S.history.length) {   // a mesma decisão do cartão "Treino de hoje"
     const tp = todayPlan();
-    m.unshift({ t: tp.type === 'train' ? 'today' : 'rest', go: 'home', text: tp.type === 'train'
+    m.unshift({ t: tp.type === 'train' ? 'today' : 'restday', go: 'home', text: tp.type === 'train'
       ? `Hoje: ${PLANS[tp.best.k].name} · ${PLANS[tp.best.k].focus}.${dsl != null && dsl >= 3 ? ` ${dsl} dias sem treinar.` : ''}`
       : tp.type === 'done' ? 'Treino de hoje concluído. Descanse ou faça um aeróbico leve.' : `Hoje: descanso. ${tp.why[0]}` });
   }
@@ -2026,7 +2047,7 @@ function coachMessages() {
   const wm = weightMessage(); if (wm) m.push(wm);
   return m;
 }
-const msgIco = { ok: '✓', warn: '!', info: 'i', deload: '↓', prop: '★', today: '▶', rest: 'Zz' };
+const msgIco = { ok: '✓', warn: '!', info: 'i', deload: '↓', prop: '★', today: '▶', restday: 'Zz' };
 const msgHtml = x => `<div class="msg ${x.t}" ${x.go ? `data-goto="${x.go}"` : ''}><span class="msg-ico">${msgIco[x.t] || 'i'}</span><span>${esc(x.text)}</span></div>`;
 
 /* ---------- Calendário ---------- */
@@ -2114,11 +2135,6 @@ function viewCoach() {
     ${pend.length ? `<h2>Propostas</h2>${pend.map(proposalCard).join('')}` : ''}
     <h2>Recuperação muscular</h2>
     ${recoveryCard()}
-    <h2>Bloco de treino</h2>
-    <div class="card"><div class="row between"><b>Bloco ${bi.n} · semana ${bi.week} de 4</b><span class="muted small">${bi.deload ? 'semana leve' : 'progressão'}</span></div>
-      <div class="blk">${[1, 2, 3, 4].map(i => `<i class="${i < bi.week ? 'past' : i === bi.week ? 'cur' : ''} ${i === 4 ? 'dl' : ''}">${i === 4 ? 'leve' : 'S' + i}</i>`).join('')}</div>
-      <p class="note" style="margin:8px 0 0">Semanas 1 a 3: progressão de carga. Semana 4: menos séries e ~10% menos carga para recuperar. A cada 2 blocos o coach propõe variações.</p>
-      ${bi.deload ? '' : `<button class="btn ghost" id="antDeload" style="margin-top:12px">Antecipar semana leve</button>`}</div>
     <h2>Constância</h2>
     <div class="stats"><div class="stat"><b>${wk}/${freq()}</b><span>nesta semana</span></div>
       <div class="stat"><b>${st}</b><span>semana${st === 1 ? '' : 's'} seguida${st === 1 ? '' : 's'} na meta</span></div>
@@ -2127,6 +2143,11 @@ function viewCoach() {
       <b>${MONTHS[cm.getMonth()]} de ${cm.getFullYear()}</b><button class="hbtn small" id="calNext" ${calOff >= 0 ? 'disabled' : ''} aria-label="Próximo mês">›</button></div>
       ${calendar(cm.getFullYear(), cm.getMonth())}
       <p class="note" style="margin:8px 0 0">${countIn(cm.getTime(), new Date(cm.getFullYear(), cm.getMonth() + 1, 1).getTime())} treinos no mês.</p></div>
+    <h2>Bloco de treino</h2>
+    <div class="card"><div class="row between"><b>Bloco ${bi.n} · semana ${bi.week} de 4</b><span class="muted small">${bi.deload ? 'semana leve' : 'progressão'}</span></div>
+      <div class="blk">${[1, 2, 3, 4].map(i => `<i class="${i < bi.week ? 'past' : i === bi.week ? 'cur' : ''} ${i === 4 ? 'dl' : ''}">${i === 4 ? 'leve' : 'S' + i}</i>`).join('')}</div>
+      <p class="note" style="margin:8px 0 0">Semanas 1 a 3: progressão de carga. Semana 4: menos séries e ~10% menos carga para recuperar. A cada 2 blocos o coach propõe variações.</p>
+      ${bi.deload ? '' : `<button class="btn ghost" id="antDeload" style="margin-top:12px">Antecipar semana leve</button>`}</div>
     <h2>Peso corporal</h2>
     <div class="card">${lw ? `<div class="row between"><div><b style="font-size:24px">${fmtKg(lw.kg)} kg</b><div class="muted small">${fmtDate(lw.t)}</div></div>
       ${tr ? `<div style="text-align:right"><b>${tr.rate > 0 ? '+' : ''}${tr.rate.toFixed(1).replace('.', ',')}%</b><div class="muted small">por semana (4 sem.)</div></div>` : ''}</div>
@@ -3026,12 +3047,15 @@ function todayCard() {
   if (S.active) {
     const k = S.active.plan; const p = PLANS[k];
     return `<div class="card hero ${k}" style="margin-top:16px"><div class="row between"><div class="row"><span class="tag ${k}">${k}</span>
-      <div><div class="muted small">Treino em andamento</div><h3>${p.name} · ${esc(p.focus)}</h3></div></div>
+      <div><div class="muted small">Treino em andamento</div><h3 class="hero-t">${p.name}</h3><div class="hero-f">${esc(p.focus)}</div></div></div>
       <button class="go-btn" data-goto="session" aria-label="Continuar"><svg viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8"/></svg></button></div>
       <button class="btn" style="margin-top:16px" data-goto="session">Continuar treino</button></div>`;
   }
   const t = todayPlan(); const k = t.best.k; const p = PLANS[k];
-  const reasons = `<ul class="why">${t.why.map(w => `<li>${esc(w)}</li>`).join('')}</ul>`;
+  const reasons = `<ul class="why">${t.why.slice(0, 2).map(w => `<li>${esc(w)}</li>`).join('')}</ul>`;
+  const exs = PLANS[k] ? exList({ plan: k, swaps: prefSwaps(k) }) : [];
+  const mins = Math.round(5 + exs.reduce((a, e) => a + exMinutes(e), 0));
+  const summary = `<details class="ex-peek"><summary><span>${exs.length} exercícios · ~${mins} min</span><span class="muted small">${esc(exs.slice(0, 2).map(e => e.name).join(', '))}${exs.length > 2 ? '…' : ''}</span></summary>${planList(k)}</details>`;
   const custom = `<button class="hbtn small" data-custom style="margin-top:10px">＋ Treino personalizado</button><button class="hbtn small" data-pain-sheet style="margin-top:10px">${activePain().any ? 'Dor relatada' : 'Sentindo dor?'}</button>`;
   if (t.type === 'rest' || t.type === 'done') {
     return `<div class="card hero rest-hero" style="margin-top:16px"><div class="row"><span class="tag R">${t.type === 'done' ? '✓' : 'Zz'}</span>
@@ -3041,10 +3065,9 @@ function todayCard() {
   }
   return `<div class="card hero ${k}" style="margin-top:16px">
     <div class="row between"><div class="row"><span class="tag ${k}">${k}</span>
-      <div><div class="muted small">Treino de hoje</div><h3>${p.name} · ${esc(p.focus)}</h3></div></div>
-      <button class="go-btn" data-start="${k}" aria-label="Começar"><svg viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8"/></svg></button></div>
-    ${reasons}${planList(k)}
-    <button class="btn" style="margin-top:16px" data-start="${k}">Começar ${p.name}</button>
+      <div><div class="muted small">Treino de hoje</div><h3 class="hero-t">${p.name}</h3><div class="hero-f">${esc(p.focus)}</div></div></div></div>
+    ${reasons}${summary}
+    <button class="btn" style="margin-top:14px" data-start="${k}">Começar ${p.name}</button>
     <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="hbtn small" data-goto="plans">Escolher outro</button>${custom.replaceAll('style="margin-top:10px"', '')}</div></div>`;
 }
 /* Mapa de recuperação (Coach) */
