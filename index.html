@@ -978,7 +978,8 @@ function viewPlans() {
 }
 
 function viewHistory() {
-  if (!S.history.length) return `<div class="wrap"><h1 class="page-title">Histórico</h1><div class="card empty">Nenhum treino registrado ainda.<br>Finalize um treino para ele aparecer aqui.</div></div>`;
+  if (!S.history.length) return `<div class="wrap"><h1 class="page-title">Histórico</h1><div class="card empty">Nenhum treino registrado ainda.<br>Finalize um treino para ele aparecer aqui.</div>
+    <button class="btn ghost" data-custom-past>＋ Registrar treino de outro dia</button></div>`;
   const items = [...S.history].reverse().map((h, i) => {
     const p = planMeta(h); const mins = Math.max(1, Math.round((h.end - h.start) / 60000));
     const detail = exList(h).map(e => {
@@ -996,7 +997,8 @@ function viewHistory() {
       </div>
     </div>`;
   }).join('');
-  return `<div class="wrap"><h1 class="page-title">Histórico</h1><p class="muted small">Toque num treino para ver as cargas ou excluí-lo.</p>${items}
+  return `<div class="wrap"><h1 class="page-title">Histórico</h1><p class="muted small">Toque num treino para ver as cargas ou excluí-lo.</p>
+    <button class="btn ghost" data-custom-past style="margin-bottom:12px">＋ Registrar treino de outro dia</button>${items}
     <button class="btn danger" id="clearHist" style="margin-top:8px">Excluir todo o histórico</button>
     <p class="note">As cargas da “última vez” de cada exercício são mantidas, para você não perder a referência.</p></div>`;
 }
@@ -1209,7 +1211,7 @@ function completeSet(ei, si) {
   if (nxt) a.cur = nxt.ei;
   save();
   if (navigator.vibrate) navigator.vibrate(30);
-  if (nxt) startRest(e.rest, nextLabel(a, nxt));       // sem descanso depois da última série do treino
+  if (nxt && !a.past) startRest(e.rest, nextLabel(a, nxt));   // registro de outro dia: sem descanso       // sem descanso depois da última série do treino
   else endRest(false);
   return nxt;
 }
@@ -1520,7 +1522,8 @@ function openReorder() {
 }
 
 function bindExtras() {
-  document.querySelectorAll('[data-custom]').forEach(b => b.onclick = startCustomPrompt);
+  document.querySelectorAll('[data-custom]').forEach(b => b.onclick = () => startCustomPrompt(false));
+  document.querySelectorAll('[data-custom-past]').forEach(b => b.onclick = () => startCustomPrompt(true));
   document.querySelectorAll('[data-addex]').forEach(b => b.onclick = openAddExercise);
   document.querySelectorAll('[data-addset]').forEach(b => b.onclick = () => { addSet(+b.dataset.addset); render(); });
   document.querySelectorAll('[data-discard]').forEach(b => b.onclick = () => { if (confirm('Cancelar este treino? Nada será salvo.')) { S.active = null; save(); endRest(false); go('home'); } });
@@ -1545,17 +1548,21 @@ function bindSession() {
 function finishSession() {
   const a = S.active; const doneCount = Object.values(a.sets).flat().filter(s => s.done).length;
   if (!doneCount && !(a.cardio && a.cardio.on) && !confirm('Nenhuma série foi marcada. Finalizar mesmo assim?')) return;
+  let end = Date.now(), start = a.start;
+  if (a.past) { end = Math.min(a.past.day + 19 * 3600000, Date.now() - 60000); start = end - (a.past.mins || 60) * 60000; }   // treino de outro dia: grava às 19h daquela data
+  while (S.history.some(h => h.end === end)) end++;
   for (const e of exList(a)) {
     const done = (a.sets[e.id] || []).filter(s => s.done);
     if (!done.length) continue;
+    if (S.history.some(h => h.end > end && setsOf(h, e.id).some(s => s.done))) continue;   // há registro mais recente desse exercício: mantém a carga dele
     const key = metric(e) === 'reps' ? (s => s.kg ?? 0) : (s => s.reps ?? 0);
     const best = done.reduce((m, s) => key(s) >= key(m) ? s : m, done[0]);
     S.last[e.id] = { kg: best.kg, reps: best.reps };
   }
   const cardio = a.cardio && a.cardio.on && a.cardio.min ? { type: a.cardio.type, min: a.cardio.min, km: a.cardio.km, int: a.cardio.int } : null;
   if (cardio) S.lastCardio = { type: cardio.type };
-  const end = Date.now();
-  S.history.push({ plan: a.plan, exs: exList(a).map(stripEx), pname: PLANS[a.plan].name, pfocus: PLANS[a.plan].focus, planId: a.custom ? 'custom' : (curPlan() && curPlan().id) || 'legacy', travel: !!a.travel, custom: !!a.custom, start: a.start, end, mod: end, deload: !!a.deload, sets: a.sets, swaps: a.swaps || {}, skipped: Object.keys(a.skipped || {}).map(Number), cardio });
+  S.history.push({ plan: a.plan, exs: exList(a).map(stripEx), pname: PLANS[a.plan].name, pfocus: PLANS[a.plan].focus, planId: a.custom ? 'custom' : (curPlan() && curPlan().id) || 'legacy', travel: !!a.travel, custom: !!a.custom, past: !!a.past, start, end, mod: Date.now(), deload: !!a.deload, sets: a.sets, swaps: a.swaps || {}, skipped: Object.keys(a.skipped || {}).map(Number), cardio });
+  S.history.sort((x, y) => x.end - y.end);   // um registro de outro dia entra no lugar certo
   if (!a.custom) S.next = ORDER[(ORDER.indexOf(a.plan) + 1) % 3];   // o personalizado não mexe na sequência; o personal do dia recalcula pelos músculos
   S.active = null; save(); endRest(false);
   runCoach(); summaryEnd = end; go('summary');
@@ -1658,6 +1665,7 @@ $('#restMinus').onclick = () => adjustRest(-15);
 
 function elapsedTxt(short) {
   if (!S.active) return '';
+  if (S.active.past) return `Registro de ${new Date(S.active.past.day).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })}${short ? '' : ` · ${progressPct()}%`}`;
   const t = fmtTime(Math.floor((Date.now() - S.active.start) / 1000));
   return short ? t : `${t} · ${progressPct()}%`;
 }
@@ -2912,7 +2920,8 @@ function groupStatus(now = Date.now()) {
   }
   return out;
 }
-const agoTxt = hrs => hrs === null ? 'ainda não treinado' : hrs < 24 ? 'treinado hoje' : `há ${Math.round(hrs / 24)} dia${Math.round(hrs / 24) === 1 ? '' : 's'}`;
+const calDays = hrs => Math.round((dayKeyOf(Date.now()) - dayKeyOf(Date.now() - hrs * 3.6e6)) / DAY);   // dias de calendário (hoje = 0, ontem = 1)
+const agoTxt = hrs => { if (hrs === null) return 'ainda não treinado'; const d = calDays(hrs); return d === 0 ? 'treinado hoje' : d === 1 ? 'treinado ontem' : `há ${d} dias`; };
 /* Pontua um treino do plano pela prontidão dos grupos que ele trabalha */
 function planReadiness(k, st) {
   const W = {};
@@ -2953,7 +2962,7 @@ function todayPlan() {
     return { type: 'rest', best, st, why };
   }
   if (dsl !== null && dsl >= 5) why.push(`Faz ${dsl} dias sem treinar: volte hoje, com cerca de 10% menos carga nas primeiras séries.`);
-  const ago2 = h => h === null ? 'sem treino recente' : `último há ${Math.max(1, Math.round(h / 24))} dia${Math.round(h / 24) > 1 ? 's' : ''}`;
+  const ago2 = h => { if (h === null) return 'sem treino recente'; const d = calDays(h); return d <= 1 ? (d ? 'último ontem' : 'último hoje') : `último há ${d} dias`; };
   if (fresh.length) why.push(`Descansados: ${fresh.map(g => `${RG[g]} (${ago2(st[g].hours)})`).join(', ')}.`);
   const avoided = ranked.slice(1).filter(r => r.score < best.score && r.main.some(g => ['cansado', 'recuperando'].includes(st[g].state)));
   if (avoided.length) { const g = avoided[0].main.find(x => ['cansado', 'recuperando'].includes(st[x].state)); why.push(`${PLANS[avoided[0].k].name} fica para depois: ${RG[g].toLowerCase()} ainda em recuperação (${agoTxt(st[g].hours)}).`); }
@@ -2997,15 +3006,35 @@ function recoveryCard() {
 /* ============================================================
    TREINO PERSONALIZADO — montar na hora (ex.: treino do amigo)
    ============================================================ */
-function startCustomPrompt() {
+function startCustomPrompt(past) {
   if (S.active) { if (!confirm(`Há um ${PLANS[S.active.plan].name} em andamento. Descartar e começar um treino personalizado?`)) return; S.active = null; endRest(false); }
-  const el = sheet(`<h3>Treino personalizado</h3><p class="note" style="margin:4px 0 12px">Monte o treino na hora, por exemplo o do seu amigo. Ele entra no histórico, conta para o coach, e o treino de amanhã é recalculado pelos músculos que você trabalhou.</p>
+  const ymd = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const today = dayKeyOf(Date.now());
+  const el = sheet(`<h3>${past ? 'Registrar treino de outro dia' : 'Treino personalizado'}</h3>
+    <p class="note" style="margin:4px 0 12px">${past ? 'Lance um treino que você fez e não registrou. Ele entra no histórico na data escolhida, conta para o coach e muda a sugestão de hoje.' : 'Monte o treino na hora, por exemplo o do seu amigo. Ele entra no histórico, conta para o coach, e o treino de amanhã é recalculado pelos músculos que você trabalhou.'}</p>
     <label class="ob-f">Nome (opcional)<input id="ctName" placeholder="Ex.: Treino com o João" maxlength="40"></label>
+    <div class="ob-f">Quando foi o treino?
+      <div class="seg" id="ctWhen"><button data-w="0" class="${past ? '' : 'on'}">Hoje</button><button data-w="1" class="${past ? 'on' : ''}">Ontem</button><button data-w="x">Outra data</button></div>
+      <input type="date" id="ctDate" class="hidden" max="${ymd(today)}" min="${ymd(today - 90 * DAY)}" value="${ymd(today - DAY)}" style="margin-top:8px"></div>
+    <div class="ob-f ${past ? '' : 'hidden'}" id="ctDurBox">Duração aproximada
+      <div class="seg" id="ctDur">${[30, 45, 60, 90].map(v => `<button data-d="${v}" class="${v === 60 ? 'on' : ''}">${v} min</button>`).join('')}</div></div>
     <button class="btn" id="ctGo">Começar e adicionar exercícios</button>`);
-  $('#ctGo', el).onclick = () => { const n = $('#ctName', el).value.trim(); el.remove(); startCustom(n); };
+  let when = past ? 1 : 0, mins = 60;
+  el.querySelectorAll('#ctWhen [data-w]').forEach(b => b.onclick = () => {
+    when = b.dataset.w === 'x' ? 'x' : +b.dataset.w;
+    el.querySelectorAll('#ctWhen [data-w]').forEach(x => x.classList.toggle('on', x === b));
+    $('#ctDate', el).classList.toggle('hidden', when !== 'x'); $('#ctDurBox', el).classList.toggle('hidden', when === 0);
+  });
+  el.querySelectorAll('#ctDur [data-d]').forEach(b => b.onclick = () => { mins = +b.dataset.d; el.querySelectorAll('#ctDur [data-d]').forEach(x => x.classList.toggle('on', x === b)); });
+  $('#ctGo', el).onclick = () => {
+    let day = null;
+    if (when === 1) day = today - DAY;
+    if (when === 'x') { const v = $('#ctDate', el).value; if (!v) return; const [y, m, d] = v.split('-').map(Number); day = new Date(y, m - 1, d).getTime(); if (day >= today) day = null; }
+    const n = $('#ctName', el).value.trim(); el.remove(); startCustom(n, day ? { day, mins } : null);
+  };
 }
-function startCustom(title) {
-  S.active = { plan: 'P', custom: true, title: title || 'Treino livre', start: Date.now(), exs: [], sets: {}, swaps: {}, order: [], skipped: {}, cardio: newCardio('A'), view: 'focus', cur: 0, travel: travelOn() };
+function startCustom(title, past) {
+  S.active = { plan: 'P', custom: true, title: title || 'Treino livre', past: past || null, start: Date.now(), exs: [], sets: {}, swaps: {}, order: [], skipped: {}, cardio: newCardio('A'), view: 'focus', cur: 0, travel: travelOn() };
   save(); go('session'); setTimeout(openAddExercise, 50);
 }
 function addExerciseToCustom(e) {
