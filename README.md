@@ -1,6 +1,6 @@
-# Treino Full Body
+# App de Treino
 
-App web (PWA) com 3 treinos full body (A · Força, B · Hipertrofia, C · Resistência), 6 exercícios cada.
+App web (PWA) que monta um treino novo a cada dia (sem treino fixo): o foco sai da recuperação de cada grupo muscular e os exercícios vêm da biblioteca, priorizando os que você já faz.
 
 - Registro de carga e repetições por série (lembra a carga da última vez)
 - Timer de descanso automático com aviso sonoro

@@ -80,6 +80,8 @@
   .card { background: var(--surface); border: 1px solid var(--edge); border-radius: var(--radius); padding: 18px; margin-bottom: 12px; box-shadow: var(--shadow-sm); }
   .tag { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 50%; font-weight: 500; font-size: 17px; flex: none; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); }
   .tag.A { background: var(--a); } .tag.B { background: var(--b); } .tag.C { background: var(--plan-c); color: var(--ink); }
+  .tag.push, .tag.upper { background: var(--a); font-size: 14px; } .tag.pull, .tag.full { background: var(--b); font-size: 14px; } .tag.legs { background: var(--plan-c); color: var(--ink); font-size: 14px; }
+  .card.dim { opacity: .72; } .warn-pill { background: rgba(214,140,40,.16); color: #9a5b00; }
 
   /* Botões */
   .btn { display: block; width: 100%; padding: 16px 20px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 500; font-size: 16px; text-align: center;
@@ -327,7 +329,8 @@
   .cal-h { text-align: center; font-size: 11px; color: var(--muted); padding-bottom: 2px; }
   .cal-d { aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; font-size: 13px; color: var(--muted); background: var(--w70); border: 1px solid var(--edge); }
   .cal-d.on { color: #fff; font-weight: 600; } .cal-d.on.A { background: var(--a); border-color: var(--a); } .cal-d.on.B { background: var(--b); border-color: var(--b); }
-  .cal-d.on.C { background: var(--plan-c); border-color: var(--plan-c); color: var(--ink); }
+  .cal-d.on.C, .cal-d.on.legs { background: var(--plan-c); border-color: var(--plan-c); color: var(--ink); }
+  .cal-d.on.push, .cal-d.on.upper { background: var(--a); border-color: var(--a); } .cal-d.on.pull, .cal-d.on.full { background: var(--b); border-color: var(--b); }
   .cal-d.today { outline: 2px solid var(--ink); outline-offset: 1px; }
   .chart { position: relative; margin-top: 10px; touch-action: pan-y; }
   .chart svg { width: 100%; height: 132px; display: block; overflow: visible; }
@@ -470,7 +473,7 @@
 :root:not([data-theme="light"]) .msg-ico { background: rgba(255,255,255,.1); }
 :root:not([data-theme="light"]) .pr-card { background: linear-gradient(160deg, rgba(255,255,255,.08), rgba(224,165,79,.1)); }
 :root:not([data-theme="light"]) .set.done { background: rgba(111,147,204,.1); }
-:root:not([data-theme="light"]) .tag.C, :root:not([data-theme="light"]) .cal-d.on.C { color: #0c1422; }
+:root:not([data-theme="light"]) .tag.C, :root:not([data-theme="light"]) .cal-d.on.C, :root:not([data-theme="light"]) .tag.legs, :root:not([data-theme="light"]) .cal-d.on.legs { color: #0c1422; }
 :root:not([data-theme="light"]) .bsvg .body > * { fill: #22304a; } :root:not([data-theme="light"]) .bsvg .mu { fill: #2e3f5e; stroke: rgba(12,20,34,.9); } :root:not([data-theme="light"]) .bsvg .mu.s, :root:not([data-theme="light"]) .sw.s { fill: #4f6c9c; background: #4f6c9c; }
 :root:not([data-theme="light"]) .btn { box-shadow: 0 8px 22px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.14); }
 :root:not([data-theme="light"]) nav.tabs .inner { box-shadow: 0 12px 34px rgba(0,0,0,.45); }
@@ -519,7 +522,7 @@
 :root[data-theme="dark"] .msg-ico { background: rgba(255,255,255,.1); }
 :root[data-theme="dark"] .pr-card { background: linear-gradient(160deg, rgba(255,255,255,.08), rgba(224,165,79,.1)); }
 :root[data-theme="dark"] .set.done { background: rgba(111,147,204,.1); }
-:root[data-theme="dark"] .tag.C, :root[data-theme="dark"] .cal-d.on.C { color: #0c1422; }
+:root[data-theme="dark"] .tag.C, :root[data-theme="dark"] .cal-d.on.C, :root[data-theme="dark"] .tag.legs, :root[data-theme="dark"] .cal-d.on.legs { color: #0c1422; }
 :root[data-theme="dark"] .bsvg .body > * { fill: #22304a; } :root[data-theme="dark"] .bsvg .mu { fill: #2e3f5e; stroke: rgba(12,20,34,.9); } :root[data-theme="dark"] .bsvg .mu.s, :root[data-theme="dark"] .sw.s { fill: #4f6c9c; background: #4f6c9c; }
 :root[data-theme="dark"] .btn { box-shadow: 0 8px 22px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.14); }
 :root[data-theme="dark"] nav.tabs .inner { box-shadow: 0 12px 34px rgba(0,0,0,.45); }
@@ -621,8 +624,7 @@ const LEGACY_PLANS = {
     ]
   }
 };
-const ORDER = ['A', 'B', 'C'];
-let PLANS = LEGACY_PLANS;   // substituído pelo treino gerado (S.plan) em applyPlan()
+let PLANS = {};   // opções de hoje, geradas em applyPlan() (uma por foco)
 
 /* ============================================================
    SUBSTITUIÇÕES — alternativas para quando o aparelho estiver ocupado
@@ -725,12 +727,8 @@ function slotEx(plan, ei, swaps) {
   const { unit, dist, assist, bodyweight, step, ...core } = base;   // flags do original não passam para o substituto
   return { ...core, ...alt, base };
 }
-function exList(x) { if (x.exs) return x.exs; return PLANS[x.plan].exercises.map((_, i) => slotEx(x.plan, i, x.swaps)); }
-function prefSwaps(plan) {
-  const out = {}; const pref = S.prefSwaps || {};
-  PLANS[plan].exercises.forEach((e, i) => { if (pref[e.id] && altsFor(e).some(x => x.id === pref[e.id])) out[i] = pref[e.id]; });
-  return out;
-}
+function exList(x) { if (x.exs) return x.exs; if (!PLANS[x.plan]) return []; return PLANS[x.plan].exercises.map((_, i) => slotEx(x.plan, i, x.swaps)); }
+function prefSwaps() { return {}; }   // as preferências (S.prefPattern) já entram na geração do treino
 function newSets(e, deload) {
   const last = S.last[e.id] || {};
   const n = deload ? Math.max(2, Math.ceil(e.sets * 0.6)) : e.sets;                 // semana leve: ~40% menos séries
@@ -808,7 +806,7 @@ function sugCard(e, a, compact) {
 function openSwap(ei) {
   const a = S.active; const base = PLANS[a.plan].exercises[ei]; const cur = slotEx(a.plan, ei, a.swaps);
   const opts = [{ ...base, isBase: true }, ...altsFor(base).map(x => slotEx(a.plan, ei, { [ei]: x.id }))];
-  const fixed = (S.prefSwaps || {})[base.id];
+  const fixed = base.slot && (S.prefPattern || {})[base.slot] === cur.id;
   const el = document.createElement('div'); el.className = 'sheet-bg';
   el.innerHTML = `<button class="sheet-x" aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button><div class="sheet" role="dialog" aria-label="Trocar exercício">
     <h3>Trocar exercício</h3>
@@ -817,14 +815,14 @@ function openSwap(ei) {
         <span><b>${esc(o.name)}</b>${o.isBase ? ' <span class="pill">original</span>' : ''}<br><span class="muted small">${esc(o.muscles)}${o.equip ? ' · ' + esc(o.equip) : ''} · ${o.sets} × ${esc(o.reps)}</span></span>
         <span class="opt-r">${o.how ? `<span class="info-btn" data-info="${esc(o.id)}" role="button" aria-label="Ver execução de ${esc(o.name)}">i</span>` : ''}${o.id === cur.id ? CHECK : ''}</span></button>`).join('')}
     ${base.slot ? `<div id="libMore"><button class="btn ghost" id="libMoreBtn" style="margin-top:10px">Mais opções da biblioteca</button></div>` : ''}
-    <label class="remember"><input type="checkbox" id="swRemember" ${fixed ? 'checked' : ''}> Usar sempre esta escolha no ${PLANS[a.plan].name}</label>
+    <label class="remember"><input type="checkbox" id="swRemember" ${fixed ? 'checked' : ''}> ${base.slot ? 'Preferir este exercício nos próximos treinos' : 'Usar sempre esta escolha'}</label>
     <button class="btn ghost" id="swCancel" style="margin-top:8px">Cancelar</button>
   </div>`;
   document.body.appendChild(el);
   const close = () => el.remove();
   el.onclick = ev => { if (ev.target === el) close(); };
   $('#swCancel', el).onclick = close; $('.sheet-x', el).onclick = close;
-  const showInfo = id => { const o = opts.find(x => x.id === id) || (S.plan && S.plan.exdb[id]); if (!o) return;
+  const showInfo = id => { const o = opts.find(x => x.id === id) || exFor(id); if (!o) return;
     const s2 = sheet(`<h3>${esc(o.name)}</h3><p class="muted small" style="margin:4px 0 8px">${esc(o.muscles)}</p>${howHtml(o)}<button class="btn ghost" data-close style="margin-top:12px">Voltar</button>`);
     $('[data-close]', s2).onclick = () => s2.remove(); };
   el.querySelectorAll('[data-info]').forEach(b => b.onclick = ev => { ev.stopPropagation(); showInfo(b.dataset.info); });
@@ -835,7 +833,8 @@ function openSwap(ei) {
       $('#libMore', el).innerHTML = `<div class="muted small" style="margin-top:14px">Outras opções para ${esc((MUSC_PT[base.prim] || '').toLowerCase())}</div>` + (more.map(x => `<button class="opt" data-lib="${esc(x.id)}"><span><b>${esc((EXMETA[x.id] || {}).name || x.n)}</b><br><span class="muted small">${esc(musclesPt(x))} · ${esc(EQ_PT[x.e] || '—')}</span></span><span class="info-btn" data-libinfo="${esc(x.id)}" role="button" aria-label="Ver execução">i</span></button>`).join('') || '<p class="note">Nenhuma outra opção encontrada.</p>');
       el.querySelectorAll('[data-libinfo]').forEach(b => b.onclick = ev => { ev.stopPropagation(); openExDetail(b.dataset.libinfo); });
       el.querySelectorAll('[data-lib]').forEach(b => b.onclick = () => {
-        const id = b.dataset.lib; const CP = curPlan(); CP.exdb[id] = libEx(id); CP.custom[base.id] = [...new Set([...(CP.custom[base.id] || []), id])];
+        const id = b.dataset.lib; const CP = S.plan = S.plan || newPlanShell(); CP.exdb = CP.exdb || {}; CP.custom = CP.custom || {};
+        CP.exdb[id] = libEx(id); CP.custom[base.slot] = [...new Set([...(CP.custom[base.slot] || []), id])];
         if (swapExercise(ei, id, $('#swRemember', el).checked)) { close(); render(); window.scrollTo(0, 0); }
       });
     }).catch(() => { $('#libMore', el).innerHTML = '<p class="note">Sem conexão para carregar a biblioteca.</p>'; });
@@ -856,8 +855,10 @@ function swapExercise(ei, altId, remember) {
     const ne = slotEx(a.plan, ei, a.swaps);
     a.sets[ne.id] = newSets(ne, a.deload);
   }
-  S.prefSwaps = S.prefSwaps || {};
-  if (remember && altId) S.prefSwaps[baseId] = altId; else delete S.prefSwaps[baseId];   // desmarcado = sem troca fixa
+  const slot = PLANS[a.plan].exercises[ei].slot;
+  if (slot) { S.prefPattern = S.prefPattern || {}; const chosen = altId || baseId;
+    if (remember) S.prefPattern[slot] = chosen; else if (S.prefPattern[slot] === chosen || S.prefPattern[slot] === old.id) delete S.prefPattern[slot]; }   // marcado = preferido nos próximos treinos
+  else { S.prefSwaps = S.prefSwaps || {}; if (remember && altId) S.prefSwaps[baseId] = altId; else delete S.prefSwaps[baseId]; }
   if (sw) stopWatch(false);
   save(); return true;
 }
@@ -950,12 +951,12 @@ function render() {
 }
 
 function planList(k) {
-  return `<ul class="ex-list">${exList({ plan: k, swaps: prefSwaps(k) }).map(e =>
-    `<li><span>${esc(e.name)}${e.base ? ' <span class="pill">troca fixa</span>' : ''}</span><span>${e.sets} × ${esc(e.reps)}</span></li>`).join('')}</ul>`;
+  const pref = S.prefPattern || {};
+  return `<ul class="ex-list">${exList({ plan: k }).map(e =>
+    `<li><span>${esc(e.name)}${pref[e.slot] === e.id ? ' <span class="pill">preferido</span>' : ''}</span><span>${e.sets} × ${esc(e.reps)}</span></li>`).join('')}</ul>`;
 }
 
 function viewHome() {
-  const k = S.active ? S.active.plan : S.next; const p = PLANS[k];
   const last = S.history[S.history.length - 1];
   return `<div class="wrap">
     <div class="hello"><div><div class="muted">${greet()} · ${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
@@ -983,17 +984,21 @@ function viewHome() {
 }
 
 function viewPlans() {
-  const CP = curPlan();
-  const tp = travelOn() ? `✈︎ Modo viagem · sem equipamento · ~${CP.tempo} min por treino` : CP ? `${TEMPLATES[CP.type].label} · ${GOALS[CP.goal] || ''} · ~${CP.tempo} min por treino` : '3 treinos full body (plano inicial)';
+  const g = (S.plan && S.plan.goal) || goal(); const t = todayPlan(); const st = t.st;
+  const tp = `${travelOn() ? '✈︎ Modo viagem · sem equipamento' : GOALS[g] || ''} · ~${Math.min(travelOn() ? 45 : 999, (S.plan && S.plan.tempo) || (S.goal && S.goal.tempo) || 60)} min`;
+  const lbl = r => r.ok ? (r.k === t.best.k && t.type === 'train' ? '<span class="pill rec-pill">Sugerido hoje</span>' : '<span class="pill">Recuperado</span>')
+    : `<span class="pill warn-pill">${r.blockers.map(gp => RG[gp]).slice(0, 2).join(', ')} ${st[r.blockers[0]].state === 'dor' ? 'com dor' : 'em recuperação'}</span>`;
   return `<div class="wrap"><h1 class="page-title">Treinos</h1><p class="muted page-sub" style="margin-top:0">${tp}</p>
+    <p class="note" style="margin:-4px 0 12px">Não há treino fixo: a cada dia o app monta as opções abaixo pela recuperação de cada músculo, usando os exercícios que você tem feito e a biblioteca.</p>
     <button class="card custom-card" data-custom><b>＋ Treino personalizado</b><span class="note">Monte na hora, por exemplo o treino do seu amigo. Fica no histórico e o treino de amanhã se ajusta.</span></button>
-    <div class="row" style="gap:8px;margin-bottom:12px"><button class="btn ghost" data-goto="library" style="flex:1">Biblioteca</button>${travelOn() ? '<button class="btn ghost" data-travel="off" style="flex:1">Sair do modo viagem</button>' : '<button class="btn ghost" data-redo style="flex:1">Gerar novo treino</button>'}</div>
-    ${ORDER.map(k => `<div class="card">
-      <div class="row"><span class="tag ${k}">${k}</span><div><h3>${PLANS[k].name} · ${PLANS[k].focus}</h3>
-      <div class="muted small">${PLANS[k].desc}</div></div></div>
+    <div class="row" style="gap:8px;margin-bottom:12px"><button class="btn ghost" data-goto="library" style="flex:1">Biblioteca</button>${travelOn() ? '<button class="btn ghost" data-travel="off" style="flex:1">Sair do modo viagem</button>' : '<button class="btn ghost" data-redo style="flex:1">Ajustar objetivo</button>'}</div>
+    <h2>Opções de hoje</h2>
+    ${t.ranked.map(r => { const k = r.k; const p = PLANS[k]; return `<div class="card ${r.ok ? '' : 'dim'}">
+      <div class="row"><span class="tag ${k}">${tagOf(k)}</span><div style="min-width:0;flex:1"><h3>${esc(p.name)}</h3>
+      <div class="muted small">${esc(p.focus)} · ~${p.mins} min</div><div style="margin-top:4px">${lbl(r)}</div></div></div>
       ${planList(k)}
-      <button class="btn ghost" style="margin-top:14px" data-start="${k}">${S.active && S.active.plan === k ? 'Continuar' : 'Iniciar ' + PLANS[k].name}</button>
-    </div>`).join('')}
+      <button class="btn ${r.ok && r.k === t.best.k ? '' : 'ghost'}" style="margin-top:14px" data-start="${k}">${S.active && S.active.plan === k ? 'Continuar' : 'Começar ' + esc(p.name.toLowerCase())}</button>
+    </div>`; }).join('')}
     <p class="note">Antes de cada treino, faça 5–10 min de aquecimento (bicicleta, esteira ou mobilidade) e 1–2 séries leves do primeiro exercício.</p>
   </div>`;
 }
@@ -1013,7 +1018,7 @@ function viewHistory() {
       return `<div><b style="color:var(--text)">${esc(e.name)}</b>: ${ss.map(s => fmtSet(e, s)).join(', ')}</div>`;
     }).join('');
     return head + `<div class="card hist-item" data-hist>
-      <div class="row between"><div class="row" style="min-width:0;flex:1"><span class="tag ${h.plan}">${h.plan}</span>
+      <div class="row between"><div class="row" style="min-width:0;flex:1"><span class="tag ${h.custom ? 'P' : h.plan}">${h.custom ? 'P' : tagOf(h.plan)}</span>
         <div style="min-width:0"><h3>${p.name}${h.travel ? ' <span class="pill travel-pill">✈︎ Viagem</span>' : ''}</h3><div class="hist-f">${esc(p.focus)}</div><div class="muted small">${fmtDate(h.end)} · ${h.cardioOnly ? `${h.cardio ? h.cardio.min : '–'} min de aeróbico` : `${mins} min${h.cardio ? ' · + aeróbico' : ''}`}</div></div></div>
         <div style="text-align:right;white-space:nowrap"><b>${sessionVolume(h).toLocaleString('pt-BR')}</b><div class="muted small">kg volume</div></div></div>
       <div class="hist-sets">${detail || 'Sem séries registradas.'}
@@ -1124,15 +1129,17 @@ function defaultReps(e) {
 }
 
 function startSession(k) {
+  if (!PLANS[k] && !(S.active && S.active.plan === k)) k = todayPlan().best.k;   // chave antiga (A/B/C): usa o treino do dia
   if (S.active && S.active.plan !== k) {
-    if (!confirm(`Há um ${PLANS[S.active.plan].name} em andamento. Descartar e iniciar o ${PLANS[k].name}?`)) return;
-    S.active = null;
+    if (!confirm(`Há um treino em andamento (${PLANS[S.active.plan].name}). Descartar e começar ${PLANS[k].name}?`)) return;
+    S.active = null; endRest(false);
   }
   if (!S.active) {
-    const swaps = prefSwaps(k); const sets = {};
-    const deload = blockInfo().deload;
+    const swaps = {}; const sets = {};
+    const deload = blockInfo().deload; const gen = JSON.parse(JSON.stringify(PLANS[k]));   // o treino fica congelado durante a sessão
+    PLANS[k] = gen;
     for (const e of exList({ plan: k, swaps })) sets[e.id] = newSets(e, deload);
-    S.active = { plan: k, start: Date.now(), travel: travelOn(), deload, sets, swaps, order: PLANS[k].exercises.map((_, i) => i), skipped: {}, cardio: newCardio(k), view: 'focus', cur: 0 };
+    S.active = { plan: k, gen, start: Date.now(), travel: travelOn(), deload, sets, swaps, order: gen.exercises.map((_, i) => i), skipped: {}, cardio: newCardio(k), view: 'focus', cur: 0 };
     const ap = activePain(); const exs = exList(S.active);
     if (ap.groups.size) {
       const hit = exs.map((e, i) => hitsPain(e, ap) ? i : -1).filter(i => i >= 0);
@@ -1146,7 +1153,8 @@ function startSession(k) {
 function newCardio(k) {
   if (travelOn()) return { on: false, type: TRAVEL_CARDIO_TYPES[0], min: TRAVEL_CARDIO_SUG.min, km: null, int: TRAVEL_CARDIO_SUG.int };
   const prev = S.lastCardio || {};
-  return { on: false, type: prev.type || 'Esteira', min: CARDIO_SUG[k].min, km: null, int: CARDIO_SUG[k].int };
+  const cs = CARDIO_SUG[k === 'legs' ? 'B' : 'A'];
+  return { on: false, type: prev.type || 'Esteira', min: cs.min, km: null, int: cs.int };
 }
 
 function viewCardio(a) {
@@ -1601,9 +1609,8 @@ function finishSession() {
   }
   const cardio = a.cardio && a.cardio.on && a.cardio.min ? { type: a.cardio.type, min: a.cardio.min, km: a.cardio.km, int: a.cardio.int } : null;
   if (cardio) S.lastCardio = { type: cardio.type };
-  S.history.push({ plan: a.plan, exs: exList(a).map(stripEx), pname: PLANS[a.plan].name, pfocus: PLANS[a.plan].focus, planId: a.custom ? 'custom' : (curPlan() && curPlan().id) || 'legacy', travel: !!a.travel, custom: !!a.custom, past: !!a.past, cardioOnly: !doneCount, start, end, mod: Date.now(), deload: !!a.deload, sets: a.sets, swaps: a.swaps || {}, skipped: Object.keys(a.skipped || {}).map(Number), cardio });
+  S.history.push({ plan: a.plan, exs: exList(a).map(stripEx), pname: PLANS[a.plan].name, pfocus: PLANS[a.plan].focus, planId: a.custom ? 'custom' : a.gen ? 'dynamic' : (curPlan() && curPlan().id) || 'legacy', travel: !!a.travel, custom: !!a.custom, past: !!a.past, cardioOnly: !doneCount, start, end, mod: Date.now(), deload: !!a.deload, sets: a.sets, swaps: a.swaps || {}, skipped: Object.keys(a.skipped || {}).map(Number), cardio });
   S.history.sort((x, y) => x.end - y.end);   // um registro de outro dia entra no lugar certo
-  if (!a.custom) S.next = ORDER[(ORDER.indexOf(a.plan) + 1) % 3];   // o personalizado não mexe na sequência; o personal do dia recalcula pelos músculos
   S.active = null; save(); endRest(false);
   runCoach(); summaryEnd = end; go('summary');
 }
@@ -1789,7 +1796,7 @@ function viewSummary() {
     ${h.cardio ? `<p class="note"><b style="color:var(--text)">Aeróbico:</b> ${esc(h.cardio.type)} · ${h.cardio.min} min${h.cardio.km ? ' · ' + fmtKg(h.cardio.km) + ' km' : ''} · ${esc(h.cardio.int)}</p>` : ''}
     ${!d.prev ? `<p class="note">Este é o seu primeiro ${p.name} registrado. Na próxima vez, o app compara cada exercício com hoje.</p>` : ''}
     ${isLatest ? backupCard() : ''}
-    ${isLatest ? `<div class="card" style="margin-top:12px"><div class="muted small">Próximo treino</div><h3>${PLANS[S.next].name} · ${PLANS[S.next].focus}</h3></div>` : ''}
+    ${isLatest ? `<div class="card" style="margin-top:12px"><div class="muted small">Próximo treino</div><div class="note" style="margin-top:2px">Será montado no dia, pela recuperação de cada músculo e pelos exercícios que você vem fazendo.</div></div>` : ''}
     <div class="stack" style="margin-top:12px"><button class="btn" data-goto="home">Concluir</button><button class="btn ghost" data-goto="history">Ver histórico</button></div>
   </div>`;
 }
@@ -1950,56 +1957,47 @@ function addProposal(p) {
   const dup = S.proposals.find(x => x.key === p.key && (x.status === 'pending' || Date.now() - x.created < 21 * DAY));
   if (!dup) S.proposals.push({ ...p, id: String(Date.now()) + Math.random().toString(36).slice(2, 6), created: Date.now(), status: 'pending' });
 }
-function pickAlt(plan, ei, curId) {
-  const base = PLANS[plan].exercises[ei];
-  const opts = [base, ...altsFor(base).map(x => slotEx(plan, ei, { [ei]: x.id }))].filter(x => x.id !== curId && metric(x) === metric(slotEx(plan, ei, { [ei]: curId === base.id ? null : curId })));
+/* Exercícios feitos nas últimas 4 semanas (o que o coach acompanha) */
+function recentExercises(days = 28) {
+  const since = Date.now() - days * DAY; const by = {};
+  for (const h of S.history) if (h.end >= since) for (const e of exList(h)) if ((h.sets[e.id] || []).some(s => s.done)) by[e.id] = e;
+  return Object.values(by);
+}
+/* Alternativa para o mesmo movimento (a menos usada recentemente) */
+function pickAlt(e) {
+  const pt = patternOf(e); if (!pt) return null;
   const lastUse = id => { for (let k = S.history.length - 1; k >= 0; k--) if (setsOf(S.history[k], id).some(s => s.done)) return S.history[k].end; return 0; };
-  return opts.sort((a, b) => lastUse(a.id) - lastUse(b.id))[0] || null;
+  const opts = altsFor({ ...e, slot: pt }).filter(x => x.id !== e.id && metric(x) === metric(e) && !(activePain().groups.size && hitsPain(x, activePain())));
+  const a = opts.sort((x, y) => lastUse(x.id) - lastUse(y.id))[0];
+  return a ? { ...a, pattern: pt } : null;
 }
 function runCoach() {
   if (S.pains && S.pains.length) S.pains = S.pains.filter(x => Date.now() - x.t < 60 * DAY);
   ensureBlock(); S.proposals = S.proposals || [];
   const bi = blockInfo();
-  for (const k of ORDER) exList({ plan: k, swaps: prefSwaps(k) }).forEach((e, ei) => {
-    const st = stagnation(e); if (!st) return;
-    const alt = pickAlt(k, ei, e.id); const baseId = PLANS[k].exercises[ei].id;
+  for (const e of recentExercises()) {
+    const st = stagnation(e); if (!st) continue;
+    const alt = pickAlt(e);
     const canReset = metric(e) === 'reps' && !e.bodyweight && !e.assist && st.kg > 0;
-    if (!alt && !canReset) return;
-    addProposal({ key: `stall:${e.id}`, type: 'stall', plan: k, slot: ei, baseId, exId: e.id, name: e.name,
-      altId: alt ? (alt.id === baseId ? null : alt.id) : undefined, altName: alt ? alt.name : null,
+    if (!alt && !canReset) continue;
+    addProposal({ key: `stall:${e.id}`, type: 'stall', pattern: alt ? alt.pattern : patternOf(e), exId: e.id, name: e.name,
+      altId: alt ? alt.id : undefined, altName: alt ? alt.name : null,
       kg: canReset ? roundStep(st.kg * 0.9, e.step || 2.5) : null,
       reason: `3 treinos seguidos sem superar ${fmtSet(e, st.best)}.` });
-  });
+  }
   const last = S.history[S.history.length - 1];
   const apc = activePain(); const rep14 = Object.keys(PAIN_AREAS).find(a => painReports().filter(x => Date.now() - x.t < 14 * DAY && x.areas.includes(a)).length >= 2);
   if (!bi.deload && (apc.general || rep14)) addProposal({ key: `deload:pain:${(painReports().slice(-1)[0] || {}).t}`, type: 'deload', reason: apc.general ? 'Você relatou dor ou desconforto recentemente.' : `Dor relatada mais de uma vez em ${PAIN_AREAS[rep14].toLowerCase()} nos últimos 14 dias.` });
   const L = S.history.filter(h => !h.deload).slice(-2);
   if (L.length === 2 && L.every(h => h.feel === 5) && !bi.deload) addProposal({ key: `deload:feel:${L[1].end}`, type: 'deload', reason: 'Seus dois últimos treinos foram marcados como "no limite".' });
-  // Renovação a cada 2 blocos (8 semanas): variar o exercício que menos evoluiu em cada treino
-  if (bi.n > 1 && (bi.n - 1) % 2 === 0 && S.block.renewed !== bi.n && S.history.length >= 12) {
-    for (const k of ORDER) {
-      const ex = exList({ plan: k, swaps: prefSwaps(k) }); const since = Date.now() - 56 * DAY;
-      let worst = null;
-      ex.forEach((e, ei) => {
-        const L2 = exSessions(e.id, since); if (L2.length < 3) return;
-        const c = cmpSet(e, bestSet(e, L2[L2.length - 1].ss), bestSet(e, L2[0].ss));
-        if (worst == null || c < worst.c) worst = { e, ei, c };
-      });
-      if (!worst) continue;
-      const alt = pickAlt(k, worst.ei, worst.e.id); if (!alt) continue;
-      const baseId = PLANS[k].exercises[worst.ei].id;
-      addProposal({ key: `renew:${bi.n}:${k}`, type: 'renew', plan: k, slot: worst.ei, baseId, exId: worst.e.id, name: worst.e.name,
-        altId: alt.id === baseId ? null : alt.id, altName: alt.name,
-        reason: `Início do bloco ${bi.n}: variar o estímulo do exercício que menos evoluiu no ${PLANS[k].name} nas últimas 8 semanas.` });
-    }
-    S.block.renewed = bi.n;
-  }
   save(false);
 }
 function resolveProposal(id, action) {
   const p = (S.proposals || []).find(x => x.id === id); if (!p) return;
-  S.prefSwaps = S.prefSwaps || {};
-  if (action === 'swap') { if (p.altId) S.prefSwaps[p.baseId] = p.altId; else delete S.prefSwaps[p.baseId]; }
+  if (action === 'swap') {
+    if (p.pattern && p.altId) { S.prefPattern = { ...(S.prefPattern || {}), [p.pattern]: p.altId }; }   // o alternativo passa a ser o preferido daquele movimento
+    else if (p.baseId) { S.prefSwaps = S.prefSwaps || {}; if (p.altId) S.prefSwaps[p.baseId] = p.altId; else delete S.prefSwaps[p.baseId]; }
+  }
   if (action === 'reset') { S.last[p.exId] = { ...(S.last[p.exId] || {}), kg: p.kg }; S.resetAt = S.resetAt || {}; S.resetAt[p.exId] = Date.now(); }
   if (action === 'deload') anticipateDeload();
   p.status = action === 'decline' ? 'declined' : 'accepted'; p.action = action; p.resolved = Date.now();
@@ -2010,10 +2008,10 @@ function proposalCard(p) {
   let title, body, acts;
   if (p.type === 'stall') {
     title = `${esc(p.name)} parou de evoluir`;
-    body = `${esc(p.reason)} Opções: ${p.altName ? `trocar por <b>${esc(p.altName)}</b> no ${PLANS[p.plan].name}` : ''}${p.altName && p.kg != null ? ' ou ' : ''}${p.kg != null ? `reduzir para <b>${fmtKg(p.kg)} kg</b> (−10%) e recomeçar a progressão` : ''}.`;
+    body = `${esc(p.reason)} Opções: ${p.altName ? `trocar por <b>${esc(p.altName)}</b> nos próximos treinos` : ''}${p.altName && p.kg != null ? ' ou ' : ''}${p.kg != null ? `reduzir para <b>${fmtKg(p.kg)} kg</b> (−10%) e recomeçar a progressão` : ''}.`;
     acts = (p.altName ? btn('swap', `Trocar por ${esc(p.altName)}`, '') : '') + (p.kg != null ? btn('reset', `Reduzir para ${fmtKg(p.kg)} kg`, p.altName ? 'ghost' : '') : '') + btn('decline', 'Manter como está');
   } else if (p.type === 'renew') {
-    title = `Renovar o ${PLANS[p.plan].name}`;
+    title = 'Renovar exercício';
     body = `${esc(p.reason)} Proposta: trocar <b>${esc(p.name)}</b> por <b>${esc(p.altName)}</b>.`;
     acts = btn('swap', 'Aceitar troca', '') + btn('decline', 'Manter como está');
   } else {
@@ -2035,11 +2033,9 @@ function coachMessages() {
   if (!S.active && tab !== 'home' && S.history.length) {   // a mesma decisão do cartão "Treino de hoje"
     const tp = todayPlan();
     m.unshift({ t: tp.type === 'train' ? 'today' : 'restday', go: 'home', text: tp.type === 'train'
-      ? `Hoje: ${PLANS[tp.best.k].name} · ${PLANS[tp.best.k].focus}.${dsl != null && dsl >= 3 ? ` ${dsl} dias sem treinar.` : ''}`
+      ? `Hoje: ${PLANS[tp.best.k].name} (${PLANS[tp.best.k].focus.toLowerCase()}).${dsl != null && dsl >= 3 ? ` ${dsl} dias sem treinar.` : ''}`
       : tp.type === 'done' ? 'Treino de hoje concluído. Descanse ou faça um aeróbico leve.' : `Hoje: descanso. ${tp.why[0]}` });
   }
-  const P0 = curPlan();
-  if (P0 && P0.type === 'fullbody' && freq() >= 4 && tab !== 'home') m.push({ t: 'info', text: `Full body com meta de ${freq()} treinos por semana: como ele trabalha todos os músculos, o personal do dia vai pedir descanso entre treinos. Para treinar em dias seguidos, o ABC se encaixa melhor (Perfil → Refazer avaliação).` });
   const n = wk.length; m.push({ t: n >= freq() ? 'ok' : 'info', text: n >= freq() ? `Meta da semana cumprida: ${n} de ${freq()} treinos.` : `Semana: ${n} de ${freq()} treinos.` });
   const cw = thisWeekAll().filter(h => h.cardio).length;
   if (cardioGoal() && n >= 2 && cw < 2)
@@ -2053,13 +2049,13 @@ const msgHtml = x => `<div class="msg ${x.t}" ${x.go ? `data-goto="${x.go}"` : '
 /* ---------- Calendário ---------- */
 function calendar(y, mo) {
   const first = new Date(y, mo, 1); const days = new Date(y, mo + 1, 0).getDate(); const off = (first.getDay() + 6) % 7;
-  const byDay = {}; S.history.forEach(h => { const d = new Date(h.end); if (d.getFullYear() === y && d.getMonth() === mo) (byDay[d.getDate()] = byDay[d.getDate()] || []).push(h.plan); });
+  const byDay = {}; S.history.forEach(h => { const d = new Date(h.end); if (d.getFullYear() === y && d.getMonth() === mo) (byDay[d.getDate()] = byDay[d.getDate()] || []).push(h.custom ? 'P' : h.plan); });
   const today = new Date(); const isToday = d => today.getFullYear() === y && today.getMonth() === mo && today.getDate() === d;
   let cells = '';
   for (let i = 0; i < off; i++) cells += '<div></div>';
   for (let d = 1; d <= days; d++) {
     const pl = byDay[d];
-    cells += `<div class="cal-d ${pl ? 'on ' + pl[0] : ''} ${isToday(d) ? 'today' : ''}" title="${pl ? 'Treino ' + pl.join(', ') : ''}">${pl ? pl[0] : d}</div>`;
+    cells += `<div class="cal-d ${pl ? 'on ' + pl[0] : ''} ${isToday(d) ? 'today' : ''}" title="${pl ? 'Treino ' + pl.map(tagOf).join(', ') : ''}">${pl ? (pl[0] in SESSION_TYPES ? d : pl[0]) : d}</div>`;
   }
   return `<div class="cal"><div class="cal-h">S</div><div class="cal-h">T</div><div class="cal-h">Q</div><div class="cal-h">Q</div><div class="cal-h">S</div><div class="cal-h">S</div><div class="cal-h">D</div>${cells}</div>`;
 }
@@ -2200,7 +2196,7 @@ function viewReport() {
   const att = [];
   if (ad < 75) att.push(`Aderência de ${ad}%: abaixo da meta de ${freq()} treinos por semana.`);
   for (const [g, n] of Object.entries(p.groups)) { const c = d.groups[g] || 0; if (n >= 10 && c < n * 0.8) att.push(`Séries de ${g} caíram ${Math.round((1 - c / n) * 100)}% em relação a ${MONTHS[pm[1]]}.`); }
-  const stalled = []; for (const k of ORDER) exList({ plan: k, swaps: prefSwaps(k) }).forEach(e => { if (stagnation(e)) stalled.push(e.name); });
+  const stalled = recentExercises().filter(e => stagnation(e)).map(e => e.name);
   if (stalled.length) att.push(`Sem progresso recente: ${[...new Set(stalled)].join(', ')}. Veja as propostas no Coach.`);
   if (pain >= 2) att.push(`Dor ou desconforto relatado em ${pain} treinos. Se persistir, procure um profissional.`);
   if (cardioGoal() && d.weeks >= 2 && d.cardio / d.weeks < 2) att.push(`Aeróbico em ${d.cardio} treino${d.cardio === 1 ? '' : 's'} no mês. Para ${goal() === 'recomp' ? 'recomposição' : 'o seu objetivo'}, a referência é 2 ou mais por semana.`);
@@ -2377,33 +2373,6 @@ const CATALOG = {
   triceps: { kind: 'i', pool: ['Triceps_Pushdown_-_Rope_Attachment', 'Triceps_Pushdown', 'EZ-Bar_Skullcrusher', 'Cable_Rope_Overhead_Triceps_Extension', 'Bench_Dips'] },
   core: { kind: 'core', pool: ['Plank', 'Cable_Crunch', 'Hanging_Leg_Raise', 'Dead_Bug', 'Pallof_Press', 'Side_Bridge'] },
 };
-/* Modelos: a ordem é a prioridade (com menos tempo, os últimos saem) */
-const TEMPLATES = {
-  fullbody: {
-    label: 'Full body', short: 'Corpo inteiro em todos os treinos',
-    days: {
-      A: { focus: 'Full body · agachamento', slots: ['squat', 'hpush', 'hpull', 'vpush', 'legcurl', 'core', 'lateral', 'biceps'] },
-      B: { focus: 'Full body · terra', slots: ['hinge', 'ipush', 'vpull', 'lunge', 'lateral', 'triceps', 'core:1', 'calf'] },
-      C: { focus: 'Full body · leg press', slots: ['legpress', 'hpush:1', 'hpull:2', 'glute', 'reardelt', 'core:3', 'biceps:2', 'triceps:1'] },
-    },
-  },
-  abc: {
-    label: 'ABC', short: 'Divisão por grupos musculares',
-    days: {
-      A: { focus: 'Peito, ombros e tríceps', slots: ['hpush', 'ipush', 'vpush', 'fly', 'lateral', 'triceps', 'triceps:2', 'core'] },
-      B: { focus: 'Costas, bíceps e abdômen', slots: ['vpull', 'hpull', 'hpull:2', 'reardelt', 'biceps', 'biceps:2', 'core:1', 'vpull:1'] },
-      C: { focus: 'Pernas e glúteos', slots: ['squat', 'hinge', 'legpress', 'legcurl', 'legext', 'glute', 'calf', 'lunge'] },
-    },
-  },
-  travel: {
-    label: 'Viagem', short: 'Sem academia: peso do corpo, cadeira, cama ou toalha',
-    days: {
-      A: { focus: 'Quarto · corpo inteiro', slots: ['tsquat', 'tpush', 'tglute', 'tback', 'tcore', 'tcond', 'ttri', 'tlunge'] },
-      B: { focus: 'Quarto · pernas e core', slots: ['tlunge', 'tsquat:1', 'tglute:1', 'tcore:1', 'tcond:1', 'tcore:2', 'tback:1', 'tcond:2'] },
-      C: { focus: 'Quarto · empurrar e circuito', slots: ['tpush:1', 'ttri', 'tpush:2', 'tcore:3', 'tcond:2', 'tcond:3', 'ttri:1', 'tcore:4'] },
-    },
-  },
-};
 /* Modo viagem: só exercícios sem equipamento (peso do corpo, cadeira, cama ou toalha) */
 Object.assign(CATALOG, {
   tsquat: { kind: 'bw', pool: ['Bodyweight_Squat', 'Freehand_Jump_Squat'] },
@@ -2438,8 +2407,8 @@ const TRAVEL_IDEAS = [
   ['HIIT no quarto', '40 s forte + 20 s de descanso, 8 a 10 vezes (polichinelo, escalador, skipping).'],
   ['Mobilidade antes de dormir', '10 min de alongamentos para soltar o corpo depois de horas sentado.'],
 ];
-const travelOn = () => !!(S.travel && S.travel.on && S.travelPlan);
-const curPlan = () => travelOn() ? S.travelPlan : S.plan;
+const travelOn = () => !!(S.travel && S.travel.on);
+const curPlan = () => S.plan;
 const NO_GYM = x => x.e === 'body only' || x.e === null || x.e === undefined;
 /* Séries, repetições e descanso por objetivo (referências gerais de prescrição) */
 const SCHEME = {
@@ -2480,32 +2449,17 @@ function prescribe(ex, kind, g, tempo) {
   return { sets, reps: reps + (ex.each ? ` ${ex.each}` : ''), rest };
 }
 const exMinutes = e => (e.sets * (45 + e.rest) + 60) / 60;      // execução + descanso + preparo
-function buildPlan(type, g, tempo) {
-  const T = TEMPLATES[type]; const exdb = {}; const plans = {};
-  for (const [k, day] of Object.entries(T.days)) {
-    const list = []; let mins = 5;                                   // 5 min de aquecimento
-    for (const s of day.slots) {
-      const [slot, idx] = s.split(':'); const cat = CATALOG[slot];
-      const id = cat.pool[+idx || 0]; const base = libEx(id); if (!base || list.some(e => e.id === id)) continue;
-      const e = { ...base, slot, ...prescribe(base, cat.kind, g, tempo) };
-      if (list.length >= 4 && mins + exMinutes(e) > tempo) break;
-      list.push(e); mins += exMinutes(e);
-      for (const pid of cat.pool) if (!exdb[pid]) { const pe = libEx(pid); if (pe) exdb[pid] = pe; }
-    }
-    plans[k] = { name: `Treino ${k}`, focus: day.focus, desc: `${T.short} · cerca de ${Math.round(mins)} min`, exercises: list, mins: Math.round(mins) };
-  }
-  return { id: 'p' + Date.now(), type, goal: g, tempo, created: Date.now(), plans, exdb, custom: {} };
-}
 /* Alternativas de um exercício do treino */
 function altsFor(base) {
   if (!base) return [];
   if (!base.slot) return ALTS[base.id] || [];                         // treino antigo (fixo)
-  const P = curPlan() || {}; const db = P.exdb || {};
-  const ids = [...CATALOG[base.slot].pool, ...((P.custom || {})[base.id] || [])].filter(id => id !== base.id);
+  const P = S.plan || {}; const tr = S.active ? !!S.active.travel : travelOn(); const usage = exerciseUsage();
+  const ids = [...new Set([...candidatesFor(base.slot, usage, tr), ...((P.custom || {})[base.slot] || []), ...((P.custom || {})[base.id] || [])])].filter(id => id !== base.id);
+  const kind = (CATALOG[base.slot] || {}).kind || 'c';
   return ids.map(id => {
-    const x = db[id] || libEx(id); if (!x) return null;
+    const x = exFor(id, (usage[id] || {}).ex); if (!x || (tr && !travelOk(id, x))) return null;
     const a = { ...x, slot: base.slot };
-    if (metric(a) !== metric(base)) Object.assign(a, prescribe(a, CATALOG[base.slot].kind, (curPlan() && curPlan().goal) || goal(), (curPlan() && curPlan().tempo) || 60));
+    if (metric(a) !== metric(base)) Object.assign(a, prescribe(a, tr && ['big', 'c', 'i'].includes(kind) ? 'bw' : kind, P.goal || goal(), P.tempo || 60));
     return a;
   }).filter(Boolean);
 }
@@ -2534,25 +2488,44 @@ const setsOf = (h, id) => (h.sets[id] || (LEGACY_OF[id] && h.sets[LEGACY_OF[id]]
 
 const stripEx = ({ how, tip, base, ...r }) => ({ ...r, ...(base ? { base: { id: base.id, name: base.name } } : {}) });
 const planMeta = h => ({ name: h.pname || (PLANS[h.plan] || {}).name || `Treino ${h.plan}`, focus: h.pfocus || (PLANS[h.plan] || {}).focus || '' });
-/* Chamado a cada renderização: aplica o treino atual e torna o histórico antigo autossuficiente */
+const newPlanShell = () => ({ id: 'd' + Date.now(), type: 'dynamic', goal: goal(), tempo: (S.goal && S.goal.tempo) || 60, created: Date.now(), exdb: {}, custom: {} });
+/* Treino fixo antigo → treino do dia: mantém objetivo, tempo e as trocas que você fixou (viram preferências por movimento) */
+function migrateToDynamic() {
+  if (S.dynamicSince) return false;
+  S.dynamicSince = Date.now();
+  if (S.plan) { S.plan.type = 'dynamic'; delete S.plan.plans; }
+  S.prefPattern = S.prefPattern || {};
+  for (const [baseId, altId] of Object.entries(S.prefSwaps || {})) { const pt = patternOf({ id: altId }) || patternOf({ id: baseId }); if (pt && !S.prefPattern[pt]) S.prefPattern[pt] = altId; }
+  for (const [leg, nid] of Object.entries(LEGACY_MAP)) if (S.last[leg] && !S.last[nid]) S.last[nid] = S.last[leg];
+  if (S.plan && S.travelPlan) S.plan.exdb = { ...(S.travelPlan.exdb || {}), ...(S.plan.exdb || {}) };
+  S.prefSwaps = {}; delete S.travelPlan;
+  (S.proposals || []).forEach(p => { if (p.status === 'pending' && p.type !== 'deload') p.status = 'expired'; });
+  return true;
+}
+/* Chamado a cada renderização: gera as opções de hoje e torna o histórico antigo autossuficiente */
 function applyPlan() {
-  PLANS = (curPlan() && curPlan().plans) || LEGACY_PLANS;
-  if (S.active && S.active.custom) PLANS = { ...PLANS, P: { name: 'Personalizado', focus: S.active.title || 'Treino livre', exercises: S.active.exs } };
   let changed = false;
   for (const h of S.history) if (!h.exs) {
     const P = PLANS; PLANS = LEGACY_PLANS;
     try { h.exs = exList(h).map(stripEx); h.pname = LEGACY_PLANS[h.plan].name; h.pfocus = LEGACY_PLANS[h.plan].focus; h.planId = 'legacy'; changed = true; } catch (e) {}
     PLANS = P;
   }
+  const a = S.active;
+  if (a && !a.custom && !a.gen) {   // sessão começada antes da mudança: congela o treino que estava aberto
+    const old = (S.travelPlan && a.travel && S.travelPlan.plans && S.travelPlan.plans[a.plan]) || (S.plan && S.plan.plans && S.plan.plans[a.plan]) || LEGACY_PLANS[a.plan];
+    if (old) { a.gen = JSON.parse(JSON.stringify(old)); changed = true; }
+  }
+  if (S.onboarded && migrateToDynamic()) changed = true;
+  PLANS = genPlans();
+  if (a && a.custom) PLANS.P = { name: 'Personalizado', focus: a.title || 'Treino livre', exercises: a.exs };
+  else if (a && a.gen) PLANS[a.plan] = a.gen;
+  else if (a && !PLANS[a.plan]) { S.active = null; changed = true; }
   if (changed) saveLocal();
 }
 function adoptPlan(plan) {
-  if (S.active) { if (!confirm('Há um treino em andamento. Descartar para começar o novo plano?')) return false; S.active = null; endRest(false); }
   for (const [leg, nid] of Object.entries(LEGACY_MAP)) if (S.last[leg] && !S.last[nid]) S.last[nid] = S.last[leg];
-  S.plan = plan; S.prefSwaps = {}; S.onboarded = true;
-  if (travelOn()) { S.nextMain = 'A'; S.travelPlan = { ...buildPlan('travel', plan.goal, Math.min(45, plan.tempo)), id: 't' + Date.now() }; S.next = 'A'; }   // viagem segue com o novo objetivo; o treino novo começa no A ao voltar
-  else S.next = 'A';
-  (S.proposals || []).forEach(p => { if (p.status === 'pending') p.status = 'expired'; });
+  S.plan = { ...(S.plan || {}), ...plan, exdb: { ...((S.plan || {}).exdb || {}), ...(plan.exdb || {}) }, custom: { ...((S.plan || {}).custom || {}), ...(plan.custom || {}) } };
+  S.onboarded = true; S.dynamicSince = S.dynamicSince || Date.now();
   applyPlan(); save(); runCoach(); return true;
 }
 
@@ -2604,21 +2577,21 @@ function viewOnboard() {
     <div class="seg">${[30, 45, 60, 75, 90].map(v => `<button class="${d.tempo === v ? 'on' : ''}" data-set="tempo" data-v="${v}">${v} min</button>`).join('')}</div>
     <div class="ob-label">Quantas vezes por semana quer treinar?</div>
     <div class="seg">${[2, 3, 4, 5, 6].map(v => `<button class="${d.freq === v ? 'on' : ''}" data-set="freq" data-v="${v}">${v}x</button>`).join('')}</div>
-    <button class="btn xl" data-ob-next style="margin-top:20px">Ver sugestões de treino</button></div>`;
-  // Passo 3: sugestões
+    <button class="btn xl" data-ob-next style="margin-top:20px">Continuar</button></div>`;
+  // Passo 3: como o treino funciona + prévia do treino de hoje
   if (!LIB) { loadLib().then(() => { if (tab === 'onboard') render(); }).catch(() => { const el = $('#obLib'); if (el) el.textContent = 'Não foi possível carregar a biblioteca de exercícios. Verifique a conexão e tente de novo.'; });
-    return `<div class="wrap ob">${back}${head(3, 'Escolha seu treino')}<p class="note" id="obLib">Carregando a biblioteca de exercícios…</p></div>`; }
-  const rec = d.freq >= 4 ? 'abc' : 'fullbody';
-  const why = { fullbody: `Com ${d.freq} treinos por semana, o full body trabalha cada músculo ${d.freq} vezes na semana: mais frequência para quem treina poucos dias.`,
-    abc: `Com ${d.freq} treinos por semana, a divisão ABC permite mais exercícios por grupo muscular e cada um descansa enquanto você treina os outros.` };
-  const card = type => { const p = buildPlan(type, d.obj, d.tempo); return `<div class="card plan-opt ${type === rec ? 'rec' : ''}">
-      <div class="row between"><h3>${TEMPLATES[type].label}</h3>${type === rec ? '<span class="pill rec-pill">Recomendado</span>' : ''}</div>
-      <p class="note" style="margin:4px 0 8px">${esc(TEMPLATES[type].short)}. ${type === rec ? esc(why[type]) : ''}</p>
-      ${ORDER.map(k => `<div class="plan-day"><div class="row between"><b>${p.plans[k].name} · ${esc(p.plans[k].focus)}</b><span class="muted small">~${p.plans[k].mins} min</span></div>
-        <div class="muted small">${p.plans[k].exercises.map(e => `${esc(e.name)} <span style="opacity:.7">${e.sets}×${esc(e.reps)}</span>`).join(' · ')}</div></div>`).join('')}
-      <button class="btn ${type === rec ? '' : 'ghost'}" data-choose="${type}" style="margin-top:12px">Escolher ${TEMPLATES[type].label}</button></div>`; };
-  return `<div class="wrap ob">${back}${head(3, 'Escolha seu treino', `${GOALS[d.obj]} · ${d.tempo} min · ${d.freq}x por semana`)}
-    ${card(rec)}${card(rec === 'abc' ? 'fullbody' : 'abc')}
+    return `<div class="wrap ob">${back}${head(3, 'Seu treino')}<p class="note" id="obLib">Carregando a biblioteca de exercícios…</p></div>`; }
+  const keep = S.plan; S.plan = { ...(keep || newPlanShell()), goal: d.obj, tempo: d.tempo };
+  let prev; try { PLANS = genPlans(); const t = todayPlan(); prev = { k: t.best.k, p: PLANS[t.best.k], ok: t.type === 'train' }; } finally { S.plan = keep; applyPlan(); }
+  return `<div class="wrap ob">${back}${head(3, 'Seu treino', `${GOALS[d.obj]} · ${d.tempo} min · ${d.freq}x por semana`)}
+    <div class="card stack note">
+      <div><b style="color:var(--text)">Sem treino fixo.</b> A cada dia o app monta um treino novo, a partir da biblioteca de exercícios.</div>
+      <div><b style="color:var(--text)">Pela recuperação.</b> O foco do dia (peito e ombros, costas e bíceps, pernas, superiores ou corpo inteiro) depende de quais músculos já descansaram e de quanto cada um treinou na semana.</div>
+      <div><b style="color:var(--text)">Pelos seus exercícios.</b> Os que você mais faz entram primeiro, alternando entre eles; trocas que você marcar como preferidas viram padrão.</div>
+    </div>
+    ${prev && prev.p ? `<div class="card plan-opt rec"><div class="row between"><h3>${prev.ok ? 'Treino de hoje' : 'Exemplo de treino'}: ${esc(prev.p.name)}</h3><span class="muted small">~${prev.p.mins} min</span></div>
+      <div class="muted small" style="margin-top:6px">${prev.p.exercises.map(e => `${esc(e.name)} <span style="opacity:.7">${e.sets}×${esc(e.reps)}</span>`).join(' · ')}</div></div>` : ''}
+    <button class="btn xl" data-choose="dynamic" style="margin-top:8px">Começar</button>
     <p class="note">Os exercícios vêm da biblioteca exercicios-bd-ptbr. Dentro do treino você pode trocar qualquer um por uma alternativa (aparelho ocupado, preferência ou limitação).</p></div>`;
 }
 function bindOnboard() {
@@ -2640,7 +2613,7 @@ function bindOnboard() {
     obStep++; render(); window.scrollTo(0, 0);
   });
   document.querySelectorAll('[data-choose]').forEach(b => b.onclick = () => {
-    const plan = buildPlan(b.dataset.choose, d.obj, d.tempo);
+    const plan = { ...newPlanShell(), goal: d.obj, tempo: d.tempo };
     if (adoptPlan(plan)) { obRedo = false; obDraft = null; obStep = 0; go('home'); }
   });
 }
@@ -2907,26 +2880,20 @@ document.addEventListener('touchend', e => {
 /* ============================== Modo viagem ============================== */
 function setTravel(on) {
   if (S.active) { alert('Finalize ou descarte o treino em andamento antes de mudar o modo viagem.'); return; }
-  if (!on) {
-    S.tnext = S.next; S.next = S.nextMain || S.next; S.travel = { ...(S.travel || {}), on: false, until: Date.now() };
-    save(); render(); return;
-  }
-  loadLib().then(() => {
-    const g = goal(), t = Math.min(45, (S.goal && S.goal.tempo) || 45);
-    if (!S.travelPlan || S.travelPlan.goal !== g || S.travelPlan.tempo !== t) S.travelPlan = { ...buildPlan('travel', g, t), id: 't' + Date.now() };
-    S.nextMain = S.next; S.next = S.tnext || 'A'; S.travel = { on: true, since: Date.now() };
-    save(); render(); openTravelSheet();
-  }).catch(() => alert('Não foi possível carregar a biblioteca de exercícios. Conecte-se à internet e tente de novo.'));
+  if (!on) { S.travel = { ...(S.travel || {}), on: false, until: Date.now() }; save(); render(); return; }
+  loadLib().then(() => { S.travel = { on: true, since: Date.now() }; save(); render(); openTravelSheet(); })
+    .catch(() => alert('Não foi possível carregar a biblioteca de exercícios. Conecte-se à internet e tente de novo.'));
 }
 function openTravelSheet() {
-  const P = S.travelPlan; if (!P) return;
+  if (!travelOn()) return;
+  const t = todayPlan(); const opts = t.ranked.filter(r => r.ok).slice(0, 3);
   const el = sheet(`<div class="travel-ico">✈︎</div><h3 style="text-align:center">Modo viagem ativado</h3>
-    <p class="note" style="text-align:center;margin:6px 0 14px">Treinos só com o peso do corpo, uma cadeira firme, a cama ou uma toalha. Tudo fica registrado no histórico como <b>Viagem</b>.</p>
-    <div class="muted small" style="margin-bottom:6px">Treinos no quarto (~${P.plans.A.mins} min)</div>
-    ${ORDER.map(k => `<div class="opt" style="display:block"><b>${P.plans[k].name} · ${esc(P.plans[k].focus)}</b><div class="muted small" style="margin-top:3px">${P.plans[k].exercises.map(e => esc(e.name)).join(' · ')}</div></div>`).join('')}
+    <p class="note" style="text-align:center;margin:6px 0 14px">O treino do dia passa a usar só o peso do corpo, uma cadeira firme, a cama ou uma toalha. Tudo fica registrado no histórico como <b>Viagem</b>.</p>
+    <div class="muted small" style="margin-bottom:6px">Opções para hoje no quarto</div>
+    ${opts.map(r => `<div class="opt" style="display:block"><b>${esc(PLANS[r.k].name)} · ~${PLANS[r.k].mins} min</b><div class="muted small" style="margin-top:3px">${PLANS[r.k].exercises.map(e => esc(e.name)).join(' · ')}</div></div>`).join('') || '<p class="note">Hoje os músculos ainda estão se recuperando. Prefira um aeróbico leve.</p>'}
     <div class="muted small" style="margin:16px 0 6px">Aeróbico sugerido</div>
     ${TRAVEL_IDEAS.map(([t, d]) => `<div class="opt" style="display:block"><b>${t}</b><div class="muted small" style="margin-top:3px">${d}</div></div>`).join('')}
-    <button class="btn" data-start="${S.next}" style="margin-top:14px">Começar ${P.plans[S.next].name}</button>`);
+    ${opts.length && t.type === 'train' ? `<button class="btn" data-start="${opts[0].k}" style="margin-top:14px">Começar ${esc(PLANS[opts[0].k].name.toLowerCase())}</button>` : ''}`);
   el.querySelectorAll('[data-start]').forEach(b => b.onclick = () => { el.remove(); startSession(b.dataset.start); });
 }
 function travelBanner() {
@@ -2988,14 +2955,130 @@ function groupStatus(now = Date.now()) {
 }
 const calDays = hrs => Math.round((dayKeyOf(Date.now()) - dayKeyOf(Date.now() - hrs * 3.6e6)) / DAY);   // dias de calendário (hoje = 0, ontem = 1)
 const agoTxt = hrs => { if (hrs === null) return 'ainda não treinado'; const d = calDays(hrs); return d === 0 ? 'treinado hoje' : d === 1 ? 'treinado ontem' : `há ${d} dias`; };
-/* Pontua um treino do plano pela prontidão dos grupos que ele trabalha */
-function planReadiness(k, st) {
-  const W = {};
-  for (const e of exList({ plan: k, swaps: prefSwaps(k) })) { const g = exGroups(e); g.p.forEach(x => W[x] = (W[x] || 0) + e.sets); g.s.forEach(x => W[x] = (W[x] || 0) + e.sets * 0.5); }
-  const tot = Object.values(W).reduce((a, b) => a + b, 0) || 1;
-  const score = Object.entries(W).reduce((a, [g, w]) => a + w * st[g].score, 0) / tot;
-  const main = Object.entries(W).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([g]) => g);
-  return { k, score, main, W };
+/* ============================================================
+   TREINO DO DIA (gerado) — não existe mais treino fixo.
+   1) o foco do dia sai da recuperação e do volume da semana de cada grupo;
+   2) cada exercício sai da biblioteca, priorizando os que você já faz,
+      alternando entre eles e respeitando dor, viagem e suas preferências.
+   ============================================================ */
+const TRAVEL2P = { tsquat: 'squat', tlunge: 'lunge', tglute: 'glute', tpush: 'hpush', ttri: 'triceps', tback: 'hinge', tcore: 'core', tcond: 'cond' };
+CATALOG.cond = { kind: 'cond', pool: CATALOG.tcond.pool };
+const SESSION_TYPES = {
+  push: { tag: 'PO', name: 'Peito e ombros', focus: 'Peito, ombros e tríceps', groups: ['peito', 'ombros', 'triceps'], slots: ['hpush', 'ipush', 'vpush', 'fly', 'lateral', 'triceps', 'triceps', 'core'] },
+  pull: { tag: 'CB', name: 'Costas e bíceps', focus: 'Costas, bíceps e posterior de ombro', groups: ['costas', 'biceps'], slots: ['vpull', 'hpull', 'hpull', 'reardelt', 'biceps', 'biceps', 'core', 'vpull'] },
+  legs: { tag: 'PE', name: 'Pernas', focus: 'Quadríceps, posterior e glúteos', groups: ['pernas', 'posterior'], slots: ['squat', 'hinge', 'legpress', 'legcurl', 'legext', 'glute', 'calf', 'lunge'] },
+  upper: { tag: 'SU', name: 'Membros superiores', focus: 'Peito, costas, ombros e braços', groups: ['peito', 'costas', 'ombros', 'biceps', 'triceps'], slots: ['hpush', 'vpull', 'vpush', 'hpull', 'lateral', 'biceps', 'triceps', 'core'] },
+  full: { tag: 'CI', name: 'Corpo inteiro', focus: 'Pernas, empurrar e puxar', groups: ['pernas', 'peito', 'costas', 'posterior', 'ombros'], slots: ['squat', 'hpush', 'hpull', 'hinge', 'vpush', 'vpull', 'core', 'lateral'] },
+};
+const TYPE_KEYS = Object.keys(SESSION_TYPES);
+const tagOf = k => (SESSION_TYPES[k] || {}).tag || k;
+const WEEK_TARGET = { peito: 10, costas: 10, pernas: 10, posterior: 10, ombros: 8, biceps: 6, triceps: 6, core: 6 };   // séries por semana (referência geral)
+const NO_TRAVEL = /pull-?up|chin-?up|muscle.?up/i;    // sem barra no quarto
+/* Padrão de movimento de qualquer exercício (do catálogo, da biblioteca ou criado por você) */
+function patternOf(e) {
+  if (e.slot) return TRAVEL2P[e.slot] || e.slot;
+  const id = dbId(e) || e.id;
+  for (const [k, c] of Object.entries(CATALOG)) if (!(k in TRAVEL2P) && k !== 'cond' && c.pool.includes(id)) return k;
+  for (const [tk, p] of Object.entries(TRAVEL2P)) if (CATALOG[tk].pool.includes(id)) return p;
+  const x = LIB && LIB.get(id); const prim = x ? x.p[0] : e.prim; const comp = x ? x.m !== 'isolation' : true; const n = String(id).toLowerCase();
+  switch (prim) {
+    case 'chest': return comp ? (/incline/.test(n) ? 'ipush' : 'hpush') : 'fly';
+    case 'lats': return 'vpull';
+    case 'middle back': case 'traps': return 'hpull';
+    case 'shoulders': return comp ? 'vpush' : (/rear|reverse|face/.test(n) ? 'reardelt' : 'lateral');
+    case 'biceps': case 'forearms': return 'biceps';
+    case 'triceps': return 'triceps';
+    case 'quadriceps': return comp ? (/lunge|split|step/.test(n) ? 'lunge' : /press/.test(n) ? 'legpress' : 'squat') : 'legext';
+    case 'hamstrings': return comp ? 'hinge' : 'legcurl';
+    case 'lower back': return 'hinge';
+    case 'glutes': return 'glute';
+    case 'calves': return 'calf';
+    case 'abdominals': return 'core';
+  }
+  return null;
+}
+/* O que você tem feito (últimos 90 dias): quantas vezes e quando foi a última */
+function exerciseUsage(days = 90) {
+  const since = Date.now() - days * DAY; const by = {};
+  for (const h of S.history) {
+    if (h.end < since) continue;
+    for (const e of exList(h)) {
+      if (!(h.sets[e.id] || []).some(s => s.done)) continue;
+      const pt = patternOf(e); if (!pt) continue;
+      const id = dbId(e) || e.id;
+      const u = by[id] = by[id] || { id, pt, n: 0, last: 0, ex: e };
+      u.n++; if (h.end >= u.last) { u.last = h.end; u.ex = e; }
+    }
+  }
+  return by;
+}
+function exFor(id, fallback) {
+  const x = libEx(id); if (x) return x;
+  const db = (S.plan || {}).exdb || {};
+  if (db[id]) return { ...db[id] };
+  if (fallback) { const { sets, reps, rest, base, slot, ...r } = fallback; return { ...r }; }
+  return null;
+}
+const travelOk = (id, ex) => { const x = LIB && LIB.get(id); return (x ? NO_GYM(x) : !!ex.bodyweight || ex.unit === 's') && !NO_TRAVEL.test(id); };
+/* Candidatos de um padrão: os que você já fez + os da biblioteca para aquele movimento */
+function candidatesFor(pattern, usage, travel) {
+  const pool = (CATALOG[pattern] || {}).pool || [];
+  const ids = new Set([...Object.values(usage).filter(u => u.pt === pattern).map(u => u.id), ...pool]);
+  if (travel) for (const [tk, p] of Object.entries(TRAVEL2P)) if (p === pattern) CATALOG[tk].pool.forEach(i => ids.add(i));
+  return [...ids];
+}
+/* Escolhe o melhor exercício para um padrão de movimento */
+function pickExercise(pattern, ctx) {
+  const pref = (S.prefPattern || {})[pattern]; const pool = (CATALOG[pattern] || {}).pool || [];
+  const ids = candidatesFor(pattern, ctx.usage, ctx.travel); if (pref && !ids.includes(pref)) ids.unshift(pref);
+  const mine = ids.map(id => ctx.usage[id]).filter(u => u && u.pt === pattern).sort((a, b) => b.last - a.last);
+  const recent = mine.length >= 2 ? mine[0].id : null;          // alterna entre os que você já faz
+  let best = null;
+  for (const id of ids) {
+    if (ctx.used.has(id)) continue;
+    const ex = exFor(id, (ctx.usage[id] || {}).ex); if (!ex) continue;
+    if (ctx.travel && !travelOk(id, ex)) continue;
+    if (ctx.pain.groups.size && hitsPain(ex, ctx.pain)) continue;
+    const u = ctx.usage[id]; const idx = pool.indexOf(id);
+    let sc = (id === pref ? 6 : 0) + (u ? 1 + Math.min(u.n, 4) : 0) + (idx >= 0 ? 0.6 * (pool.length - idx) / pool.length : 0);
+    if (id === recent && id !== pref) sc -= 1.5;
+    if (!best || sc > best.sc) best = { id, ex, sc };
+  }
+  return best;
+}
+function generateWorkout(type, ctx) {
+  const T = SESSION_TYPES[type]; const g = (S.plan && S.plan.goal) || goal();
+  const tempo = Math.min(ctx.travel ? 45 : 999, (S.plan && S.plan.tempo) || (S.goal && S.goal.tempo) || 60);
+  ctx = { ...ctx, used: new Set() };
+  const list = []; let mins = 5;                                  // 5 min de aquecimento
+  for (const slot of ctx.travel ? [...T.slots, 'cond'] : T.slots) {
+    const pk = pickExercise(slot, ctx); if (!pk) continue;
+    let kind = (CATALOG[slot] || {}).kind || 'c';
+    if (ctx.travel && ['big', 'c', 'i'].includes(kind)) kind = 'bw';
+    const e = { ...pk.ex, slot, ...prescribe(pk.ex, kind, g, tempo) };
+    if (list.length >= 4 && mins + exMinutes(e) > tempo) break;
+    list.push(e); ctx.used.add(pk.id); mins += exMinutes(e);
+  }
+  return { name: T.name, focus: T.focus, type, gen: true, desc: `${list.length} exercícios · cerca de ${Math.round(mins)} min`, exercises: list, mins: Math.round(mins) };
+}
+/* Monta as opções de hoje (uma por foco) */
+function genPlans() {
+  const ctx = { usage: exerciseUsage(), travel: travelOn(), pain: activePain() };
+  return Object.fromEntries(TYPE_KEYS.map(t => [t, generateWorkout(t, ctx)]));
+}
+/* Ordena os focos: só entra quem tem todos os grupos recuperados */
+function rankTypes(st) {
+  const f = freq();
+  return TYPE_KEYS.map(type => {
+    const T = SESSION_TYPES[type]; const p = PLANS[type];
+    const blockers = T.groups.filter(gp => ['cansado', 'dor'].includes(st[gp].state) || (BIG.has(gp) && st[gp].state === 'recuperando'));
+    const soft = T.groups.filter(gp => !BIG.has(gp) && st[gp].state === 'recuperando');
+    const need = T.groups.reduce((a, gp) => a + Math.max(0, (WEEK_TARGET[gp] - st[gp].week) / WEEK_TARGET[gp]), 0) / T.groups.length;
+    const ready = T.groups.reduce((a, gp) => a + Math.min(1.5, st[gp].score), 0) / T.groups.length;
+    const fit = f <= 3 ? (type === 'full' ? 0.6 : type === 'upper' ? 0.2 : 0) : (type === 'full' ? -0.2 : 0.1);
+    const ok = !blockers.length && p && p.exercises.length >= 3;
+    return { k: type, T, ok, blockers, soft, need, main: T.groups, score: (ok ? 0 : -10 - blockers.length) + ready + need - 0.5 * soft.length + fit };
+  }).sort((a, b) => b.score - a.score);
 }
 function dayKeyOf(t) { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
 function trainedDaysStreak() {             // dias seguidos com treino, terminando ontem
@@ -3007,68 +3090,66 @@ function trainedDaysStreak() {             // dias seguidos com treino, terminan
 function todayPlan() {
   const st = groupStatus(); const now = Date.now();
   const today = S.history.filter(h => isStrength(h) && dayKeyOf(h.end) === dayKeyOf(now));
-  const ranked = ORDER.filter(k => PLANS[k]).map(k => planReadiness(k, st))
-    .sort((a, b) => b.score - a.score || (a.k === S.next ? -1 : b.k === S.next ? 1 : 0));
+  const ranked = rankTypes(st);
   const best = ranked[0]; const why = [];
   const wk = thisWeek().length, f = freq(), streak = trainedDaysStreak(), dsl = daysSinceLast();
-  const flags = recoveryFlags(); const bi = blockInfo(); const P = curPlan();
-  const fresh = best.main.filter(g => ['pronto', 'parado', 'novo'].includes(st[g].state));
+  const flags = recoveryFlags(); const bi = blockInfo();
   const tired = Object.entries(st).filter(([, o]) => o.state === 'cansado' || o.state === 'recuperando').map(([g]) => g);
-  const painNote = () => { const a = activePain(); return a.groups.size ? `Evitando a região com dor: ${painNames(a)}. Os exercícios que a trabalham entram como pulados.` : null; };
-  if (today.length) return { type: 'done', best, st, why: [`Você já treinou hoje (${today.map(h => planMeta(h).name).join(', ')}).`, 'Descanse ou faça um aeróbico leve, se quiser.'] };
-  let rest = null;
   const ap = activePain();
+  if (today.length) return { type: 'done', best, ranked, st, why: [`Você já treinou hoje (${today.map(h => planMeta(h).name).join(', ')}).`, 'Descanse ou faça um aeróbico leve, se quiser.'] };
+  let rest = null;
   if (flags.pain) rest = 'Você relatou dor recentemente, sem indicar a região. Hoje é melhor descansar ou fazer só mobilidade.';
   else if (flags.limit) rest = 'Seus dois últimos treinos foram "no limite". Um dia de descanso vai render mais.';
   else if (streak >= 3) rest = `Você treinou ${streak} dias seguidos. Hoje o corpo pede descanso.`;
   else if (wk >= f && streak >= 1) rest = `Meta da semana já cumprida (${wk} de ${f}) e você treinou ontem. Descansar hoje ajuda a recuperar.`;
-  else if (best.score < 0 && best.main.some(g => ap.groups.has(g))) rest = `Os treinos disponíveis trabalham a região com dor (${painNames(ap)}). Prefira descanso, mobilidade ou um treino personalizado sem essa região.`;
-  else if (best.score < 0) rest = 'Você treinou há pouco e os músculos dos treinos disponíveis ainda estão se recuperando.';
+  else if (!best.ok && best.blockers.some(g => ap.groups.has(g))) rest = `Os músculos disponíveis estão em recuperação ou na região com dor (${painNames(ap)}). Prefira descanso ou mobilidade.`;
+  else if (!best.ok) rest = 'Todos os grupos grandes ainda estão se recuperando do último treino.';
   if (rest) {
     why.push(rest);
     if (tired.length) why.push(`Em recuperação: ${tired.slice(0, 3).map(g => RG[g]).join(', ')}.`);
     why.push('Se quiser se mexer: 20–30 min de caminhada ou mobilidade (conta como aeróbico).');
-    if (best.score < 0 && P && P.type === 'fullbody' && f >= 4) why.push(`Com meta de ${f} treinos por semana, o ABC permite treinar em dias seguidos (Perfil → Refazer avaliação).`);
-    return { type: 'rest', best, st, why };
+    return { type: 'rest', best, ranked, st, why };
   }
-  if (painNote()) why.push(painNote());
-  if (bi.deload) why.push(`Semana leve (semana 4 do bloco ${bi.n}): o treino vem com menos séries e cerca de 10% menos carga.`);
-  if (dsl !== null && dsl >= 5) why.push(`Faz ${dsl} dias sem treinar: volte hoje, com cerca de 10% menos carga nas primeiras séries.`);
-  const ago2 = h => { if (h === null) return 'sem treino recente'; const d = calDays(h); return d <= 1 ? (d ? 'último ontem' : 'último hoje') : `último há ${d} dias`; };
-  if (fresh.length) why.push(`Descansados: ${fresh.map(g => `${RG[g]} (${ago2(st[g].hours)})`).join(', ')}.`);
-  const avoided = ranked.slice(1).filter(r => r.score < best.score && r.main.some(g => ['cansado', 'recuperando'].includes(st[g].state)));
-  if (avoided.length) { const g = avoided[0].main.find(x => ['cansado', 'recuperando'].includes(st[x].state)); why.push(`${PLANS[avoided[0].k].name} fica para depois: ${RG[g].toLowerCase()} ainda em recuperação (${agoTxt(st[g].hours)}).`); }
+  const ago2 = h => { if (h === null) return 'sem registro'; const d = calDays(h); return d <= 1 ? (d ? 'ontem' : 'hoje') : `há ${d} dias`; };
+  const fresh = best.main.filter(g => ['pronto', 'parado', 'novo'].includes(st[g].state));
+  if (fresh.length) why.push(`Recuperados: ${fresh.slice(0, 3).map(g => `${RG[g]} (${ago2(st[g].hours)})`).join(', ')}.`);
+  const blockedBig = [...new Set(ranked.filter(r => !r.ok).flatMap(r => r.blockers))].filter(g => !best.main.includes(g));
+  if (blockedBig.length) why.push(`Para depois: ${blockedBig.slice(0, 2).map(g => RG[g]).join(', ')} (${st[blockedBig[0]].state === 'dor' ? 'região com dor' : agoTxt(st[blockedBig[0]].hours)}).`);
+  if (ap.groups.size) why.push(`Exercícios que trabalham a região com dor (${painNames(ap)}) ficaram de fora.`);
+  if (bi.deload) why.push(`Semana leve (semana 4 do bloco ${bi.n}): menos séries e cerca de 10% menos carga.`);
+  if (dsl !== null && dsl >= 5) why.push(`Faz ${dsl} dias sem treinar: volte com cerca de 10% menos carga nas primeiras séries.`);
   if (wk < f) why.push(`Semana: ${wk} de ${f} treinos.`);
-  return { type: 'train', best, st, why };
+  return { type: 'train', best, ranked, st, why };
 }
 function suggestedKey() { const t = todayPlan(); return t.best.k; }
 
+function exPeek(k) {
+  const exs = exList({ plan: k }); const mins = PLANS[k].mins;
+  return `<details class="ex-peek"><summary><span>${exs.length} exercícios · ~${mins} min</span><span class="muted small">${esc(exs.slice(0, 2).map(e => e.name).join(', '))}${exs.length > 2 ? '…' : ''}</span></summary>${planList(k)}</details>`;
+}
 function todayCard() {
   if (S.active) {
     const k = S.active.plan; const p = PLANS[k];
-    return `<div class="card hero ${k}" style="margin-top:16px"><div class="row between"><div class="row"><span class="tag ${k}">${k}</span>
-      <div><div class="muted small">Treino em andamento</div><h3 class="hero-t">${p.name}</h3><div class="hero-f">${esc(p.focus)}</div></div></div>
+    return `<div class="card hero ${k}" style="margin-top:16px"><div class="row between"><div class="row"><span class="tag ${k}">${tagOf(k)}</span>
+      <div><div class="muted small">Treino em andamento</div><h3 class="hero-t">${esc(p.name)}</h3><div class="hero-f">${esc(p.focus)}</div></div></div>
       <button class="go-btn" data-goto="session" aria-label="Continuar"><svg viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8"/></svg></button></div>
       <button class="btn" style="margin-top:16px" data-goto="session">Continuar treino</button></div>`;
   }
   const t = todayPlan(); const k = t.best.k; const p = PLANS[k];
   const reasons = `<ul class="why">${t.why.slice(0, 2).map(w => `<li>${esc(w)}</li>`).join('')}</ul>`;
-  const exs = PLANS[k] ? exList({ plan: k, swaps: prefSwaps(k) }) : [];
-  const mins = Math.round(5 + exs.reduce((a, e) => a + exMinutes(e), 0));
-  const summary = `<details class="ex-peek"><summary><span>${exs.length} exercícios · ~${mins} min</span><span class="muted small">${esc(exs.slice(0, 2).map(e => e.name).join(', '))}${exs.length > 2 ? '…' : ''}</span></summary>${planList(k)}</details>`;
-  const custom = `<button class="hbtn small" data-custom style="margin-top:10px">＋ Treino personalizado</button><button class="hbtn small" data-pain-sheet style="margin-top:10px">${activePain().any ? 'Dor relatada' : 'Sentindo dor?'}</button>`;
+  const custom = `<button class="hbtn small" data-custom>＋ Treino personalizado</button><button class="hbtn small" data-pain-sheet>${activePain().any ? 'Dor relatada' : 'Sentindo dor?'}</button>`;
   if (t.type === 'rest' || t.type === 'done') {
     return `<div class="card hero rest-hero" style="margin-top:16px"><div class="row"><span class="tag R">${t.type === 'done' ? '✓' : 'Zz'}</span>
       <div><div class="muted small">Personal do dia</div><h3>${t.type === 'done' ? 'Treino de hoje concluído' : 'Hoje é dia de descanso'}</h3></div></div>
       ${reasons}
-      <div class="row" style="gap:8px;margin-top:6px;flex-wrap:wrap"><button class="hbtn small" data-cardio-only>♥ Registrar aeróbico</button><button class="hbtn small" data-start="${k}">Treinar mesmo assim: ${p.name}</button>${custom.replaceAll('style="margin-top:10px"', '')}</div></div>`;
+      <div class="row" style="gap:8px;margin-top:6px;flex-wrap:wrap"><button class="hbtn small" data-cardio-only>♥ Registrar aeróbico</button><button class="hbtn small" data-goto="plans">Treinar mesmo assim</button>${custom}</div></div>`;
   }
   return `<div class="card hero ${k}" style="margin-top:16px">
-    <div class="row between"><div class="row"><span class="tag ${k}">${k}</span>
-      <div><div class="muted small">Treino de hoje</div><h3 class="hero-t">${p.name}</h3><div class="hero-f">${esc(p.focus)}</div></div></div></div>
-    ${reasons}${summary}
-    <button class="btn" style="margin-top:14px" data-start="${k}">Começar ${p.name}</button>
-    <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="hbtn small" data-goto="plans">Escolher outro</button>${custom.replaceAll('style="margin-top:10px"', '')}</div></div>`;
+    <div class="row between"><div class="row"><span class="tag ${k}">${tagOf(k)}</span>
+      <div><div class="muted small">Treino de hoje${travelOn() ? ' · viagem' : ''}</div><h3 class="hero-t">${esc(p.name)}</h3><div class="hero-f">${esc(p.focus)}</div></div></div></div>
+    ${reasons}${exPeek(k)}
+    <button class="btn" style="margin-top:14px" data-start="${k}">Começar treino</button>
+    <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="hbtn small" data-goto="plans">Outro foco</button>${custom}</div></div>`;
 }
 /* Mapa de recuperação (Coach) */
 function recoveryCard() {
@@ -3232,9 +3313,6 @@ function rebuildFromHistory() {
   }
   for (const [leg, nid] of Object.entries(LEGACY_MAP)) if (last[leg] && !last[nid]) last[nid] = last[leg];
   S.last = last;
-  const pid = (curPlan() && curPlan().id) || 'legacy';
-  const lastPlan = [...S.history].reverse().find(h => !h.custom && !h.cardioOnly && (h.planId || 'legacy') === pid && ORDER.includes(h.plan));
-  S.next = lastPlan ? ORDER[(ORDER.indexOf(lastPlan.plan) + 1) % 3] : 'A';
 }
 
 /* ============================== Eventos gerais ============================== */
@@ -3285,7 +3363,7 @@ function bind() {
 }
 document.querySelectorAll('#tabs button[data-tab]').forEach(b => b.onclick = () => go(b.dataset.tab));
 $('#fab').onclick = () => { if (S.active) return go('session'); const t = todayPlan();
-  if (t.type !== 'train' && !confirm(`${t.type === 'done' ? 'Você já treinou hoje' : 'Hoje a sugestão é descansar'}. Começar ${PLANS[t.best.k].name} mesmo assim?`)) return;
+  if (t.type !== 'train' && !confirm(`${t.type === 'done' ? 'Você já treinou hoje' : 'Hoje a sugestão é descansar'}. Começar ${PLANS[t.best.k].name.toLowerCase()} mesmo assim?`)) return;
   startSession(t.best.k); };
 
 if (S.active) tab = 'home';
@@ -3293,7 +3371,7 @@ applyTheme();
 applyPlan();
 runCoach();
 render();
-loadLib().then(() => { if (tab === 'home' || tab === 'coach') window.safeRender(); }).catch(() => {});
+loadLib().then(() => { applyPlan(); if (['home', 'coach', 'plans'].includes(tab)) window.safeRender(); }).catch(() => {});
 
 if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 </script>
