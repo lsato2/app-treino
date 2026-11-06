@@ -401,7 +401,7 @@
   .seg { display: flex; gap: 6px; flex-wrap: wrap; }
   .seg button { flex: 1; min-width: 56px; min-height: 46px; padding: 10px 8px; border-radius: 999px; background: var(--w75); border: 1px solid var(--edge); font-weight: 500; box-shadow: var(--shadow-sm); }
   .seg button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .plan-opt.rec { border-color: rgba(61,90,134,.45); box-shadow: 0 0 0 1px rgba(61,90,134,.25) inset, var(--shadow); }
+  .plan-opt.sel { border-color: rgba(61,90,134,.45); box-shadow: 0 0 0 1px rgba(61,90,134,.25) inset, var(--shadow); }
   .rec-pill { background: var(--accent); color: #fff; border: 0; font-weight: 600; }
   .plan-day { padding: 11px 0; border-top: 1px solid var(--line); } .plan-day .muted { margin-top: 3px; line-height: 1.5; } .plan-day b { font-weight: 500; }
   .g-btn { background: #fff; color: #1f1f1f; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid var(--edge); box-shadow: var(--shadow-sm); }
@@ -2589,8 +2589,8 @@ function viewOnboard() {
       <div><b style="color:var(--text)">Pela recuperação.</b> O foco do dia (peito e ombros, costas e bíceps, pernas, superiores ou corpo inteiro) depende de quais músculos já descansaram e de quanto cada um treinou na semana.</div>
       <div><b style="color:var(--text)">Pelos seus exercícios.</b> Os que você mais faz entram primeiro, alternando entre eles; trocas que você marcar como preferidas viram padrão.</div>
     </div>
-    ${prev && prev.p ? `<div class="card plan-opt rec"><div class="row between"><h3>${prev.ok ? 'Treino de hoje' : 'Exemplo de treino'}: ${esc(prev.p.name)}</h3><span class="muted small">~${prev.p.mins} min</span></div>
-      <div class="muted small" style="margin-top:6px">${prev.p.exercises.map(e => `${esc(e.name)} <span style="opacity:.7">${e.sets}×${esc(e.reps)}</span>`).join(' · ')}</div></div>` : ''}
+    ${prev && prev.p ? `<div class="card plan-opt sel"><div class="muted small">${prev.ok ? 'Treino de hoje' : 'Exemplo de treino'} · ~${prev.p.mins} min</div><h3 style="margin-top:2px">${esc(prev.p.name)}</h3>
+      <ul class="ex-list">${prev.p.exercises.map(e => `<li><span>${esc(e.name)}</span><span>${e.sets} × ${esc(e.reps)}</span></li>`).join('')}</ul></div>` : ''}
     <button class="btn xl" data-choose="dynamic" style="margin-top:8px">Começar</button>
     <p class="note">Os exercícios vêm da biblioteca exercicios-bd-ptbr. Dentro do treino você pode trocar qualquer um por uma alternativa (aparelho ocupado, preferência ou limitação).</p></div>`;
 }
