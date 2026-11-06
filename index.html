@@ -1001,6 +1001,7 @@ function viewHome() {
       <h1>${S.profile.nome ? esc(S.profile.nome.split(' ')[0]) : 'Bora treinar'}</h1></div>${avatarBtn()}</div>
     ${travelBanner()}
     ${todayCard()}
+    ${S.active || rotina() ? '' : '<button class="card report-card" data-goto="profile"><b>Como é o seu dia a dia?</b><span class="note">Responda no Perfil para ajustar o aeróbico e o gasto calórico.</span></button>'}
     ${S.active ? '' : loginCard()}
     ${S.active ? '' : reportReadyCard()}
     ${(() => { const ms = coachMessages().filter(x => (x.t !== 'info' || !S.history.length) && x.t !== 'deload').slice(0, 2); return ms.length ? `<div class="stack" style="margin-top:12px">${ms.map(msgHtml).join('')}</div>` : ''; })()}
@@ -1071,13 +1072,12 @@ function calcProfile() {
   const p = S.profile; const h = p.altura / 100;
   const imc = p.peso / (h * h);
   const tmb = 10 * p.peso + 6.25 * p.altura - 5 * p.idade + (p.sexo === 'M' ? 5 : -161); // Mifflin-St Jeor
-  return { imc, tmb, get: tmb * (+p.atividade || 1.55), protMin: p.peso * 1.6, protMax: p.peso * 2.2, agua: p.peso * 35 };
+  return { imc, tmb, get: tmb * activityFactor(), protMin: p.peso * 1.6, protMax: p.peso * 2.2, agua: p.peso * 35 };
 }
 function imcClass(v) { return v < 18.5 ? 'abaixo do peso' : v < 25 ? 'faixa normal' : v < 30 ? 'sobrepeso' : 'obesidade'; }
 
 function viewProfile() {
   const p = S.profile; const c = calcProfile();
-  const acts = [[1.375, 'Leve'], [1.55, 'Moderada'], [1.725, 'Alta']];
   return `<div class="wrap"><h1 class="page-title">Perfil</h1>
     <div class="card">
       <div class="field"><label for="pNome">Nome</label><input id="pNome" value="${esc(p.nome || '')}" style="text-align:left"></div>
@@ -1092,9 +1092,9 @@ function viewProfile() {
       <div class="field"><label for="pFreq">Treinos por semana</label>
         <select id="pFreq" style="padding:10px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);width:100%">
         ${[2, 3, 4, 5].map(v => `<option value="${v}" ${freq() === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-      <div class="field"><label for="pAtiv">Atividade</label>
-        <select id="pAtiv" style="padding:10px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);width:100%">
-        ${acts.map(([v, l]) => `<option value="${v}" ${p.atividade == v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      <div class="field"><label for="pRot">Dia a dia</label>
+        <select id="pRot" style="padding:10px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);width:100%">
+        ${rotina() ? '' : '<option value="" selected>Escolha…</option>'}${Object.entries(ROTINA).map(([v, o]) => `<option value="${v}" ${rotina() === v ? 'selected' : ''}>${o.label.replace(' a maior parte do dia', '').replace(' boa parte do dia', '')}</option>`).join('')}</select></div>
     </div>
     <div class="card"><b>Grupos para priorizar</b> <span class="muted small">até ${MAX_PRIO}</span>${prioChips(prioGroups(), 'data-pprio')}</div>
     <h2>Estimativas</h2>
@@ -1105,7 +1105,7 @@ function viewProfile() {
       <div class="kv"><span>Proteína sugerida</span><b>${Math.round(c.protMin)}–${Math.round(c.protMax)} g/dia</b></div>
       <div class="kv"><span>Água</span><b>~${(c.agua / 1000).toFixed(1).replace('.', ',')} L/dia</b></div>
     </div>
-    <details class="calc-ref"><summary class="muted small">Como estes valores são calculados</summary><p class="note">Mifflin-St Jeor (metabolismo basal), atividade leve 1–3x, moderada 3–5x e alta 6–7x por semana, 1,6–2,2 g/kg de proteína e 35 ml/kg de água. O IMC não diferencia massa muscular de gordura. São estimativas e não substituem a avaliação de um profissional de educação física, médico ou nutricionista.</p></details>
+    <details class="calc-ref"><summary class="muted small">Como estes valores são calculados</summary><p class="note">Mifflin-St Jeor (metabolismo basal) × fator de atividade (1,2 a 1,9), definido pelo seu dia a dia e pelos treinos por semana; 1,6–2,2 g/kg de proteína e 35 ml/kg de água. O IMC não diferencia massa muscular de gordura. São estimativas e não substituem a avaliação de um profissional de educação física, médico ou nutricionista.</p></details>
     <button class="btn ghost" data-redo style="margin-top:12px">Refazer avaliação</button>
     <h2>Modo viagem</h2>
     <div class="card"><div class="row between"><div><b>Treinar sem academia</b><div class="note" style="margin-top:2px">Só exercícios sem equipamento</div></div>
@@ -1200,7 +1200,7 @@ function viewCardio(a) {
       <button class="switch ${c.on ? 'on' : ''}" id="cardioSw" role="switch" aria-checked="${c.on}" aria-label="Incluir aeróbico"></button>
     </div>
     <div class="cardio-body">
-      <div class="note" style="margin-top:10px"><b style="color:var(--text)">Sugestão:</b> ${esc(sug.txt)}</div>
+      <div class="note" style="margin-top:10px"><b style="color:var(--text)">Sugestão:</b> ${esc(rotina() === 'bracal' && !a.travel ? 'Opcional para você: seu dia a dia já é fisicamente ativo. Se fizer, prefira ritmo leve.' : sug.txt)}</div>
       <div class="cardio-grid">
         <label>Modalidade<select data-c="type">${opt(types.includes(c.type) ? types : [c.type, ...types], c.type)}</select></label>
         <label>Intensidade<select data-c="int">${opt(CARDIO_INT, c.int)}</select></label>
@@ -1870,6 +1870,26 @@ async function exportBackup() {
 const DAY = 86400000;
 const GOALS = { hipertrofia: 'Hipertrofia', forca: 'Força', recomp: 'Recomposição corporal', emagrecimento: 'Emagrecimento', saude: 'Saúde e condicionamento' };
 const cardioGoal = () => ['recomp', 'emagrecimento', 'saude'].includes(goal());
+/* Rotina do dia a dia: muda a recomendação de aeróbico, o dia de descanso e o gasto calórico */
+const ROTINA = {
+  sentado: { label: 'Sentado a maior parte do dia', sub: 'Escritório, home office, motorista', lvl: 0 },
+  pe: { label: 'Em pé ou andando boa parte do dia', sub: 'Comércio, professor, área da saúde', lvl: 1 },
+  bracal: { label: 'Trabalho físico pesado', sub: 'Construção, carga e descarga, agricultura', lvl: 2 },
+};
+const rotina = () => (S.profile && ROTINA[S.profile.rotina]) ? S.profile.rotina : null;
+/* Dias de aeróbico por semana sugeridos: objetivo × rotina */
+function cardioTarget() {
+  const r = rotina();
+  if (r === 'bracal') return 0;                                   // o trabalho já movimenta o corpo o dia todo
+  if (cardioGoal()) return r === 'sentado' ? 3 : 2;
+  return r === 'sentado' ? 1 : 0;
+}
+/* Fator de atividade (Mifflin-St Jeor): rotina + treinos por semana */
+function activityFactor() {
+  const r = rotina(); if (!r) return +S.profile.atividade || 1.55;
+  const f = freq(); const ex = f >= 6 ? 3 : f >= 4 ? 2 : f >= 2 ? 1 : 0;
+  return [1.2, 1.375, 1.55, 1.725, 1.9][Math.min(4, ROTINA[r].lvl + ex)];
+}
 const MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 const GROUPS = [['Pernas', /quadr|glúte|posterior/i], ['Peito', /peitoral/i], ['Costas', /dorsa|trapézio|romboide|costas/i],
   ['Ombros', /ombro/i], ['Braços', /bíceps|tríceps|braquial|antebraço/i], ['Core', /core|abdôm|oblíq/i]];
@@ -2069,8 +2089,9 @@ function coachMessages() {
   }
   const n = wk.length; m.push({ t: n >= freq() ? 'ok' : 'info', text: n >= freq() ? `Meta da semana cumprida: ${n} de ${freq()} treinos.` : `Semana: ${n} de ${freq()} treinos.` });
   const cw = thisWeekAll().filter(h => h.cardio).length;
-  if (cardioGoal() && n >= 2 && cw < 2)
-    m.push({ t: 'info', text: `Aeróbico em ${cw} dia${cw === 1 ? '' : 's'} nesta semana. Para ${goal() === 'recomp' ? 'recomposição' : 'o seu objetivo'}, a referência é em pelo menos 2.` });
+  const ct = cardioTarget();
+  if (ct && n >= 2 && cw < ct)
+    m.push({ t: 'info', text: `Aeróbico em ${cw} dia${cw === 1 ? '' : 's'} nesta semana. ${rotina() === 'sentado' ? 'Como você passa o dia sentado' : `Para ${goal() === 'recomp' ? 'recomposição' : 'o seu objetivo'}`}, a referência é em pelo menos ${ct}.` });
   const wm = weightMessage(); if (wm) m.push(wm);
   return m;
 }
@@ -2232,7 +2253,7 @@ function viewReport() {
   const stalled = recentExercises().filter(e => stagnation(e)).map(e => e.name);
   if (stalled.length) att.push(`Sem progresso recente: ${[...new Set(stalled)].join(', ')}. Veja as propostas no Coach.`);
   if (pain >= 2) att.push(`Dor ou desconforto relatado em ${pain} treinos. Se persistir, procure um profissional.`);
-  if (cardioGoal() && d.weeks >= 2 && d.cardio / d.weeks < 2) att.push(`Aeróbico em ${d.cardio} treino${d.cardio === 1 ? '' : 's'} no mês. Para ${goal() === 'recomp' ? 'recomposição' : 'o seu objetivo'}, a referência é 2 ou mais por semana.`);
+  if (cardioTarget() && d.weeks >= 2 && d.cardio / d.weeks < cardioTarget()) att.push(`Aeróbico em ${d.cardio} treino${d.cardio === 1 ? '' : 's'} no mês. A referência para você é ${cardioTarget()} ou mais por semana.`);
   const wm = weightMessage(); if (wm && wm.t === 'warn') att.push(wm.text);
   return `<div class="wrap">
     <button class="hbtn small" data-goto="coach" style="margin-top:4px">‹ Coach</button>
@@ -2571,7 +2592,7 @@ function draft() {
   const P = S.profile; const mine = S.onboarded || !!(P.nome && String(P.nome).trim());   // só preenche com dados que a pessoa já informou
   const gname = (window.cloud && window.cloud.user && window.cloud.user.name || '').split(' ')[0];
   if (!obDraft) obDraft = { nome: mine ? P.nome : gname, sexo: mine ? P.sexo || '' : '', idade: mine ? P.idade || '' : '', altura: mine ? P.altura || '' : '', peso: mine ? P.peso || '' : '',
-    obj: goal(), tempo: (S.goal && S.goal.tempo) || 60, freq: freq(), prio: prioGroups() };
+    obj: goal(), tempo: (S.goal && S.goal.tempo) || 60, freq: freq(), prio: prioGroups(), rotina: rotina() || '' };
   return obDraft;
 }
 function viewOnboard() {
@@ -2607,12 +2628,15 @@ function viewOnboard() {
   if (obStep === 2) return `<div class="wrap ob">${back}${head(2, 'Objetivo e rotina')}
     <div class="ob-label">Qual é o seu objetivo?</div>
     <div class="stack">${Object.entries(GOALS).map(([v, l]) => `<button class="opt ${d.obj === v ? 'on' : ''}" data-set="obj" data-v="${v}"><span><b>${l}</b><br><span class="muted small">${GOAL_DESC[v]}</span></span>${d.obj === v ? CHECK : ''}</button>`).join('')}</div>
+    <div class="ob-label">Como é o seu dia a dia?</div>
+    <div class="stack">${Object.entries(ROTINA).map(([v, o]) => `<button class="opt ${d.rotina === v ? 'on' : ''}" data-set="rotina" data-v="${v}"><span><b>${o.label}</b><br><span class="muted small">${o.sub}</span></span>${d.rotina === v ? CHECK : ''}</button>`).join('')}</div>
     <div class="ob-label">Quanto tempo você tem por treino?</div>
     <div class="seg">${[30, 45, 60, 75, 90].map(v => `<button class="${d.tempo === v ? 'on' : ''}" data-set="tempo" data-v="${v}">${v} min</button>`).join('')}</div>
     <div class="ob-label">Quantas vezes por semana quer treinar?</div>
     <div class="seg">${[2, 3, 4, 5, 6].map(v => `<button class="${d.freq === v ? 'on' : ''}" data-set="freq" data-v="${v}">${v}x</button>`).join('')}</div>
     <div class="ob-label">Quer priorizar algum grupo? <span class="muted small">(opcional, até ${MAX_PRIO})</span></div>
     ${prioChips(d.prio, 'data-prio')}
+    <p class="note" id="obErr2" style="color:var(--danger)"></p>
     <button class="btn xl" data-ob-next style="margin-top:20px">Continuar</button></div>`;
   // Passo 3: como o treino funciona + prévia do treino de hoje
   if (!LIB) { loadLib().then(() => { if (tab === 'onboard') render(); }).catch(() => { const el = $('#obLib'); if (el) el.textContent = 'Não foi possível carregar a biblioteca de exercícios. Verifique a conexão e tente de novo.'; });
@@ -2645,7 +2669,10 @@ function bindOnboard() {
       if (!(S.weights || []).length) S.weights = [{ t: Date.now(), kg: peso }];
       save();
     }
-    if (obStep === 2) { S.goal = { ...(S.goal || {}), obj: d.obj, tempo: d.tempo, freq: d.freq, prio: d.prio }; save(); loadLib().catch(() => {}); }
+    if (obStep === 2) {
+      if (!d.rotina) { const el = $('#obErr2'); if (el) el.textContent = 'Conte como é o seu dia a dia.'; return; }
+      S.goal = { ...(S.goal || {}), obj: d.obj, tempo: d.tempo, freq: d.freq, prio: d.prio }; S.profile.rotina = d.rotina; save(); loadLib().catch(() => {});
+    }
     obStep++; render(); window.scrollTo(0, 0);
   });
   document.querySelectorAll('[data-choose]').forEach(b => b.onclick = () => {
@@ -3159,7 +3186,7 @@ function todayPlan() {
   if (rest) {
     why.push(rest);
     if (tired.length) why.push(`Em recuperação: ${tired.slice(0, 3).map(g => RG[g]).join(', ')}.`);
-    why.push('Se quiser se mexer: 20–30 min de caminhada ou mobilidade (conta como aeróbico).');
+    why.push(rotina() === 'bracal' ? 'Seu trabalho já movimenta o corpo: aproveite para descansar de verdade.' : rotina() === 'sentado' ? 'Como você passa o dia sentado, vale 20–30 min de caminhada ou mobilidade (conta como aeróbico).' : 'Se quiser se mexer: 20–30 min de caminhada ou mobilidade (conta como aeróbico).');
     return { type: 'rest', best, ranked, st, why };
   }
   const ago2 = h => { if (h === null) return 'sem registro'; const d = calDays(h); return d <= 1 ? (d ? 'ontem' : 'hoje') : `há ${d} dias`; };
@@ -3396,11 +3423,11 @@ function bind() {
     const upd = () => {
       const p = S.profile;
       p.idade = num($('#pIdade').value) || p.idade; p.altura = num($('#pAltura').value) || p.altura;
-      p.peso = num($('#pPeso').value) || p.peso; p.atividade = num($('#pAtiv').value) || p.atividade;
+      p.peso = num($('#pPeso').value) || p.peso;
       save();
     };
     ['#pIdade', '#pAltura', '#pPeso'].forEach(s => $(s).addEventListener('change', () => { upd(); render(); }));
-    $('#pAtiv').onchange = () => { upd(); render(); };
+    $('#pRot').onchange = ev => { if (ev.target.value) { S.profile.rotina = ev.target.value; save(); render(); } };
     $('#pObj').onchange = ev => { S.goal = { ...(S.goal || {}), obj: ev.target.value }; save(); render(); };
     $('#pNome').onchange = ev => { S.profile.nome = ev.target.value.trim(); save(); };
     $('#pSexo').onchange = ev => { S.profile.sexo = ev.target.value; save(); render(); };
