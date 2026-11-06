@@ -2431,7 +2431,10 @@ const EXMETA = {
   Cable_Rope_Overhead_Triceps_Extension: { name: 'Tríceps francês na polia' }, Bench_Dips: { name: 'Mergulho no banco ou cadeira', bodyweight: true },
   Plank: { name: 'Prancha abdominal', unit: 's' }, Side_Bridge: { name: 'Prancha lateral', unit: 's', each: 'cada lado' }, Cable_Crunch: { name: 'Abdominal na polia' },
   Hanging_Leg_Raise: { name: 'Elevação de pernas na barra', bodyweight: true }, Dead_Bug: { name: 'Dead bug', bodyweight: true, each: 'cada lado' },
-  Pallof_Press: { name: 'Pallof press (antirrotação)', each: 'cada lado' }, Farmers_Walk: { name: 'Caminhada do fazendeiro', dist: true },
+  Pallof_Press: { name: 'Pallof press (antirrotação)', each: 'cada lado' },
+  Hyperextensions_Back_Extensions: { name: 'Hiperextensão lombar (banco 45°)' }, Back_Extension_Machine: { name: 'Extensão lombar na máquina' },
+  Bird_Dog: { name: 'Perdigueiro (bird dog)', each: 'cada lado', bodyweight: true }, Alternating_Superman: { name: 'Super-homem alternado (nadador)', each: 'cada lado', bodyweight: true },
+  Prone_Cobra: { name: 'Cobra em prono', bodyweight: true }, Weighted_Ball_Hyperextension: { name: 'Hiperextensão na bola' }, Farmers_Walk: { name: 'Caminhada do fazendeiro', dist: true },
 };
 /* Padrões de movimento e opções (a 1ª é a padrão; as demais são as alternativas) */
 const CATALOG = {
@@ -2454,6 +2457,7 @@ const CATALOG = {
   biceps: { kind: 'i', pool: ['Barbell_Curl', 'Dumbbell_Bicep_Curl', 'Hammer_Curls', 'EZ-Bar_Curl', 'Standing_Biceps_Cable_Curl', 'Preacher_Curl'] },
   triceps: { kind: 'i', pool: ['Triceps_Pushdown_-_Rope_Attachment', 'Triceps_Pushdown', 'EZ-Bar_Skullcrusher', 'Cable_Rope_Overhead_Triceps_Extension', 'Bench_Dips'] },
   core: { kind: 'core', pool: ['Plank', 'Cable_Crunch', 'Hanging_Leg_Raise', 'Dead_Bug', 'Pallof_Press', 'Side_Bridge'] },
+  lowback: { kind: 'core', pool: ['Hyperextensions_Back_Extensions', 'Back_Extension_Machine', 'Bird_Dog', 'Superman', 'Alternating_Superman', 'Prone_Cobra', 'Hyperextensions_With_No_Hyperextension_Bench'] },
 };
 /* Modo viagem: só exercícios sem equipamento (peso do corpo, cadeira, cama ou toalha) */
 Object.assign(CATALOG, {
@@ -2717,7 +2721,7 @@ function bindOnboard() {
 /* ============================== Biblioteca de exercícios ============================== */
 let libQ = '', libM = '';
 const LIB_GROUPS = [['', 'Todos'], ['chest', 'Peito'], ['lats|middle back', 'Costas'], ['shoulders', 'Ombros'], ['biceps', 'Bíceps'], ['triceps', 'Tríceps'],
-  ['quadriceps', 'Quadríceps'], ['hamstrings', 'Posteriores'], ['glutes', 'Glúteos'], ['calves', 'Panturrilhas'], ['abdominals', 'Abdômen']];
+  ['quadriceps', 'Quadríceps'], ['hamstrings', 'Posteriores'], ['glutes', 'Glúteos'], ['calves', 'Panturrilhas'], ['abdominals', 'Abdômen'], ['lower back', 'Lombar']];
 const norm = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 function libResults() {
   const q = norm(libQ.trim()); const ms = libM ? libM.split('|') : null;
@@ -2779,7 +2783,7 @@ function ytUrl(e) { return 'https://www.youtube.com/results?search_query=' + enc
 function exMedia(e) {
   const id = dbId(e);
   return `<div class="media">
-    ${id && mediaOn('photos') ? `<div class="photos"><img loading="lazy" src="${PHOTO_BASE}${encodeURIComponent(id)}/0.jpg" alt="Posição inicial" onerror="this.remove()">
+    ${id && mediaOn('photos') && !((LIB && LIB.get(id)) || {}).src ? `<div class="photos"><img loading="lazy" src="${PHOTO_BASE}${encodeURIComponent(id)}/0.jpg" alt="Posição inicial" onerror="this.remove()">
       <img loading="lazy" src="${PHOTO_BASE}${encodeURIComponent(id)}/1.jpg" alt="Posição final" onerror="this.remove()"></div>
       <div class="credit">Fotos: free-exercise-db · origem dos direitos não confirmada</div>` : ''}
     ${id && mediaOn('wger') ? `<div class="wger" data-wger="${esc(id)}"></div>` : ''}
@@ -2926,7 +2930,7 @@ function weekCard() {
     <div class="week">${days.map((d, i) => `<div class="day"><div class="bar ${d.hs.length ? 'on' : ''} ${i === today ? 'today' : ''}" style="height:${d.hs.length ? 34 + 50 * d.n / max : 30}px" title="${d.hs.map(h => planMeta(h).name).join(', ')}"></div>
       <span class="d">${'STQQSSD'[i]}</span></div>`).join('')}</div>
     <div class="row between" style="margin:14px 0 4px"><span class="muted small">Séries por grupo · vezes na semana</span><button class="hbtn small" data-why>Por quê?</button></div>
-    <div class="gsets">${Object.keys(RG).map(g => { const v = Math.round(G[g] || 0), t = WEEK_TARGET[g]; return `<div class="gs"><div class="row between"><span>${volMode(g) === 'prio' ? '★ ' : ''}${RG[g] === 'Posterior e glúteos' ? 'Posterior' : RG[g]}<span class="muted"> · ${F[g] || 0}×</span></span><b>${v}<span class="muted">/${t}</span></b></div>
+    <div class="gsets">${Object.keys(RG).map(g => { const v = Math.round(G[g] || 0), t = WEEK_TARGET[g]; return `<div class="gs"><div class="row between"><span>${volMode(g) === 'prio' ? '★ ' : ''}${g === 'posterior' ? 'Posterior e lombar' : RG[g]}<span class="muted"> · ${F[g] || 0}×</span></span><b>${v}<span class="muted">/${t}</span></b></div>
       <span class="gtrack"><i class="${v >= t ? 'full' : ''}" style="width:${Math.min(100, v / t * 100)}%"></i></span></div>`; }).join('')}</div></div>`;
 }
 function openKeypad(inp, unit, decimal, onOk) {
@@ -3022,7 +3026,7 @@ function travelBanner() {
    (regras: recuperação por grupo muscular, sequência de dias, meta
    da semana, check-in e tempo parado)
    ============================================================ */
-const RG = { peito: 'Peito', costas: 'Costas', ombros: 'Ombros', biceps: 'Bíceps', triceps: 'Tríceps', pernas: 'Quadríceps', posterior: 'Posterior e glúteos', core: 'Abdômen' };
+const RG = { peito: 'Peito', costas: 'Costas', ombros: 'Ombros', biceps: 'Bíceps', triceps: 'Tríceps', pernas: 'Quadríceps', posterior: 'Posterior, glúteos e lombar', core: 'Abdômen' };
 const BIG = new Set(['peito', 'costas', 'pernas', 'posterior']);
 const M2G = { chest: 'peito', lats: 'costas', 'middle back': 'costas', traps: 'costas', shoulders: 'ombros', biceps: 'biceps', forearms: 'biceps', triceps: 'triceps',
   quadriceps: 'pernas', adductors: 'pernas', abductors: 'pernas', calves: 'pernas', hamstrings: 'posterior', glutes: 'posterior', 'lower back': 'posterior', abdominals: 'core' };
@@ -3075,7 +3079,7 @@ const agoTxt = hrs => { if (hrs === null) return 'ainda não treinado'; const d 
    2) cada exercício sai da biblioteca, priorizando os que você já faz,
       alternando entre eles e respeitando dor, viagem e suas preferências.
    ============================================================ */
-const TRAVEL2P = { tsquat: 'squat', tlunge: 'lunge', tglute: 'glute', tpush: 'hpush', ttri: 'triceps', tback: 'hinge', tcore: 'core', tcond: 'cond' };
+const TRAVEL2P = { tsquat: 'squat', tlunge: 'lunge', tglute: 'glute', tpush: 'hpush', ttri: 'triceps', tback: 'lowback', tcore: 'core', tcond: 'cond' };
 CATALOG.cond = { kind: 'cond', pool: CATALOG.tcond.pool };
 const SESSION_TYPES = {
   push: { tag: 'PO', name: 'Peito e ombros', focus: 'Peito, ombros e tríceps', groups: ['peito', 'ombros', 'triceps'], slots: ['hpush', 'ipush', 'vpush', 'fly', 'lateral', 'triceps', 'triceps', 'core'] },
@@ -3149,7 +3153,7 @@ const NO_TRAVEL = /pull-?up|chin-?up|muscle.?up/i;    // sem barra no quarto
 /* Limitações permanentes: tira os exercícios que mais sobrecarregam a região (regra do app, não orientação médica) */
 const LIMITS = {
   ombros: { label: 'Ombros', re: /Military|Shoulder_Press|Overhead|Upright|Behind|Dips?\b|Dip_|Dips_|Arnold|Handstand|Snatch|Jerk|Push_Press/i, txt: 'sem desenvolvimento acima da cabeça, mergulho e remada alta' },
-  lombar: { label: 'Lombar', re: /Deadlift|Good_Morning|Bent_Over|T-Bar|Barbell_Full_Squat|Barbell_Squat|Hyperextension|Superman|Clean|Snatch|Romanian/i, txt: 'sem terra, bom-dia, remada curvada e agachamento livre com barra' },
+  lombar: { label: 'Lombar', re: /Deadlift|Good_Morning|Bent_Over|T-Bar|Barbell_Full_Squat|Barbell_Squat|Hyperextension|Superman|Back_Extension|Clean|Snatch|Romanian/i, txt: 'sem terra, bom-dia, remada curvada, agachamento livre com barra e hiperextensão (o perdigueiro continua)' },
   joelho: { label: 'Joelho', re: /Lunge|Jump|Split|Step|Sissy|Pistol|Barbell_Full_Squat|Leg_Extensions|Skipping|Scissors/i, txt: 'sem avanço, saltos, agachamento profundo e cadeira extensora' },
   cotovelo: { label: 'Cotovelo', re: /Skull|Close-Grip|Triceps_Extension|Dips?\b|Dip_|Dips_|Preacher|Close_Triceps/i, txt: 'sem tríceps testa, extensões acima da cabeça e rosca Scott' },
   punho: { label: 'Punho', re: /Barbell_Curl|EZ-Bar|Pushups|Push-U|Push_Up|Wrist|Front_Squat/i, txt: 'sem barra reta na rosca e sem flexão no chão' },
@@ -3172,7 +3176,7 @@ function patternOf(e) {
     case 'triceps': return 'triceps';
     case 'quadriceps': return comp ? (/lunge|split|step/.test(n) ? 'lunge' : /press/.test(n) ? 'legpress' : 'squat') : 'legext';
     case 'hamstrings': return comp ? 'hinge' : 'legcurl';
-    case 'lower back': return 'hinge';
+    case 'lower back': return comp && !/hyperext|superman|extension|bird|cobra/.test(n) ? 'hinge' : 'lowback';
     case 'glutes': return 'glute';
     case 'calves': return 'calf';
     case 'abdominals': return 'core';
@@ -3235,7 +3239,9 @@ function generateWorkout(type, ctx) {
   ctx = { ...ctx, used: new Set() };
   const list = []; let mins = 5;                                  // 5 min de aquecimento
   const prio = prioGroups().filter(gp => T.groups.includes(gp) || (gp === 'core' && T.slots.includes('core')));
-  const slots = [...T.slots]; prio.forEach(gp => slots.splice(Math.min(3, slots.length), 0, PRIO_SLOT[gp].find(x => !slots.includes(x)) || PRIO_SLOT[gp][0]));   // um exercício a mais para cada prioridade do foco
+  const slots = [...T.slots];
+  if (['legs', 'full'].includes(type) && !slots.includes('lowback')) slots.splice(rotina() === 'sentado' ? 4 : slots.length - (type === 'legs' ? 1 : 0), 0, 'lowback');   // lombar: mais cedo para quem passa o dia sentado
+  prio.forEach(gp => slots.splice(Math.min(3, slots.length), 0, PRIO_SLOT[gp].find(x => !slots.includes(x)) || PRIO_SLOT[gp][0]));   // um exercício a mais para cada prioridade do foco
   for (const slot of ctx.travel ? [...slots, 'cond'] : slots) {
     const pk = pickExercise(slot, ctx); if (!pk) continue;
     let kind = (CATALOG[slot] || {}).kind || 'c';
@@ -3432,7 +3438,7 @@ function addSet(ei) {
   const a = S.active; const e = exList(a)[ei]; const sets = a.sets[e.id]; const lastS = sets[sets.length - 1] || {};
   sets.push({ kg: lastS.kg ?? null, reps: null, done: false }); if (a.custom) e.sets = sets.length; save();
 }
-const CUSTOM_GROUPS = [['chest', 'Peito'], ['lats', 'Costas'], ['shoulders', 'Ombros'], ['biceps', 'Bíceps'], ['triceps', 'Tríceps'], ['quadriceps', 'Quadríceps'], ['hamstrings', 'Posterior'], ['glutes', 'Glúteos'], ['calves', 'Panturrilhas'], ['abdominals', 'Abdômen']];
+const CUSTOM_GROUPS = [['chest', 'Peito'], ['lats', 'Costas'], ['shoulders', 'Ombros'], ['biceps', 'Bíceps'], ['triceps', 'Tríceps'], ['quadriceps', 'Quadríceps'], ['hamstrings', 'Posterior'], ['glutes', 'Glúteos'], ['calves', 'Panturrilhas'], ['abdominals', 'Abdômen'], ['lower back', 'Lombar']];
 function openAddExercise() {
   let q = '', m = '';
   const el = sheet(`<h3>Adicionar exercício</h3>
