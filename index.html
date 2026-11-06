@@ -281,6 +281,7 @@
   .msg-ico { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: rgba(27,38,64,.08); color: var(--ink-2); }
   .msg.ok .msg-ico { background: var(--ok); color: #fff; }
   .msg.warn .msg-ico { background: var(--c); color: #fff; } .msg.warn { border-color: rgba(185,128,46,.3); }
+  .msg.today .msg-ico { background: var(--accent); color: #fff; font-size: 10px; } .msg.rest .msg-ico { font-size: 9px; } .msg.today, .msg.rest { border-color: rgba(61,90,134,.3); }
   .msg.deload .msg-ico, .msg.prop .msg-ico { background: var(--accent); color: #fff; } .msg.prop { border-color: rgba(61,90,134,.3); }
   .prop-card { border-color: rgba(61,90,134,.25); }
   .blk { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
@@ -943,7 +944,7 @@ function viewHome() {
     ${todayCard()}
     ${S.active ? '' : loginCard()}
     ${S.active ? '' : reportReadyCard()}
-    ${(() => { const ms = coachMessages().filter(x => x.t !== 'info' || !S.history.length).slice(0, 2); return ms.length ? `<div class="stack" style="margin-top:12px">${ms.map(msgHtml).join('')}</div>` : ''; })()}
+    ${(() => { const ms = coachMessages().filter(x => (x.t !== 'info' || !S.history.length) && x.t !== 'deload').slice(0, 2); return ms.length ? `<div class="stack" style="margin-top:12px">${ms.map(msgHtml).join('')}</div>` : ''; })()}
     ${S.active ? '' : weightCard(false)}
     ${S.active ? '' : backupCard()}
     ${weekCard()}
@@ -1845,10 +1846,14 @@ function anticipateDeload() {
 }
 
 /* ---------- Check-in: segurar progressão quando necessário ---------- */
-function coachHold() {
-  const L = S.history.filter(h => !h.deload).slice(-2); const last = S.history[S.history.length - 1];
-  if (last && last.pain) return 'Você relatou dor no último treino: mantenha a carga hoje. Se a dor persistir, procure um profissional.';
-  if (L.length === 2 && L.every(h => h.feel === 5)) return 'Seus dois últimos treinos foram "no limite": mantenha a carga hoje para recuperar.';
+function recoveryFlags() {
+  const last = S.history[S.history.length - 1]; const L = S.history.filter(h => !h.deload).slice(-2);
+  return { pain: !!(last && last.pain), limit: L.length === 2 && L.every(h => h.feel === 5) };
+}
+function coachHold() {   // usado nas sugestões de carga, se a pessoa decidir treinar mesmo assim
+  const f = recoveryFlags();
+  if (f.pain) return 'Você relatou dor no último treino: se for treinar, mantenha a carga. Se a dor persistir, procure um profissional.';
+  if (f.limit) return 'Seus dois últimos treinos foram "no limite": se for treinar, mantenha a carga para recuperar.';
   return null;
 }
 
@@ -1984,16 +1989,21 @@ function coachMessages() {
   if (!S.history.length) m.push({ t: 'info', text: 'Bem-vindo! O coach começa a propor ajustes depois de 3 a 4 semanas de registros. Por enquanto, foque na constância.' });
   if (pend) m.push({ t: 'prop', text: `O coach tem ${pend} proposta${pend > 1 ? 's' : ''} de ajuste para você.`, go: 'coach' });
   if (bi.deload) m.push({ t: 'deload', text: `Semana leve (semana 4 do bloco ${bi.n}): menos séries e cerca de 10% menos carga. É quando o corpo assimila o treino.` });
-  if (dsl != null && dsl >= 3 && !S.active && tab !== 'home') { const tp = todayPlan();
-    m.push({ t: 'warn', text: tp.type === 'train' ? `${dsl} dias sem treinar. Sugestão de hoje: ${PLANS[tp.best.k].name}.` : `${dsl} dias sem treinar, mas hoje a sugestão é descansar. ${tp.why[0]}` }); }
-  const hold = coachHold(); if (hold) m.push({ t: 'warn', text: hold });
+  if (!S.active && tab !== 'home' && S.history.length) {   // a mesma decisão do cartão "Treino de hoje"
+    const tp = todayPlan();
+    m.unshift({ t: tp.type === 'train' ? 'today' : 'rest', go: 'home', text: tp.type === 'train'
+      ? `Hoje: ${PLANS[tp.best.k].name} · ${PLANS[tp.best.k].focus}.${dsl != null && dsl >= 3 ? ` ${dsl} dias sem treinar.` : ''}`
+      : tp.type === 'done' ? 'Treino de hoje concluído. Descanse ou faça um aeróbico leve.' : `Hoje: descanso. ${tp.why[0]}` });
+  }
+  const P0 = curPlan();
+  if (P0 && P0.type === 'fullbody' && freq() >= 4 && tab !== 'home') m.push({ t: 'info', text: `Full body com meta de ${freq()} treinos por semana: como ele trabalha todos os músculos, o personal do dia vai pedir descanso entre treinos. Para treinar em dias seguidos, o ABC se encaixa melhor (Perfil → Refazer avaliação).` });
   const n = wk.length; m.push({ t: n >= freq() ? 'ok' : 'info', text: n >= freq() ? `Meta da semana cumprida: ${n} de ${freq()} treinos.` : `Semana: ${n} de ${freq()} treinos.` });
   if (cardioGoal() && n >= 2 && wk.filter(h => h.cardio).length < 2)
     m.push({ t: 'info', text: `Aeróbico em ${wk.filter(h => h.cardio).length} treino${wk.filter(h => h.cardio).length === 1 ? '' : 's'} nesta semana. Para ${goal() === 'recomp' ? 'recomposição' : 'o seu objetivo'}, a referência é em pelo menos 2.` });
   const wm = weightMessage(); if (wm) m.push(wm);
   return m;
 }
-const msgIco = { ok: '✓', warn: '!', info: 'i', deload: '↓', prop: '★' };
+const msgIco = { ok: '✓', warn: '!', info: 'i', deload: '↓', prop: '★', today: '▶', rest: 'Zz' };
 const msgHtml = x => `<div class="msg ${x.t}" ${x.go ? `data-goto="${x.go}"` : ''}><span class="msg-ico">${msgIco[x.t] || 'i'}</span><span>${esc(x.text)}</span></div>`;
 
 /* ---------- Calendário ---------- */
@@ -2947,22 +2957,24 @@ function todayPlan() {
     .sort((a, b) => b.score - a.score || (a.k === S.next ? -1 : b.k === S.next ? 1 : 0));
   const best = ranked[0]; const why = [];
   const wk = thisWeek().length, f = freq(), streak = trainedDaysStreak(), dsl = daysSinceLast();
-  const last = S.history[S.history.length - 1]; const lastTwo = S.history.slice(-2);
+  const flags = recoveryFlags(); const bi = blockInfo(); const P = curPlan();
   const fresh = best.main.filter(g => ['pronto', 'parado', 'novo'].includes(st[g].state));
   const tired = Object.entries(st).filter(([, o]) => o.state === 'cansado' || o.state === 'recuperando').map(([g]) => g);
   if (today.length) return { type: 'done', best, st, why: [`Você já treinou hoje (${today.map(h => planMeta(h).name).join(', ')}).`, 'Descanse ou faça um aeróbico leve, se quiser.'] };
   let rest = null;
-  if (last && last.pain) rest = 'Você relatou dor no último treino. Hoje é melhor descansar ou fazer só mobilidade.';
-  else if (lastTwo.length === 2 && lastTwo.every(h => h.feel === 5)) rest = 'Seus dois últimos treinos foram "no limite". Um dia de descanso vai render mais.';
+  if (flags.pain) rest = 'Você relatou dor no último treino. Hoje é melhor descansar ou fazer só mobilidade.';
+  else if (flags.limit) rest = 'Seus dois últimos treinos foram "no limite". Um dia de descanso vai render mais.';
   else if (streak >= 3) rest = `Você treinou ${streak} dias seguidos. Hoje o corpo pede descanso.`;
   else if (wk >= f && streak >= 1) rest = `Meta da semana já cumprida (${wk} de ${f}) e você treinou ontem. Descansar hoje ajuda a recuperar.`;
   else if (best.score < 0) rest = 'Você treinou há pouco e os músculos dos treinos disponíveis ainda estão se recuperando.';
   if (rest) {
     why.push(rest);
     if (tired.length) why.push(`Em recuperação: ${tired.slice(0, 3).map(g => RG[g]).join(', ')}.`);
-    why.push('Se quiser se mexer: 20–30 min de caminhada ou mobilidade.');
+    why.push('Se quiser se mexer: 20–30 min de caminhada ou mobilidade (conta como aeróbico).');
+    if (best.score < 0 && P && P.type === 'fullbody' && f >= 4) why.push(`Com meta de ${f} treinos por semana, o ABC permite treinar em dias seguidos (Perfil → Refazer avaliação).`);
     return { type: 'rest', best, st, why };
   }
+  if (bi.deload) why.push(`Semana leve (semana 4 do bloco ${bi.n}): o treino vem com menos séries e cerca de 10% menos carga.`);
   if (dsl !== null && dsl >= 5) why.push(`Faz ${dsl} dias sem treinar: volte hoje, com cerca de 10% menos carga nas primeiras séries.`);
   const ago2 = h => { if (h === null) return 'sem treino recente'; const d = calDays(h); return d <= 1 ? (d ? 'último ontem' : 'último hoje') : `último há ${d} dias`; };
   if (fresh.length) why.push(`Descansados: ${fresh.map(g => `${RG[g]} (${ago2(st[g].hours)})`).join(', ')}.`);
