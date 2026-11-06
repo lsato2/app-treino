@@ -1096,6 +1096,7 @@ function viewProfile() {
         <select id="pAtiv" style="padding:10px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);width:100%">
         ${acts.map(([v, l]) => `<option value="${v}" ${p.atividade == v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
     </div>
+    <div class="card"><b>Grupos para priorizar</b> <span class="muted small">até ${MAX_PRIO}</span>${prioChips(prioGroups(), 'data-pprio')}</div>
     <h2>Estimativas</h2>
     <div class="card">
       <div class="kv"><span>IMC</span><b>${c.imc.toFixed(1).replace('.', ',')} <span class="muted small">(${imcClass(c.imc)})</span></b></div>
@@ -2570,7 +2571,7 @@ function draft() {
   const P = S.profile; const mine = S.onboarded || !!(P.nome && String(P.nome).trim());   // só preenche com dados que a pessoa já informou
   const gname = (window.cloud && window.cloud.user && window.cloud.user.name || '').split(' ')[0];
   if (!obDraft) obDraft = { nome: mine ? P.nome : gname, sexo: mine ? P.sexo || '' : '', idade: mine ? P.idade || '' : '', altura: mine ? P.altura || '' : '', peso: mine ? P.peso || '' : '',
-    obj: goal(), tempo: (S.goal && S.goal.tempo) || 60, freq: freq() };
+    obj: goal(), tempo: (S.goal && S.goal.tempo) || 60, freq: freq(), prio: prioGroups() };
   return obDraft;
 }
 function viewOnboard() {
@@ -2610,13 +2611,15 @@ function viewOnboard() {
     <div class="seg">${[30, 45, 60, 75, 90].map(v => `<button class="${d.tempo === v ? 'on' : ''}" data-set="tempo" data-v="${v}">${v} min</button>`).join('')}</div>
     <div class="ob-label">Quantas vezes por semana quer treinar?</div>
     <div class="seg">${[2, 3, 4, 5, 6].map(v => `<button class="${d.freq === v ? 'on' : ''}" data-set="freq" data-v="${v}">${v}x</button>`).join('')}</div>
+    <div class="ob-label">Quer priorizar algum grupo? <span class="muted small">(opcional, até ${MAX_PRIO})</span></div>
+    ${prioChips(d.prio, 'data-prio')}
     <button class="btn xl" data-ob-next style="margin-top:20px">Continuar</button></div>`;
   // Passo 3: como o treino funciona + prévia do treino de hoje
   if (!LIB) { loadLib().then(() => { if (tab === 'onboard') render(); }).catch(() => { const el = $('#obLib'); if (el) el.textContent = 'Não foi possível carregar a biblioteca de exercícios. Verifique a conexão e tente de novo.'; });
     return `<div class="wrap ob">${back}${head(3, 'Seu treino')}<p class="note" id="obLib">Carregando a biblioteca de exercícios…</p></div>`; }
   const keep = S.plan; S.plan = { ...(keep || newPlanShell()), goal: d.obj, tempo: d.tempo };
   let prev; try { PLANS = genPlans(); const t = todayPlan(); prev = { k: t.best.k, p: PLANS[t.best.k], ok: t.type === 'train' }; } finally { S.plan = keep; applyPlan(); }
-  return `<div class="wrap ob">${back}${head(3, 'Seu treino', `${GOALS[d.obj]} · ${d.tempo} min · ${d.freq}x por semana`)}
+  return `<div class="wrap ob">${back}${head(3, 'Seu treino', `${GOALS[d.obj]} · ${d.tempo} min · ${d.freq}x por semana${(d.prio || []).length ? ' · prioridade: ' + d.prio.map(g => RG[g].toLowerCase()).join(', ') : ''}`)}
     <div class="card stack note">
       <div><b style="color:var(--text)">Sem treino fixo.</b> A cada dia o app monta um treino novo, a partir da biblioteca de exercícios.</div>
       <div><b style="color:var(--text)">Pela recuperação.</b> O foco do dia (peito e ombros, costas e bíceps, pernas, superiores ou corpo inteiro) depende de quais músculos já descansaram e de quanto cada um treinou na semana.</div>
@@ -2630,6 +2633,7 @@ function bindOnboard() {
   const d = draft();
   document.querySelectorAll('[data-d]').forEach(i => i.addEventListener('input', () => { d[i.dataset.d] = i.value; }));
   document.querySelectorAll('[data-set]').forEach(b => b.onclick = () => { const f = b.dataset.set; d[f] = ['tempo', 'freq'].includes(f) ? +b.dataset.v : b.dataset.v; render(); });
+  document.querySelectorAll('[data-prio]').forEach(b => b.onclick = () => { d.prio = togglePrio(d.prio || [], b.dataset.prio); render(); });
   document.querySelectorAll('[data-ob-back]').forEach(b => b.onclick = () => { obStep = Math.max(obRedo ? 1 : 0, obStep - 1); render(); window.scrollTo(0, 0); });
   document.querySelectorAll('[data-ob-cancel]').forEach(b => b.onclick = () => { obRedo = false; obDraft = null; obStep = 0; go('profile'); });
   document.querySelectorAll('[data-ob-next]').forEach(b => b.onclick = () => {
@@ -2641,7 +2645,7 @@ function bindOnboard() {
       if (!(S.weights || []).length) S.weights = [{ t: Date.now(), kg: peso }];
       save();
     }
-    if (obStep === 2) { S.goal = { ...(S.goal || {}), obj: d.obj, tempo: d.tempo, freq: d.freq }; save(); loadLib().catch(() => {}); }
+    if (obStep === 2) { S.goal = { ...(S.goal || {}), obj: d.obj, tempo: d.tempo, freq: d.freq, prio: d.prio }; save(); loadLib().catch(() => {}); }
     obStep++; render(); window.scrollTo(0, 0);
   });
   document.querySelectorAll('[data-choose]').forEach(b => b.onclick = () => {
@@ -3007,7 +3011,16 @@ const SESSION_TYPES = {
 };
 const TYPE_KEYS = Object.keys(SESSION_TYPES);
 const tagOf = k => (SESSION_TYPES[k] || {}).tag || k;
-const WEEK_TARGET = { peito: 10, costas: 10, pernas: 10, posterior: 10, ombros: 8, biceps: 6, triceps: 6, core: 6 };   // séries por semana (referência geral)
+const WEEK_BASE = { peito: 10, costas: 10, pernas: 10, posterior: 10, ombros: 8, biceps: 6, triceps: 6, core: 6 };   // séries por semana (referência geral)
+/* Grupos que a pessoa quer priorizar (até 3): meta semanal ~40% maior, foco do dia favorecido e um exercício a mais */
+const MAX_PRIO = 3;
+const prioGroups = () => ((S.goal && S.goal.prio) || []).filter(g => g in WEEK_BASE).slice(0, MAX_PRIO);
+const WEEK_TARGET = new Proxy(WEEK_BASE, { get: (t, g) => t[g] == null ? undefined : prioGroups().includes(g) ? Math.round(t[g] * 1.4) : t[g] });
+const PRIO_SLOT = { peito: 'fly', costas: 'hpull', ombros: 'lateral', biceps: 'biceps', triceps: 'triceps', pernas: 'legext', posterior: 'legcurl', core: 'core' };
+function prioChips(sel, attr) {
+  return `<div class="chips wrap-chips">${Object.entries(RG).map(([k, l]) => `<button class="${sel.includes(k) ? 'on' : ''}" ${attr}="${k}">${l}</button>`).join('')}</div>`;
+}
+const togglePrio = (list, g) => list.includes(g) ? list.filter(x => x !== g) : list.length >= MAX_PRIO ? list : [...list, g];
 const NO_TRAVEL = /pull-?up|chin-?up|muscle.?up/i;    // sem barra no quarto
 /* Padrão de movimento de qualquer exercício (do catálogo, da biblioteca ou criado por você) */
 function patternOf(e) {
@@ -3086,11 +3099,14 @@ function generateWorkout(type, ctx) {
   const tempo = Math.min(ctx.travel ? 45 : 999, (S.plan && S.plan.tempo) || (S.goal && S.goal.tempo) || 60);
   ctx = { ...ctx, used: new Set() };
   const list = []; let mins = 5;                                  // 5 min de aquecimento
-  for (const slot of ctx.travel ? [...T.slots, 'cond'] : T.slots) {
+  const prio = prioGroups().filter(gp => T.groups.includes(gp) || (gp === 'core' && T.slots.includes('core')));
+  const slots = [...T.slots]; prio.forEach(gp => slots.splice(Math.min(3, slots.length), 0, PRIO_SLOT[gp]));   // um exercício a mais para cada prioridade do foco
+  for (const slot of ctx.travel ? [...slots, 'cond'] : slots) {
     const pk = pickExercise(slot, ctx); if (!pk) continue;
     let kind = (CATALOG[slot] || {}).kind || 'c';
     if (ctx.travel && ['big', 'c', 'i'].includes(kind)) kind = 'bw';
     const e = { ...pk.ex, slot, ...prescribe(pk.ex, kind, g, tempo) };
+    if (prio.some(gp => exGroups(e).p.includes(gp)) && e.sets < 4 && kind !== 'cond') e.sets += 1;   // +1 série nos grupos prioritários
     if (list.length >= 4 && mins + exMinutes(e) > tempo) break;
     list.push(e); ctx.used.add(pk.id); mins += exMinutes(e);
   }
@@ -3111,8 +3127,9 @@ function rankTypes(st) {
     const need = T.groups.reduce((a, gp) => a + Math.max(0, (WEEK_TARGET[gp] - st[gp].week) / WEEK_TARGET[gp]), 0) / T.groups.length;
     const ready = T.groups.reduce((a, gp) => a + Math.min(1.5, st[gp].score), 0) / T.groups.length;
     const fit = f <= 3 ? (type === 'full' ? 0.6 : type === 'upper' ? 0.2 : 0) : (type === 'full' ? -0.2 : 0.1);
+    const pr = prioGroups(); const prioHit = pr.filter(gp => T.groups.includes(gp)).length;
     const ok = !blockers.length && p && p.exercises.length >= 3;
-    return { k: type, T, ok, blockers, soft, need, main: T.groups, score: (ok ? 0 : -10 - blockers.length) + ready + need - 0.5 * soft.length + fit };
+    return { k: type, T, ok, blockers, soft, need, main: T.groups, prioHit, score: (ok ? 0 : -10 - blockers.length) + ready + need - 0.5 * soft.length + fit + (pr.length ? 0.6 * prioHit / pr.length : 0) };
   }).sort((a, b) => b.score - a.score);
 }
 function dayKeyOf(t) { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
@@ -3150,6 +3167,8 @@ function todayPlan() {
   if (fresh.length) why.push(`Recuperados: ${fresh.slice(0, 3).map(g => `${RG[g]} (${ago2(st[g].hours)})`).join(', ')}.`);
   const blockedBig = [...new Set(ranked.filter(r => !r.ok).flatMap(r => r.blockers))].filter(g => !best.main.includes(g));
   if (blockedBig.length) why.push(`Para depois: ${blockedBig.slice(0, 2).map(g => RG[g]).join(', ')} (${st[blockedBig[0]].state === 'dor' ? 'região com dor' : agoTxt(st[blockedBig[0]].hours)}).`);
+  const pBest = prioGroups().filter(gp => best.main.includes(gp));
+  if (pBest.length) why.splice(1, 0, `Prioridade: ${pBest.map(gp => RG[gp]).join(', ')} (${pBest.map(gp => `${Math.round(st[gp].week)}/${WEEK_TARGET[gp]}`).join(', ')} séries na semana).`);
   if (ap.groups.size) why.push(`Exercícios que trabalham a região com dor (${painNames(ap)}) ficaram de fora.`);
   if (bi.deload) why.push(`Semana leve (semana 4 do bloco ${bi.n}): menos séries e cerca de 10% menos carga.`);
   if (dsl !== null && dsl >= 5) why.push(`Faz ${dsl} dias sem treinar: volte com cerca de 10% menos carga nas primeiras séries.`);
@@ -3386,6 +3405,7 @@ function bind() {
     $('#pNome').onchange = ev => { S.profile.nome = ev.target.value.trim(); save(); };
     $('#pSexo').onchange = ev => { S.profile.sexo = ev.target.value; save(); render(); };
     $('#pFreq').onchange = ev => { S.goal = { ...(S.goal || {}), freq: +ev.target.value }; save(); render(); };
+    document.querySelectorAll('[data-pprio]').forEach(b => b.onclick = () => { S.goal = { ...(S.goal || {}), prio: togglePrio(prioGroups(), b.dataset.pprio) }; save(); render(); });
     $('#exportBtn').onclick = exportBackup;
     $('#bkEvery').onchange = ev => { S.backupEvery = +ev.target.value; save(); };
     $('#importIn').onchange = ev => {
