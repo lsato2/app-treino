@@ -2819,12 +2819,26 @@ function fillMap(el) {
 const WGER = 'https://wger.de';
 const WSTOP = /\b(barbell|dumbbells?|cable|machine|seated|standing|lying|smith|leverage|with|the|on|one-arm|two-arm|alternate|alternating|medium|grip|close-grip|wide-grip|-)\b/gi;
 function wgerCache(id, v) {
-  const k = 'wger:' + id;
+  const k = 'wger2:' + id;   // v2: resultados antigos (sem checagem de nome) são ignorados
   try {
     if (v !== undefined) { localStorage.setItem(k, JSON.stringify({ t: Date.now(), v })); return v; }
     const c = JSON.parse(localStorage.getItem(k)); if (c && Date.now() - c.t < 30 * DAY) return c;
   } catch (e) {}
   return null;
+}
+/* Só aceita a ilustração se o nome encontrado tiver as palavras-chave do exercício (evita "Arnold press" virar supino) */
+const WGENERIC = new Set(['press', 'rais', 'curl', 'row', 'exercis', 'and', 'for', 'sid']);
+const WVAR = ['incline', 'decline', 'front', 'reverse', 'close', 'wide', 'single', 'hammer', 'overhead', 'behind', 'sumo', 'romanian', 'stiff', 'upright', 'bulgarian', 'jump', 'kneeling', 'lying', 'seated', 'standing', 'preacher', 'concentration', 'arnold', 'military'];
+const wtok = t => norm(t).replace(/-/g, '').replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).map(w => (/ss$/.test(w) ? w : w.replace(/s$/, '')).replace(/e$/, '')).filter(w => w.length >= 3);
+function wgerMatch(id, name) {
+  if (!name) return false;
+  const key = wtok(id.replace(/_/g, ' ').replace(WSTOP, ' ')); const gt = wtok(name); const got = new Set([...gt, ...gt.slice(1).map((w, i) => gt[i] + w)]);   // "pull down" = "pulldown"
+  const must = key.filter(w => !WGENERIC.has(w)); const gen = key.filter(w => WGENERIC.has(w));
+  if (!must.length && !gen.length) return false;
+  const raw = new Set([...wtok(id.replace(/_/g, ' ')), ...wtok(id.replace(/[_-]/g, ' '))]);
+  if (wtok(WVAR.join(' ')).some(v => got.has(v) && !raw.has(v))) return false;              // outra variação (inclinado, sentado...)
+  const hit = must.filter(w => got.has(w)).length;
+  return (must.length <= 2 ? hit === must.length : hit >= must.length - 1) && (gen.length === 0 || gen.some(w => got.has(w)));
 }
 async function wgerFind(id) {
   const terms = [id.replace(/_/g, ' '), id.replace(/_/g, ' ').replace(WSTOP, ' ').replace(/(^|\s)-(\s|$)/g, ' ').replace(/\s+/g, ' ').trim()].filter((t, i, a) => t && a.indexOf(t) === i);
@@ -2836,8 +2850,8 @@ async function wgerFind(id) {
         const j = await r.json();
         for (const ex of j.results || []) {
           const img = (ex.images || []).find(i => i.is_main) || (ex.images || [])[0];
-          if (img) {
-            const tr = (ex.translations || []).find(t => t.language === 2) || (ex.translations || [])[0] || {};
+          const tr = (ex.translations || []).find(t => t.language === 2) || (ex.translations || [])[0] || {};
+          if (img && wgerMatch(id, tr.name)) {
             return { img: img.image, name: tr.name || '', author: img.license_author || (img.author_history || [])[0] || '', lic: img.license_title || 'CC-BY-SA', url: `${WGER}/en/exercise/${ex.id}/view-base` };
           }
         }
@@ -2847,7 +2861,7 @@ async function wgerFind(id) {
     try {
       const r = await fetch(`${WGER}/api/v2/exercise/search/?term=${encodeURIComponent(term)}&language=english`);
       if (r.ok) {
-        const j = await r.json(); const s = (j.suggestions || []).find(x => x.data && x.data.image);
+        const j = await r.json(); const s = (j.suggestions || []).find(x => x.data && x.data.image && wgerMatch(id, x.data.name || x.value));
         if (s) return { img: WGER + s.data.image, name: s.data.name || s.value, author: '', lic: 'CC-BY-SA', url: `${WGER}/en/exercise/${s.data.base_id || s.data.id}/view-base` };
       }
     } catch (e) {}
