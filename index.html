@@ -901,7 +901,7 @@ const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-line
 function weekCount() {
   const now = new Date(); const d = new Date(now); d.setHours(0,0,0,0);
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // segunda-feira
-  return S.history.filter(h => h.end >= d.getTime()).length;
+  return S.history.filter(h => isStrength(h) && h.end >= d.getTime()).length;
 }
 function sessionVolume(h) {
   let v = 0;
@@ -1156,7 +1156,7 @@ function viewCardio(a) {
 function bindCardio(a) {
   if (!$('#cardio')) return;
   $('#cardioSw').onclick = () => {
-    a.cardio.on = !a.cardio.on; save();
+    a.cardio.on = !a.cardio.on; save(); if (a.custom && !exList(a).length) { render(); return; }
     $('#cardio').classList.toggle('off', !a.cardio.on);
     $('#cardioSw').classList.toggle('on', a.cardio.on); $('#cardioSw').setAttribute('aria-checked', a.cardio.on);
   };
@@ -1260,10 +1260,11 @@ function viewFocus(a) {
       <div class="f-cta"><button class="btn xl" id="fSkip">${rest.title === 'Aeróbico' ? 'Encerrar cronômetro' : 'Pular descanso'}</button></div>
     </div>`;
   }
-  if (a.custom && !ex.length) return `<div class="focus"><div class="done-ico" style="font-size:30px;color:var(--accent)">＋</div>
+  if (a.custom && !ex.length) return `<div class="focus"><div class="done-ico" style="font-size:30px;color:var(--accent)">${a.cardioOnly ? '♥' : '＋'}</div>
       <h1 style="text-align:center">${esc(a.title || 'Treino personalizado')}</h1>
-      <p class="muted" style="text-align:center;margin-top:0">Adicione os exercícios conforme for fazendo. As cargas ficam registradas como no treino normal.</p>
-      <div class="f-cta stack"><button class="btn xl" data-addex>＋ Adicionar exercício</button><button class="btn ghost" data-discard>Cancelar treino</button></div></div>`;
+      <p class="muted" style="text-align:center;margin-top:0">${a.cardioOnly ? 'Registre a atividade. Ela conta como aeróbico, não como treino de musculação.' : 'Adicione os exercícios conforme for fazendo, ou registre só um aeróbico.'}</p>
+      ${viewCardio(a)}
+      <div class="f-cta stack">${a.cardio.on ? swipeHtml('finishBtn', 'Deslize para registrar') : ''}<button class="btn ${a.cardio.on ? 'ghost' : 'xl'}" data-addex>＋ Adicionar exercício</button><button class="btn ghost" data-discard>Cancelar</button></div></div>`;
   if (!nextPending(a, 0)) {
     const n = Object.values(a.sets).flat().filter(s => s.done).length;
     return `<div class="focus">
@@ -1537,6 +1538,7 @@ function openReorder() {
 function bindExtras() {
   document.querySelectorAll('[data-custom]').forEach(b => b.onclick = () => startCustomPrompt(false));
   document.querySelectorAll('[data-pain-sheet]').forEach(b => b.onclick = openPainSheet);
+  document.querySelectorAll('[data-cardio-only]').forEach(b => b.onclick = () => { if (S.active && !confirm('Há um treino em andamento. Descartar e registrar um aeróbico?')) return; S.active = null; startCardio(null); });
   document.querySelectorAll('[data-custom-past]').forEach(b => b.onclick = () => startCustomPrompt(true));
   document.querySelectorAll('[data-addex]').forEach(b => b.onclick = openAddExercise);
   document.querySelectorAll('[data-addset]').forEach(b => b.onclick = () => { addSet(+b.dataset.addset); render(); });
@@ -1561,7 +1563,10 @@ function bindSession() {
 
 function finishSession() {
   const a = S.active; const doneCount = Object.values(a.sets).flat().filter(s => s.done).length;
-  if (!doneCount && !(a.cardio && a.cardio.on) && !confirm('Nenhuma série foi marcada. Finalizar mesmo assim?')) return;
+  if (!doneCount && !(a.cardio && a.cardio.on && a.cardio.min)) {   // nada a registrar: não entra no histórico nem conta na meta
+    if (confirm('Nenhuma série nem aeróbico foi registrado. Descartar este treino?')) { S.active = null; save(); endRest(false); go('home'); }
+    return;
+  }
   let end = Date.now(), start = a.start;
   if (a.past) { end = Math.min(a.past.day + 19 * 3600000, Date.now() - 60000); start = end - (a.past.mins || 60) * 60000; }   // treino de outro dia: grava às 19h daquela data
   while (S.history.some(h => h.end === end)) end++;
@@ -1575,7 +1580,7 @@ function finishSession() {
   }
   const cardio = a.cardio && a.cardio.on && a.cardio.min ? { type: a.cardio.type, min: a.cardio.min, km: a.cardio.km, int: a.cardio.int } : null;
   if (cardio) S.lastCardio = { type: cardio.type };
-  S.history.push({ plan: a.plan, exs: exList(a).map(stripEx), pname: PLANS[a.plan].name, pfocus: PLANS[a.plan].focus, planId: a.custom ? 'custom' : (curPlan() && curPlan().id) || 'legacy', travel: !!a.travel, custom: !!a.custom, past: !!a.past, start, end, mod: Date.now(), deload: !!a.deload, sets: a.sets, swaps: a.swaps || {}, skipped: Object.keys(a.skipped || {}).map(Number), cardio });
+  S.history.push({ plan: a.plan, exs: exList(a).map(stripEx), pname: PLANS[a.plan].name, pfocus: PLANS[a.plan].focus, planId: a.custom ? 'custom' : (curPlan() && curPlan().id) || 'legacy', travel: !!a.travel, custom: !!a.custom, past: !!a.past, cardioOnly: !doneCount, start, end, mod: Date.now(), deload: !!a.deload, sets: a.sets, swaps: a.swaps || {}, skipped: Object.keys(a.skipped || {}).map(Number), cardio });
   S.history.sort((x, y) => x.end - y.end);   // um registro de outro dia entra no lugar certo
   if (!a.custom) S.next = ORDER[(ORDER.indexOf(a.plan) + 1) % 3];   // o personalizado não mexe na sequência; o personal do dia recalcula pelos músculos
   S.active = null; save(); endRest(false);
@@ -1819,14 +1824,16 @@ function groupOf(e) {
 }
 function weekStart(t) { const d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); }
 const addWeeks = (t, n) => weekStart(t + n * 7 * DAY + 3 * DAY);   // robusto a horário de verão
-const countIn = (a, b) => S.history.filter(h => h.end >= a && h.end < b).length;
+const isStrength = h => !h.cardioOnly;
+const countIn = (a, b) => S.history.filter(h => isStrength(h) && h.end >= a && h.end < b).length;
 const roundStep = (v, st) => Math.max(0, Math.round(v / st) * st);
 function daysSinceLast() {
-  const last = S.history[S.history.length - 1]; if (!last) return null;
+  const last = [...S.history].reverse().find(isStrength); if (!last) return null;
   const d0 = new Date(last.end); d0.setHours(0, 0, 0, 0); const d1 = new Date(); d1.setHours(0, 0, 0, 0);
   return Math.round((d1 - d0) / DAY);
 }
-function thisWeek() { const ws = weekStart(Date.now()); return S.history.filter(h => h.end >= ws); }
+function thisWeek() { const ws = weekStart(Date.now()); return S.history.filter(h => isStrength(h) && h.end >= ws); }
+function thisWeekAll() { const ws = weekStart(Date.now()); return S.history.filter(h => h.end >= ws); }
 function streakWeeks() {
   let n = 0, ws = weekStart(Date.now());
   if (countIn(ws, addWeeks(ws, 1)) >= freq()) n++;
@@ -1929,6 +1936,7 @@ function pickAlt(plan, ei, curId) {
   return opts.sort((a, b) => lastUse(a.id) - lastUse(b.id))[0] || null;
 }
 function runCoach() {
+  if (S.pains && S.pains.length) S.pains = S.pains.filter(x => Date.now() - x.t < 60 * DAY);
   ensureBlock(); S.proposals = S.proposals || [];
   const bi = blockInfo();
   for (const k of ORDER) exList({ plan: k, swaps: prefSwaps(k) }).forEach((e, ei) => {
@@ -2012,8 +2020,9 @@ function coachMessages() {
   const P0 = curPlan();
   if (P0 && P0.type === 'fullbody' && freq() >= 4 && tab !== 'home') m.push({ t: 'info', text: `Full body com meta de ${freq()} treinos por semana: como ele trabalha todos os músculos, o personal do dia vai pedir descanso entre treinos. Para treinar em dias seguidos, o ABC se encaixa melhor (Perfil → Refazer avaliação).` });
   const n = wk.length; m.push({ t: n >= freq() ? 'ok' : 'info', text: n >= freq() ? `Meta da semana cumprida: ${n} de ${freq()} treinos.` : `Semana: ${n} de ${freq()} treinos.` });
-  if (cardioGoal() && n >= 2 && wk.filter(h => h.cardio).length < 2)
-    m.push({ t: 'info', text: `Aeróbico em ${wk.filter(h => h.cardio).length} treino${wk.filter(h => h.cardio).length === 1 ? '' : 's'} nesta semana. Para ${goal() === 'recomp' ? 'recomposição' : 'o seu objetivo'}, a referência é em pelo menos 2.` });
+  const cw = thisWeekAll().filter(h => h.cardio).length;
+  if (cardioGoal() && n >= 2 && cw < 2)
+    m.push({ t: 'info', text: `Aeróbico em ${cw} dia${cw === 1 ? '' : 's'} nesta semana. Para ${goal() === 'recomp' ? 'recomposição' : 'o seu objetivo'}, a referência é em pelo menos 2.` });
   const wm = weightMessage(); if (wm) m.push(wm);
   return m;
 }
@@ -2519,7 +2528,9 @@ function applyPlan() {
 function adoptPlan(plan) {
   if (S.active) { if (!confirm('Há um treino em andamento. Descartar para começar o novo plano?')) return false; S.active = null; endRest(false); }
   for (const [leg, nid] of Object.entries(LEGACY_MAP)) if (S.last[leg] && !S.last[nid]) S.last[nid] = S.last[leg];
-  S.plan = plan; S.prefSwaps = {}; S.next = 'A'; S.onboarded = true;
+  S.plan = plan; S.prefSwaps = {}; S.onboarded = true;
+  if (travelOn()) { S.nextMain = 'A'; S.travelPlan = { ...buildPlan('travel', plan.goal, Math.min(45, plan.tempo)), id: 't' + Date.now() }; S.next = 'A'; }   // viagem segue com o novo objetivo; o treino novo começa no A ao voltar
+  else S.next = 'A';
   (S.proposals || []).forEach(p => { if (p.status === 'pending') p.status = 'expired'; });
   applyPlan(); save(); runCoach(); return true;
 }
@@ -2858,16 +2869,18 @@ if (darkMQ && darkMQ.addEventListener) darkMQ.addEventListener('change', applyTh
 
 /* ============================== Sem zoom acidental (iOS) ============================== */
 document.addEventListener('gesturestart', e => e.preventDefault(), { passive: false });
-let lastTouch = 0;
+let lastTap = 0, tStart = null;
+document.addEventListener('touchstart', e => { const t = e.touches[0]; tStart = t ? { x: t.clientX, y: t.clientY, at: Date.now() } : null; }, { passive: true });
 document.addEventListener('touchend', e => {
-  const now = Date.now();
+  const now = Date.now(); const t = e.changedTouches[0];
+  const isTap = !!(tStart && t && Math.hypot(t.clientX - tStart.x, t.clientY - tStart.y) < 10 && now - tStart.at < 400);   // rolagem não é toque
   // 2º toque rápido: o iPhone trataria como zoom; cancela o zoom e entrega o clique normalmente
-  if (now - lastTouch < 350 && !e.target.closest('input, textarea, select, .swipe')) {
+  if (isTap && now - lastTap < 350 && !e.target.closest('input, textarea, select, .swipe')) {
     e.preventDefault();
     let el = e.target; while (el && !(el instanceof HTMLElement)) el = el.parentElement;   // ícones SVG: sobe até o elemento HTML
-    if (el) el.click();   // entrega o clique ao próprio elemento tocado (o navegador aplica a ação do botão, link, resumo etc.)
+    if (el) el.click();
   }
-  lastTouch = now;
+  lastTap = isTap ? now : 0;
 }, { passive: false });
 
 /* ============================== Modo viagem ============================== */
@@ -2965,14 +2978,14 @@ function planReadiness(k, st) {
 }
 function dayKeyOf(t) { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
 function trainedDaysStreak() {             // dias seguidos com treino, terminando ontem
-  const days = new Set(S.history.map(h => dayKeyOf(h.end))); let n = 0; let d = dayKeyOf(Date.now()) - DAY;
+  const days = new Set(S.history.filter(isStrength).map(h => dayKeyOf(h.end))); let n = 0; let d = dayKeyOf(Date.now()) - DAY;
   while (days.has(d)) { n++; d -= DAY; }
   return n;
 }
 /* A sugestão do dia */
 function todayPlan() {
   const st = groupStatus(); const now = Date.now();
-  const today = S.history.filter(h => dayKeyOf(h.end) === dayKeyOf(now));
+  const today = S.history.filter(h => isStrength(h) && dayKeyOf(h.end) === dayKeyOf(now));
   const ranked = ORDER.filter(k => PLANS[k]).map(k => planReadiness(k, st))
     .sort((a, b) => b.score - a.score || (a.k === S.next ? -1 : b.k === S.next ? 1 : 0));
   const best = ranked[0]; const why = [];
@@ -3024,7 +3037,7 @@ function todayCard() {
     return `<div class="card hero rest-hero" style="margin-top:16px"><div class="row"><span class="tag R">${t.type === 'done' ? '✓' : 'Zz'}</span>
       <div><div class="muted small">Personal do dia</div><h3>${t.type === 'done' ? 'Treino de hoje concluído' : 'Hoje é dia de descanso'}</h3></div></div>
       ${reasons}
-      <div class="row" style="gap:8px;margin-top:6px;flex-wrap:wrap"><button class="hbtn small" data-start="${k}">Treinar mesmo assim: ${p.name}</button>${custom.replaceAll('style="margin-top:10px"', '')}</div></div>`;
+      <div class="row" style="gap:8px;margin-top:6px;flex-wrap:wrap"><button class="hbtn small" data-cardio-only>♥ Registrar aeróbico</button><button class="hbtn small" data-start="${k}">Treinar mesmo assim: ${p.name}</button>${custom.replaceAll('style="margin-top:10px"', '')}</div></div>`;
   }
   return `<div class="card hero ${k}" style="margin-top:16px">
     <div class="row between"><div class="row"><span class="tag ${k}">${k}</span>
@@ -3074,9 +3087,13 @@ function startCustomPrompt(past) {
     const n = $('#ctName', el).value.trim(); el.remove(); startCustom(n, day ? { day, mins } : null);
   };
 }
-function startCustom(title, past) {
+function startCardio(past) {
+  startCustom('Aeróbico', past, true);
+}
+function startCustom(title, past, cardioOnly) {
   S.active = { plan: 'P', custom: true, title: title || 'Treino livre', past: past || null, start: Date.now(), exs: [], sets: {}, swaps: {}, order: [], skipped: {}, cardio: newCardio('A'), view: 'focus', cur: 0, travel: travelOn() };
-  save(); go('session'); setTimeout(openAddExercise, 50);
+  if (cardioOnly) { S.active.cardioOnly = true; S.active.cardio = { ...S.active.cardio, on: true, type: travelOn() ? TRAVEL_CARDIO_TYPES[0] : 'Caminhada/corrida na rua', int: 'Leve' }; }
+  save(); go('session'); if (!cardioOnly) setTimeout(openAddExercise, 50);
 }
 function addExerciseToCustom(e) {
   const a = S.active; if (!a || !a.custom) return false;
@@ -3181,6 +3198,22 @@ function openPainSheet() {
   if ($('#pnClear', el)) $('#pnClear', el).onclick = () => { S.painClearedAt = Date.now(); save(); runCoach(); el.remove(); render(); };
 }
 
+/* ============================== Consistência depois de excluir ou importar ============================== */
+function rebuildFromHistory() {
+  const last = {};
+  for (const h of S.history) for (const e of exList(h)) {
+    const done = (h.sets[e.id] || []).filter(x => x.done); if (!done.length) continue;
+    const key = metric(e) === 'reps' ? (x => x.kg ?? 0) : (x => x.reps ?? 0);
+    const best = done.reduce((m, x) => key(x) >= key(m) ? x : m, done[0]);
+    last[e.id] = { kg: best.kg, reps: best.reps };   // o histórico está em ordem: fica o mais recente
+  }
+  for (const [leg, nid] of Object.entries(LEGACY_MAP)) if (last[leg] && !last[nid]) last[nid] = last[leg];
+  S.last = last;
+  const pid = (curPlan() && curPlan().id) || 'legacy';
+  const lastPlan = [...S.history].reverse().find(h => !h.custom && !h.cardioOnly && (h.planId || 'legacy') === pid && ORDER.includes(h.plan));
+  S.next = lastPlan ? ORDER[(ORDER.indexOf(lastPlan.plan) + 1) % 3] : 'A';
+}
+
 /* ============================== Eventos gerais ============================== */
 function bind() {
   bindCoach(); bindCloud(); bindExtras();
@@ -3200,10 +3233,10 @@ function bind() {
   document.querySelectorAll('[data-del]').forEach(b => b.onclick = ev => {
     ev.stopPropagation();
     if (!confirm('Excluir este treino do histórico?')) return;
-    S.deleted = [...(S.deleted || []), +b.dataset.del]; S.history = S.history.filter(h => String(h.end) !== b.dataset.del); save(); render();
+    S.deleted = [...(S.deleted || []), +b.dataset.del]; S.history = S.history.filter(h => String(h.end) !== b.dataset.del); rebuildFromHistory(); save(); runCoach(); render();
   });
   const ch = $('#clearHist');
-  if (ch) ch.onclick = () => { if (confirm('Excluir TODO o histórico de treinos? Essa ação não pode ser desfeita.')) { S.deleted = [...(S.deleted || []), ...S.history.map(h => h.end)]; S.history = []; save(); render(); } };
+  if (ch) ch.onclick = () => { if (confirm('Excluir TODO o histórico de treinos? Essa ação não pode ser desfeita.')) { S.deleted = [...(S.deleted || []), ...S.history.map(h => h.end)]; S.history = []; rebuildFromHistory(); save(); runCoach(); render(); } };
   if (tab === 'profile') {
     const upd = () => {
       const p = S.profile;
@@ -3221,7 +3254,7 @@ function bind() {
     $('#bkEvery').onchange = ev => { S.backupEvery = +ev.target.value; save(); };
     $('#importIn').onchange = ev => {
       const f = ev.target.files[0]; if (!f) return;
-      f.text().then(t => { const d = JSON.parse(t); if (!d.history) throw 0; S = Object.assign(structuredClone(DEFAULT), d); save(); alert('Backup importado.'); render(); })
+      f.text().then(t => { const d = JSON.parse(t); if (!d.history) throw 0; S = Object.assign(structuredClone(DEFAULT), d); applyPlan(); rebuildFromHistory(); save(); alert('Backup importado.'); render(); })
         .catch(() => alert('Arquivo inválido.'));
     };
     $('#resetBtn').onclick = () => { if (confirm(`Apagar histórico, cargas e perfil?${window.cloud && window.cloud.user ? ' Os dados também serão apagados da nuvem.' : ''} Essa ação não pode ser desfeita.`)) { const del = [...(S.deleted || []), ...S.history.map(h => h.end)]; S = structuredClone(DEFAULT); S.deleted = del; save(); render(); } };
