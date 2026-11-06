@@ -1984,7 +1984,8 @@ function coachMessages() {
   if (!S.history.length) m.push({ t: 'info', text: 'Bem-vindo! O coach começa a propor ajustes depois de 3 a 4 semanas de registros. Por enquanto, foque na constância.' });
   if (pend) m.push({ t: 'prop', text: `O coach tem ${pend} proposta${pend > 1 ? 's' : ''} de ajuste para você.`, go: 'coach' });
   if (bi.deload) m.push({ t: 'deload', text: `Semana leve (semana 4 do bloco ${bi.n}): menos séries e cerca de 10% menos carga. É quando o corpo assimila o treino.` });
-  if (dsl != null && dsl >= 3 && !S.active && tab !== 'home') m.push({ t: 'warn', text: `${dsl} dias sem treinar. Sugestão de hoje: ${PLANS[suggestedKey()].name}.` });
+  if (dsl != null && dsl >= 3 && !S.active && tab !== 'home') { const tp = todayPlan();
+    m.push({ t: 'warn', text: tp.type === 'train' ? `${dsl} dias sem treinar. Sugestão de hoje: ${PLANS[tp.best.k].name}.` : `${dsl} dias sem treinar, mas hoje a sugestão é descansar. ${tp.why[0]}` }); }
   const hold = coachHold(); if (hold) m.push({ t: 'warn', text: hold });
   const n = wk.length; m.push({ t: n >= freq() ? 'ok' : 'info', text: n >= freq() ? `Meta da semana cumprida: ${n} de ${freq()} treinos.` : `Semana: ${n} de ${freq()} treinos.` });
   if (cardioGoal() && n >= 2 && wk.filter(h => h.cardio).length < 2)
@@ -2914,8 +2915,9 @@ function groupStatus(now = Date.now()) {
     }
   }
   for (const [g, o] of Object.entries(out)) {
-    const need = BIG.has(g) ? 60 : 44;                                   // grupos grandes recuperam mais devagar
-    o.state = o.hours === null ? 'novo' : o.hours < 22 ? 'cansado' : o.hours < need ? 'recuperando' : o.hours > 7 * 24 ? 'parado' : 'pronto';
+    // Pelo calendário: hoje = cansado; ontem = recuperando (grupos pequenos já liberam após ~30 h); 2+ dias = pronto; 8+ dias = parado
+    const d = o.hours === null ? null : calDays(o.hours);
+    o.state = d === null ? 'novo' : d === 0 ? 'cansado' : d === 1 ? (BIG.has(g) || o.hours < 30 ? 'recuperando' : 'pronto') : d > 7 ? 'parado' : 'pronto';
     o.score = { cansado: -2, recuperando: -1, pronto: 1, parado: 1.5, novo: 1 }[o.state];
   }
   return out;
@@ -2954,7 +2956,7 @@ function todayPlan() {
   else if (lastTwo.length === 2 && lastTwo.every(h => h.feel === 5)) rest = 'Seus dois últimos treinos foram "no limite". Um dia de descanso vai render mais.';
   else if (streak >= 3) rest = `Você treinou ${streak} dias seguidos. Hoje o corpo pede descanso.`;
   else if (wk >= f && streak >= 1) rest = `Meta da semana já cumprida (${wk} de ${f}) e você treinou ontem. Descansar hoje ajuda a recuperar.`;
-  else if (best.score < 0) rest = 'Os músculos dos treinos disponíveis ainda estão se recuperando.';
+  else if (best.score < 0) rest = 'Você treinou há pouco e os músculos dos treinos disponíveis ainda estão se recuperando.';
   if (rest) {
     why.push(rest);
     if (tired.length) why.push(`Em recuperação: ${tired.slice(0, 3).map(g => RG[g]).join(', ')}.`);
@@ -3089,6 +3091,13 @@ function openAddExercise() {
     if (addExerciseToCustom(e)) { el.remove(); render(); window.scrollTo(0, 0); }
   };
 }
+
+/* ============================== Atualiza a tela ao voltar para o app ou quando o dia muda ============================== */
+let shownDay = dayKeyOf(Date.now());
+const refreshIfStale = () => { if (['home', 'coach', 'plans', 'history'].includes(tab)) window.safeRender(); shownDay = dayKeyOf(Date.now()); };
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshIfStale(); });
+window.addEventListener('pageshow', refreshIfStale);
+setInterval(() => { if (dayKeyOf(Date.now()) !== shownDay) refreshIfStale(); }, 60000);
 
 /* ============================== Eventos gerais ============================== */
 function bind() {
