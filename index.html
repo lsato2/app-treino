@@ -274,6 +274,15 @@
   .pain-bar { color: var(--danger); }
   .wrap-chips { flex-wrap: wrap; overflow: visible; margin: 0; padding: 8px 0; }
   .hero-t { font-size: 24px; font-weight: 400; letter-spacing: -0.02em; line-height: 1.15; } .hero-f { font-size: 14px; color: var(--ink-2); margin-top: 1px; }
+  .focus-list { padding: 4px 16px; }
+  .focus-row { border-top: 1px solid var(--line); } .focus-row:first-child { border-top: 0; }
+  .focus-row summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 12px 22px 12px 0; position: relative; }
+  .focus-row summary::-webkit-details-marker { display: none; }
+  .focus-row summary::after { content: '⌄'; position: absolute; right: 2px; top: 50%; transform: translateY(-60%); color: var(--muted); font-size: 18px; transition: transform .2s; }
+  .focus-row[open] summary::after { transform: translateY(-30%) rotate(180deg); }
+  .focus-row .tag { width: 36px; height: 36px; font-size: 12px; }
+  .fr-t { display: grid; flex: 1; min-width: 0; } .fr-t b { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .focus-row .pill { white-space: nowrap; flex: none; }
+  .focus-row.dim summary { opacity: .6; } .fr-body { padding-bottom: 14px; }
   .ex-peek { margin-top: 10px; border-top: 1px solid var(--line); }
   .ex-peek summary { list-style: none; cursor: pointer; display: grid; gap: 2px; padding: 12px 26px 4px 0; position: relative; font-weight: 500; }
   .ex-peek summary::-webkit-details-marker { display: none; }
@@ -1008,19 +1017,24 @@ function viewHome() {
 
 function viewPlans() {
   const g = (S.plan && S.plan.goal) || goal(); const t = todayPlan(); const st = t.st;
-  const tp = `${travelOn() ? '✈︎ Modo viagem · sem equipamento' : GOALS[g] || ''} · ~${Math.min(travelOn() ? 45 : 999, (S.plan && S.plan.tempo) || (S.goal && S.goal.tempo) || 60)} min`;
-  const lbl = r => r.ok ? (r.k === t.best.k && t.type === 'train' ? '<span class="pill rec-pill">Sugerido hoje</span>' : '<span class="pill">Recuperado</span>')
-    : `<span class="pill warn-pill">${r.blockers.map(gp => RG[gp]).slice(0, 2).join(', ')} ${st[r.blockers[0]].state === 'dor' ? 'com dor' : 'em recuperação'}</span>`;
+  const tp = `${travelOn() ? '✈︎ Modo viagem' : GOALS[g] || ''} · ~${Math.min(travelOn() ? 45 : 999, (S.plan && S.plan.tempo) || (S.goal && S.goal.tempo) || 60)} min`;
+  const lbl = r => r.ok ? '<span class="pill">Recuperado</span>'
+    : `<span class="pill warn-pill">${st[r.blockers[0]].state === 'dor' ? 'Com dor' : 'Recuperando'}</span>`;
+  const startBtn = (k, main) => `<button class="btn ${main ? '' : 'ghost'}" style="margin-top:14px" data-start="${k}">${S.active && S.active.plan === k ? 'Continuar treino' : 'Começar treino'}</button>`;
+  const topK = S.active && !S.active.custom ? S.active.plan : t.type === 'train' ? t.best.k : null;
+  const top = topK ? (() => { const p = PLANS[topK]; return `<div class="card hero ${topK}"><div class="row"><span class="tag ${topK}">${tagOf(topK)}</span>
+      <div style="min-width:0;flex:1"><div class="muted small">${S.active && S.active.plan === topK ? 'Em andamento' : 'Sugerido hoje'} · ~${p.mins} min</div><h3 class="hero-t">${esc(p.name)}</h3><div class="hero-f">${esc(p.focus)}</div></div></div>
+      ${planList(topK)}${startBtn(topK, true)}</div>`; })()
+    : `<div class="card hero rest-hero"><div class="row"><span class="tag R">${t.type === 'done' ? '✓' : 'Zz'}</span><div><div class="muted small">Hoje</div><h3>${t.type === 'done' ? 'Treino concluído' : 'Dia de descanso'}</h3></div></div>
+      <p class="note" style="margin:10px 0 0">${esc(t.why[0])}</p></div>`;
+  const others = t.ranked.filter(r => r.k !== topK);
   return `<div class="wrap"><h1 class="page-title">Treinos</h1><p class="muted page-sub" style="margin-top:0">${tp}</p>
-    <button class="card custom-card" data-custom><b>＋ Treino personalizado</b></button>
-    <div class="row" style="gap:8px;margin-bottom:12px"><button class="btn ghost" data-goto="library" style="flex:1">Biblioteca</button>${travelOn() ? '<button class="btn ghost" data-travel="off" style="flex:1">Sair do modo viagem</button>' : '<button class="btn ghost" data-redo style="flex:1">Ajustar objetivo</button>'}</div>
-    <h2>Opções de hoje</h2>
-    ${t.ranked.map(r => { const k = r.k; const p = PLANS[k]; return `<div class="card ${r.ok ? '' : 'dim'}">
-      <div class="row"><span class="tag ${k}">${tagOf(k)}</span><div style="min-width:0;flex:1"><h3>${esc(p.name)}</h3>
-      <div class="muted small">${esc(p.focus)} · ~${p.mins} min</div><div style="margin-top:4px">${lbl(r)}</div></div></div>
-      ${planList(k)}
-      <button class="btn ${r.ok && r.k === t.best.k ? '' : 'ghost'}" style="margin-top:14px" data-start="${k}">${S.active && S.active.plan === k ? 'Continuar' : 'Começar ' + esc(p.name.toLowerCase())}</button>
-    </div>`; }).join('')}
+    ${top}
+    <h2>${topK ? 'Trocar o foco' : 'Treinar mesmo assim'}</h2>
+    <div class="card focus-list">${others.map(r => { const k = r.k; const p = PLANS[k]; return `<details class="focus-row ${r.ok ? '' : 'dim'}">
+      <summary><span class="tag ${k}">${tagOf(k)}</span><span class="fr-t"><b>${esc(p.name)}</b><span class="muted small">~${p.mins} min${r.ok ? '' : ' · ' + r.blockers.map(gp => RG[gp]).slice(0, 2).join(', ').toLowerCase()}</span></span>${lbl(r)}</summary>
+      <div class="fr-body">${planList(k)}${startBtn(k, false)}</div></details>`; }).join('')}</div>
+    <div class="row" style="gap:8px;margin-top:16px;flex-wrap:wrap"><button class="hbtn small" data-custom>＋ Treino personalizado</button><button class="hbtn small" data-goto="library">Biblioteca</button>${travelOn() ? '<button class="hbtn small" data-travel="off">Sair do modo viagem</button>' : '<button class="hbtn small" data-redo>Ajustar objetivo</button>'}</div>
   </div>`;
 }
 
