@@ -2486,7 +2486,7 @@ const exMinutes = e => (e.sets * (45 + e.rest) + 60) / 60;      // execução + 
 function altsFor(base) {
   if (!base) return [];
   if (!base.slot) return ALTS[base.id] || [];                         // treino antigo (fixo)
-  const P = S.plan || {}; const tr = S.active ? !!S.active.travel : travelOn(); const usage = exerciseUsage();
+  const P = S.plan || {}; const tr = S.active ? !!S.active.travel : travelOn(); const usage = exerciseUsage(90, tr);
   const ids = [...new Set([...candidatesFor(base.slot, usage, tr), ...((P.custom || {})[base.slot] || []), ...((P.custom || {})[base.id] || [])])].filter(id => id !== base.id);
   const kind = (CATALOG[base.slot] || {}).kind || 'c';
   return ids.map(id => {
@@ -3033,10 +3033,10 @@ function patternOf(e) {
   return null;
 }
 /* O que você tem feito (últimos 90 dias): quantas vezes e quando foi a última */
-function exerciseUsage(days = 90) {
+function exerciseUsage(days = 90, travel = false) {   // academia e viagem contam separado
   const since = Date.now() - days * DAY; const by = {};
   for (const h of S.history) {
-    if (h.end < since) continue;
+    if (h.end < since || !!h.travel !== !!travel) continue;
     for (const e of exList(h)) {
       if (!(h.sets[e.id] || []).some(s => s.done)) continue;
       const pt = patternOf(e); if (!pt) continue;
@@ -3098,7 +3098,7 @@ function generateWorkout(type, ctx) {
 }
 /* Monta as opções de hoje (uma por foco) */
 function genPlans() {
-  const ctx = { usage: exerciseUsage(), travel: travelOn(), pain: activePain() };
+  const ctx = { usage: exerciseUsage(90, travelOn()), travel: travelOn(), pain: activePain() };
   return Object.fromEntries(TYPE_KEYS.map(t => [t, generateWorkout(t, ctx)]));
 }
 /* Ordena os focos: só entra quem tem todos os grupos recuperados */
