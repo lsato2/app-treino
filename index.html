@@ -258,6 +258,15 @@
   .travel-card { border-color: rgba(185,128,46,.35); background: linear-gradient(160deg, var(--w82), rgba(255,236,206,.35)); }
   .travel-pill { font-size: 11px; vertical-align: middle; color: var(--c); border-color: rgba(185,128,46,.35); }
   .travel-ico { width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 10px; display: grid; place-items: center; font-size: 28px; background: var(--w85); border: 1px solid var(--edge); color: var(--c); }
+  .tag.P, .cal-d.on.P { background: var(--c); color: #fff; border-color: var(--c); } .tag.R { background: var(--w85); color: var(--accent); font-size: 14px; }
+  .why { margin: 12px 0 4px; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; color: var(--ink-2); } .why li { line-height: 1.4; }
+  .rec-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); font-size: 15px; }
+  .rec-row:first-of-type { border-top: 0; }
+  .rec { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--edge); background: var(--w80); }
+  .rec.cansado { color: var(--danger); } .rec.recuperando { color: var(--c); } .rec.pronto { color: var(--ok); } .rec.parado { color: var(--accent); } .rec.novo { color: var(--muted); }
+  .custom-card { display: grid; gap: 4px; width: 100%; text-align: left; border-color: rgba(185,128,46,.3); }
+  .add-plus { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; font-weight: 600; }
+  .ax-new { margin-top: 14px; } .ax-new summary { cursor: pointer; color: var(--accent); font-weight: 500; padding: 8px 0; }
   .done-ico { width: 76px; height: 76px; border-radius: 50%; background: var(--w80); border: 1px solid var(--edge); display: grid; place-items: center; margin: 24px auto 4px; box-shadow: var(--shadow-sm); }
   .done-ico svg { width: 34px; height: 34px; stroke: var(--ok); }
 
@@ -905,7 +914,7 @@ function render() {
   if (!S.onboarded && tab !== 'onboard') tab = 'onboard';
   if (S.onboarded && tab === 'onboard' && !obRedo) tab = 'home';   // conta já cadastrada (ex.: dados vindos da nuvem)
   document.body.classList.toggle('in-onboard', tab === 'onboard');
-  $('#fab').classList.toggle('live', !!S.active); $('#fab').setAttribute('aria-label', S.active ? 'Continuar treino' : `Iniciar ${PLANS[S.next] ? PLANS[S.next].name : 'treino'}`);
+  $('#fab').classList.toggle('live', !!S.active); $('#fab').setAttribute('aria-label', S.active ? 'Continuar treino' : 'Iniciar o treino de hoje');
   const app = $('#app');
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === (tab === 'report' ? 'coach' : tab)));
   document.body.classList.toggle('in-session', tab === 'session' && !!S.active);
@@ -931,16 +940,10 @@ function viewHome() {
     <div class="hello"><div><div class="muted">${greet()} · ${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
       <h1>${S.profile.nome ? esc(S.profile.nome.split(' ')[0]) : 'Bora treinar'}</h1></div>${avatarBtn()}</div>
     ${travelBanner()}
+    ${todayCard()}
     ${S.active ? '' : loginCard()}
     ${S.active ? '' : reportReadyCard()}
     ${(() => { const ms = coachMessages().filter(x => x.t !== 'info' || !S.history.length).slice(0, 2); return ms.length ? `<div class="stack" style="margin-top:12px">${ms.map(msgHtml).join('')}</div>` : ''; })()}
-    <div class="card hero ${k}" style="margin-top:16px">
-      <div class="row between"><div class="row"><span class="tag ${k}">${k}</span>
-        <div><div class="muted small">${S.active ? 'Treino em andamento' : 'Próximo treino'}</div><h3>${p.name} · ${esc(p.focus)}</h3></div></div>
-        <button class="go-btn" data-start="${k}" aria-label="${S.active ? 'Continuar' : 'Começar'}"><svg viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8"/></svg></button></div>
-      ${planList(k)}
-      <button class="btn" style="margin-top:16px" data-start="${k}">${S.active ? 'Continuar treino' : 'Começar ' + p.name}</button>
-    </div>
     ${S.active ? '' : weightCard(false)}
     ${S.active ? '' : backupCard()}
     ${weekCard()}
@@ -962,6 +965,7 @@ function viewPlans() {
   const CP = curPlan();
   const tp = travelOn() ? `✈︎ Modo viagem · sem equipamento · ~${CP.tempo} min por treino` : CP ? `${TEMPLATES[CP.type].label} · ${GOALS[CP.goal] || ''} · ~${CP.tempo} min por treino` : '3 treinos full body (plano inicial)';
   return `<div class="wrap"><h1 class="page-title">Treinos</h1><p class="muted page-sub" style="margin-top:0">${tp}</p>
+    <button class="card custom-card" data-custom><b>＋ Treino personalizado</b><span class="note">Monte na hora, por exemplo o treino do seu amigo. Fica no histórico e o treino de amanhã se ajusta.</span></button>
     <div class="row" style="gap:8px;margin-bottom:12px"><button class="btn ghost" data-goto="library" style="flex:1">Biblioteca de exercícios</button>${travelOn() ? '<button class="btn ghost" data-travel="off" style="flex:1">Sair do modo viagem</button>' : '<button class="btn ghost" data-redo style="flex:1">Gerar novo treino</button>'}</div>
     ${ORDER.map(k => `<div class="card">
       <div class="row"><span class="tag ${k}">${k}</span><div><h3>${PLANS[k].name} · ${PLANS[k].focus}</h3>
@@ -1114,7 +1118,7 @@ function newCardio(k) {
 }
 
 function viewCardio(a) {
-  const c = a.cardio; const sug = a.travel ? TRAVEL_CARDIO_SUG : CARDIO_SUG[a.plan];
+  const c = a.cardio; const sug = a.travel ? TRAVEL_CARDIO_SUG : CARDIO_SUG[a.plan] || CARDIO_SUG.A;
   const types = a.travel ? TRAVEL_CARDIO_TYPES : CARDIO_TYPES;
   const opt = (list, v) => list.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
   return `<div class="card cardio ${c.on ? '' : 'off'}" id="cardio">
@@ -1241,6 +1245,10 @@ function viewFocus(a) {
       <div class="f-cta"><button class="btn xl" id="fSkip">${rest.title === 'Aeróbico' ? 'Encerrar cronômetro' : 'Pular descanso'}</button></div>
     </div>`;
   }
+  if (a.custom && !ex.length) return `<div class="focus"><div class="done-ico" style="font-size:30px;color:var(--accent)">＋</div>
+      <h1 style="text-align:center">${esc(a.title || 'Treino personalizado')}</h1>
+      <p class="muted" style="text-align:center;margin-top:0">Adicione os exercícios conforme for fazendo. As cargas ficam registradas como no treino normal.</p>
+      <div class="f-cta stack"><button class="btn xl" data-addex>＋ Adicionar exercício</button><button class="btn ghost" data-discard>Cancelar treino</button></div></div>`;
   if (!nextPending(a, 0)) {
     const n = Object.values(a.sets).flat().filter(s => s.done).length;
     return `<div class="focus">
@@ -1249,7 +1257,7 @@ function viewFocus(a) {
       <p class="muted" style="text-align:center;margin-top:0">${n} séries · ${elapsedTxt(true)}</p>
       ${Object.keys(a.skipped || {}).length ? `<p class="note" style="text-align:center">Pulados hoje: ${Object.keys(a.skipped).map(i => esc(ex[i].name)).join(', ')}. Para retomar, use a lista.</p>` : ''}
       ${viewCardio(a)}
-      <div class="f-cta stack">${swipeHtml('finishBtn', 'Deslize para finalizar')}
+      <div class="f-cta stack">${a.custom ? '<button class="btn ghost" data-addex>＋ Adicionar outro exercício</button>' : ''}${swipeHtml('finishBtn', 'Deslize para finalizar')}
       <button class="btn ghost" id="toList">Revisar séries</button></div>
     </div>`;
   }
@@ -1279,6 +1287,7 @@ function viewFocus(a) {
     return `<div class="focus">${header}
       <div class="f-meta">Exercício concluído ✓</div>
       <div class="dots">${dots}</div>
+      <div class="row" style="gap:6px;margin:-4px 0 8px"><button class="hbtn small" data-addset="${ei}">＋ Série</button>${a.custom ? '<button class="hbtn small" data-addex>＋ Exercício</button>' : ''}</div>
       <div class="card" style="margin-top:8px">${sets.map((s, j) => `<div class="kv"><span>Série ${j + 1}</span><b>${fmtSet(e, s)}</b></div>`).join('')}</div>
       <div class="f-cta"><button class="btn xl" id="fGoNext">Ir para a próxima série pendente</button>${nav}</div>
     </div>`;
@@ -1304,6 +1313,7 @@ function viewFocus(a) {
   return `<div class="focus">${header}
       <div class="f-meta">Série <b>${si + 1}</b> de ${sets.length} · meta <b>${esc(e.reps)}</b> · descanso ${fmtTime(e.rest)}</div>
       <div class="dots">${dots}</div>
+      <div class="row" style="gap:6px;margin:-4px 0 8px"><button class="hbtn small" data-addset="${ei}">＋ Série</button>${a.custom ? '<button class="hbtn small" data-addex>＋ Exercício</button>' : ''}</div>
       <div class="f-last">${last ? `Última vez: ${fmtSet(e, last)}` : 'Primeira vez neste exercício'}
         · <button class="tip-toggle" id="fTipBtn" style="margin:0">Como executar</button></div>
       <div class="tip" id="fTip">${howHtml(e)}</div>
@@ -1408,6 +1418,7 @@ function viewList(a) {
     </div>`;
   }).join('');
   return `<div class="wrap">${cards}
+      ${a.custom ? '<button class="btn ghost" data-addex style="margin-bottom:12px">＋ Adicionar exercício</button>' : ''}
       ${viewCardio(a)}
       <div style="margin-top:8px">${swipeHtml('finishBtn', 'Deslize para finalizar')}</div>
       <button class="btn danger" id="discardBtn" style="margin-top:10px">Descartar treino</button>
@@ -1471,7 +1482,7 @@ function sheet(html, cls) {
 function openActions(ei) {
   const a = S.active; const e = exList(a)[ei]; const sk = isSkipped(a, ei);
   const el = sheet(`<h3>${esc(e.name)}</h3>
-    <button class="opt" data-act="swap"><span><b>⇄ Trocar exercício</b><br><span class="muted small">Aparelho ocupado ou indisponível</span></span></button>
+    ${a.custom ? `<button class="opt" data-act="remove"><span><b>✕ Remover do treino</b><br><span class="muted small">Tira este exercício do treino personalizado</span></span></button>` : `<button class="opt" data-act="swap"><span><b>⇄ Trocar exercício</b><br><span class="muted small">Aparelho ocupado ou indisponível</span></span></button>`}
     ${sk ? '' : `<button class="opt" data-act="later"><span><b>↓ Fazer depois</b><br><span class="muted small">Move para o fim do treino e segue para o próximo</span></span></button>`}
     <button class="opt" data-act="skip"><span><b>${sk ? '↺ Retomar exercício' : '⤼ Pular hoje'}</b><br><span class="muted small">${sk ? 'Volta a fazer parte do treino de hoje' : 'Não entra no treino de hoje'}</span></span></button>
     <button class="opt" data-act="order"><span><b>⇅ Reordenar treino</b><br><span class="muted small">Mudar a sequência dos exercícios de hoje</span></span></button>
@@ -1480,6 +1491,7 @@ function openActions(ei) {
     const act = b.dataset.act; el.remove();
     if (act === 'swap') return openSwap(ei);
     if (act === 'order') return openReorder();
+    if (act === 'remove') removeFromCustom(ei);
     if (act === 'later') moveLater(ei);
     if (act === 'skip') skipToday(ei, !sk);
     if (act !== 'close') { render(); window.scrollTo(0, 0); }
@@ -1507,7 +1519,14 @@ function openReorder() {
   $('#ordDone', el).onclick = () => { el.remove(); const n = nextPending(a, orderOf(a)[0]); if (n) a.cur = n.ei; save(); render(); window.scrollTo(0, 0); };
 }
 
+function bindExtras() {
+  document.querySelectorAll('[data-custom]').forEach(b => b.onclick = startCustomPrompt);
+  document.querySelectorAll('[data-addex]').forEach(b => b.onclick = openAddExercise);
+  document.querySelectorAll('[data-addset]').forEach(b => b.onclick = () => { addSet(+b.dataset.addset); render(); });
+  document.querySelectorAll('[data-discard]').forEach(b => b.onclick = () => { if (confirm('Cancelar este treino? Nada será salvo.')) { S.active = null; save(); endRest(false); go('home'); } });
+}
 function bindSwapApply(a) {
+  bindExtras();
   document.querySelectorAll('[data-actions]').forEach(b => b.onclick = () => openActions(+b.dataset.actions));
   document.querySelectorAll('[data-swap]').forEach(b => b.onclick = () => openSwap(+b.dataset.swap));
   document.querySelectorAll('[data-apply]').forEach(b => b.onclick = () => {
@@ -1536,8 +1555,8 @@ function finishSession() {
   const cardio = a.cardio && a.cardio.on && a.cardio.min ? { type: a.cardio.type, min: a.cardio.min, km: a.cardio.km, int: a.cardio.int } : null;
   if (cardio) S.lastCardio = { type: cardio.type };
   const end = Date.now();
-  S.history.push({ plan: a.plan, exs: exList(a).map(stripEx), pname: PLANS[a.plan].name, pfocus: PLANS[a.plan].focus, planId: (curPlan() && curPlan().id) || 'legacy', travel: !!a.travel, start: a.start, end, mod: end, deload: !!a.deload, sets: a.sets, swaps: a.swaps || {}, skipped: Object.keys(a.skipped || {}).map(Number), cardio });
-  S.next = ORDER[(ORDER.indexOf(a.plan) + 1) % 3];
+  S.history.push({ plan: a.plan, exs: exList(a).map(stripEx), pname: PLANS[a.plan].name, pfocus: PLANS[a.plan].focus, planId: a.custom ? 'custom' : (curPlan() && curPlan().id) || 'legacy', travel: !!a.travel, custom: !!a.custom, start: a.start, end, mod: end, deload: !!a.deload, sets: a.sets, swaps: a.swaps || {}, skipped: Object.keys(a.skipped || {}).map(Number), cardio });
+  if (!a.custom) S.next = ORDER[(ORDER.indexOf(a.plan) + 1) % 3];   // o personalizado não mexe na sequência; o personal do dia recalcula pelos músculos
   S.active = null; save(); endRest(false);
   runCoach(); summaryEnd = end; go('summary');
 }
@@ -1957,7 +1976,7 @@ function coachMessages() {
   if (!S.history.length) m.push({ t: 'info', text: 'Bem-vindo! O coach começa a propor ajustes depois de 3 a 4 semanas de registros. Por enquanto, foque na constância.' });
   if (pend) m.push({ t: 'prop', text: `O coach tem ${pend} proposta${pend > 1 ? 's' : ''} de ajuste para você.`, go: 'coach' });
   if (bi.deload) m.push({ t: 'deload', text: `Semana leve (semana 4 do bloco ${bi.n}): menos séries e cerca de 10% menos carga. É quando o corpo assimila o treino.` });
-  if (dsl != null && dsl >= 3 && !S.active) m.push({ t: 'warn', text: `${dsl} dias sem treinar. Hoje é dia de ${PLANS[S.next].name}.` });
+  if (dsl != null && dsl >= 3 && !S.active && tab !== 'home') m.push({ t: 'warn', text: `${dsl} dias sem treinar. Sugestão de hoje: ${PLANS[suggestedKey()].name}.` });
   const hold = coachHold(); if (hold) m.push({ t: 'warn', text: hold });
   const n = wk.length; m.push({ t: n >= freq() ? 'ok' : 'info', text: n >= freq() ? `Meta da semana cumprida: ${n} de ${freq()} treinos.` : `Semana: ${n} de ${freq()} treinos.` });
   if (cardioGoal() && n >= 2 && wk.filter(h => h.cardio).length < 2)
@@ -2051,6 +2070,8 @@ function viewCoach() {
   return `<div class="wrap"><h1 class="page-title">Coach</h1><p class="muted page-sub" style="margin-top:0">${GOALS[goal()]} · ${freq()} treinos por semana</p>
     <div class="stack">${coachMessages().map(msgHtml).join('')}</div>
     ${pend.length ? `<h2>Propostas</h2>${pend.map(proposalCard).join('')}` : ''}
+    <h2>Recuperação muscular</h2>
+    ${recoveryCard()}
     <h2>Bloco de treino</h2>
     <div class="card"><div class="row between"><b>Bloco ${bi.n} · semana ${bi.week} de 4</b><span class="muted small">${bi.deload ? 'semana leve' : 'progressão'}</span></div>
       <div class="blk">${[1, 2, 3, 4].map(i => `<i class="${i < bi.week ? 'past' : i === bi.week ? 'cur' : ''} ${i === 4 ? 'dl' : ''}">${i === 4 ? 'leve' : 'S' + i}</i>`).join('')}</div>
@@ -2449,6 +2470,7 @@ const planMeta = h => ({ name: h.pname || (PLANS[h.plan] || {}).name || `Treino 
 /* Chamado a cada renderização: aplica o treino atual e torna o histórico antigo autossuficiente */
 function applyPlan() {
   PLANS = (curPlan() && curPlan().plans) || LEGACY_PLANS;
+  if (S.active && S.active.custom) PLANS = { ...PLANS, P: { name: 'Personalizado', focus: S.active.title || 'Treino livre', exercises: S.active.exs } };
   let changed = false;
   for (const h of S.history) if (!h.exs) {
     const P = PLANS; PLANS = LEGACY_PLANS;
@@ -2805,8 +2827,8 @@ document.addEventListener('touchend', e => {
   // 2º toque rápido: o iPhone trataria como zoom; cancela o zoom e entrega o clique normalmente
   if (now - lastTouch < 350 && !e.target.closest('input, textarea, select, .swipe')) {
     e.preventDefault();
-    const el = e.target.closest('button, [role="button"], a, label, .opt, .msg, [data-goto], [data-hist], [data-libex]');
-    if (el) el.click();
+    let el = e.target; while (el && !(el instanceof HTMLElement)) el = el.parentElement;   // ícones SVG: sobe até o elemento HTML
+    if (el) el.click();   // entrega o clique ao próprio elemento tocado (o navegador aplica a ação do botão, link, resumo etc.)
   }
   lastTouch = now;
 }, { passive: false });
@@ -2842,9 +2864,206 @@ function travelBanner() {
     <div class="row" style="gap:8px;margin-top:12px"><button class="btn ghost" data-travel-ideas style="flex:1">Ver sugestões</button><button class="btn ghost" data-travel="off" style="flex:1">Desativar</button></div></div>`;
 }
 
+
+/* ============================================================
+   PERSONAL DO DIA — lê os últimos dias e sugere o treino de hoje
+   (regras: recuperação por grupo muscular, sequência de dias, meta
+   da semana, check-in e tempo parado)
+   ============================================================ */
+const RG = { peito: 'Peito', costas: 'Costas', ombros: 'Ombros', biceps: 'Bíceps', triceps: 'Tríceps', pernas: 'Quadríceps', posterior: 'Posterior e glúteos', core: 'Abdômen' };
+const BIG = new Set(['peito', 'costas', 'pernas', 'posterior']);
+const M2G = { chest: 'peito', lats: 'costas', 'middle back': 'costas', traps: 'costas', shoulders: 'ombros', biceps: 'biceps', forearms: 'biceps', triceps: 'triceps',
+  quadriceps: 'pernas', adductors: 'pernas', abductors: 'pernas', calves: 'pernas', hamstrings: 'posterior', glutes: 'posterior', 'lower back': 'posterior', abdominals: 'core' };
+const PT2G = [['peito', /peitoral/i], ['costas', /dorsa|costas|trapézio|romboide/i], ['ombros', /ombro/i], ['biceps', /bíceps|braquial|antebraço/i], ['triceps', /tríceps/i],
+  ['pernas', /quadr|adutor|abdutor|panturr/i], ['posterior', /posterior|glúte|lombar/i], ['core', /core|abdôm|oblíq/i]];
+/* Grupos trabalhados por um exercício: principais (peso 1) e secundários (peso 0,5) */
+function exGroups(e) {
+  const id = typeof dbId === 'function' ? dbId(e) : e.id; const x = id && LIB && LIB.get(id);
+  if (x) { const p = [...new Set(x.p.map(m => M2G[m]).filter(Boolean))]; return { p, s: [...new Set(x.s.map(m => M2G[m]).filter(g => g && !p.includes(g)))] }; }
+  if (e.prim && M2G[e.prim]) return { p: [M2G[e.prim]], s: [] };
+  const first = String(e.muscles || '').split(',')[0]; const hit = PT2G.find(([, r]) => r.test(first));
+  return { p: hit ? [hit[0]] : [], s: PT2G.filter(([g, r]) => r.test(e.muscles || '') && (!hit || g !== hit[0])).map(([g]) => g) };
+}
+/* Carga de um treino por grupo = séries feitas (principal 1, secundário 0,5) */
+function sessionLoad(h) {
+  const L = {};
+  for (const e of exList(h)) {
+    const n = (h.sets[e.id] || []).filter(s => s.done).length; if (!n) continue;
+    const g = exGroups(e); g.p.forEach(k => L[k] = (L[k] || 0) + n); g.s.forEach(k => L[k] = (L[k] || 0) + n * 0.5);
+  }
+  return L;
+}
+/* Estado de cada grupo: horas desde o último treino com pelo menos 3 séries */
+function groupStatus(now = Date.now()) {
+  const out = {};
+  for (const g of Object.keys(RG)) out[g] = { hours: null, week: 0 };
+  for (const h of S.history) {
+    const L = sessionLoad(h);
+    for (const [g, v] of Object.entries(L)) {
+      if (!out[g]) continue;
+      if (now - h.end < 7 * DAY) out[g].week += v;
+      if (v >= 3) out[g].hours = (now - h.end) / 3.6e6;
+    }
+  }
+  for (const [g, o] of Object.entries(out)) {
+    const need = BIG.has(g) ? 60 : 44;                                   // grupos grandes recuperam mais devagar
+    o.state = o.hours === null ? 'novo' : o.hours < 22 ? 'cansado' : o.hours < need ? 'recuperando' : o.hours > 7 * 24 ? 'parado' : 'pronto';
+    o.score = { cansado: -2, recuperando: -1, pronto: 1, parado: 1.5, novo: 1 }[o.state];
+  }
+  return out;
+}
+const agoTxt = hrs => hrs === null ? 'ainda não treinado' : hrs < 24 ? 'treinado hoje' : `há ${Math.round(hrs / 24)} dia${Math.round(hrs / 24) === 1 ? '' : 's'}`;
+/* Pontua um treino do plano pela prontidão dos grupos que ele trabalha */
+function planReadiness(k, st) {
+  const W = {};
+  for (const e of exList({ plan: k, swaps: prefSwaps(k) })) { const g = exGroups(e); g.p.forEach(x => W[x] = (W[x] || 0) + e.sets); g.s.forEach(x => W[x] = (W[x] || 0) + e.sets * 0.5); }
+  const tot = Object.values(W).reduce((a, b) => a + b, 0) || 1;
+  const score = Object.entries(W).reduce((a, [g, w]) => a + w * st[g].score, 0) / tot;
+  const main = Object.entries(W).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([g]) => g);
+  return { k, score, main, W };
+}
+function dayKeyOf(t) { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
+function trainedDaysStreak() {             // dias seguidos com treino, terminando ontem
+  const days = new Set(S.history.map(h => dayKeyOf(h.end))); let n = 0; let d = dayKeyOf(Date.now()) - DAY;
+  while (days.has(d)) { n++; d -= DAY; }
+  return n;
+}
+/* A sugestão do dia */
+function todayPlan() {
+  const st = groupStatus(); const now = Date.now();
+  const today = S.history.filter(h => dayKeyOf(h.end) === dayKeyOf(now));
+  const ranked = ORDER.filter(k => PLANS[k]).map(k => planReadiness(k, st))
+    .sort((a, b) => b.score - a.score || (a.k === S.next ? -1 : b.k === S.next ? 1 : 0));
+  const best = ranked[0]; const why = [];
+  const wk = thisWeek().length, f = freq(), streak = trainedDaysStreak(), dsl = daysSinceLast();
+  const last = S.history[S.history.length - 1]; const lastTwo = S.history.slice(-2);
+  const fresh = best.main.filter(g => ['pronto', 'parado', 'novo'].includes(st[g].state));
+  const tired = Object.entries(st).filter(([, o]) => o.state === 'cansado' || o.state === 'recuperando').map(([g]) => g);
+  if (today.length) return { type: 'done', best, st, why: [`Você já treinou hoje (${today.map(h => planMeta(h).name).join(', ')}).`, 'Descanse ou faça um aeróbico leve, se quiser.'] };
+  let rest = null;
+  if (last && last.pain) rest = 'Você relatou dor no último treino. Hoje é melhor descansar ou fazer só mobilidade.';
+  else if (lastTwo.length === 2 && lastTwo.every(h => h.feel === 5)) rest = 'Seus dois últimos treinos foram "no limite". Um dia de descanso vai render mais.';
+  else if (streak >= 3) rest = `Você treinou ${streak} dias seguidos. Hoje o corpo pede descanso.`;
+  else if (wk >= f && streak >= 1) rest = `Meta da semana já cumprida (${wk} de ${f}) e você treinou ontem. Descansar hoje ajuda a recuperar.`;
+  else if (best.score < 0) rest = 'Os músculos dos treinos disponíveis ainda estão se recuperando.';
+  if (rest) {
+    why.push(rest);
+    if (tired.length) why.push(`Em recuperação: ${tired.slice(0, 3).map(g => RG[g]).join(', ')}.`);
+    why.push('Se quiser se mexer: 20–30 min de caminhada ou mobilidade.');
+    return { type: 'rest', best, st, why };
+  }
+  if (dsl !== null && dsl >= 5) why.push(`Faz ${dsl} dias sem treinar: volte hoje, com cerca de 10% menos carga nas primeiras séries.`);
+  const ago2 = h => h === null ? 'sem treino recente' : `último há ${Math.max(1, Math.round(h / 24))} dia${Math.round(h / 24) > 1 ? 's' : ''}`;
+  if (fresh.length) why.push(`Descansados: ${fresh.map(g => `${RG[g]} (${ago2(st[g].hours)})`).join(', ')}.`);
+  const avoided = ranked.slice(1).filter(r => r.score < best.score && r.main.some(g => ['cansado', 'recuperando'].includes(st[g].state)));
+  if (avoided.length) { const g = avoided[0].main.find(x => ['cansado', 'recuperando'].includes(st[x].state)); why.push(`${PLANS[avoided[0].k].name} fica para depois: ${RG[g].toLowerCase()} ainda em recuperação (${agoTxt(st[g].hours)}).`); }
+  if (wk < f) why.push(`Semana: ${wk} de ${f} treinos.`);
+  return { type: 'train', best, st, why };
+}
+function suggestedKey() { const t = todayPlan(); return t.best.k; }
+
+function todayCard() {
+  if (S.active) {
+    const k = S.active.plan; const p = PLANS[k];
+    return `<div class="card hero ${k}" style="margin-top:16px"><div class="row between"><div class="row"><span class="tag ${k}">${k}</span>
+      <div><div class="muted small">Treino em andamento</div><h3>${p.name} · ${esc(p.focus)}</h3></div></div>
+      <button class="go-btn" data-goto="session" aria-label="Continuar"><svg viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8"/></svg></button></div>
+      <button class="btn" style="margin-top:16px" data-goto="session">Continuar treino</button></div>`;
+  }
+  const t = todayPlan(); const k = t.best.k; const p = PLANS[k];
+  const reasons = `<ul class="why">${t.why.map(w => `<li>${esc(w)}</li>`).join('')}</ul>`;
+  const custom = `<button class="hbtn small" data-custom style="margin-top:10px">＋ Treino personalizado</button>`;
+  if (t.type === 'rest' || t.type === 'done') {
+    return `<div class="card hero rest-hero" style="margin-top:16px"><div class="row"><span class="tag R">${t.type === 'done' ? '✓' : 'Zz'}</span>
+      <div><div class="muted small">Personal do dia</div><h3>${t.type === 'done' ? 'Treino de hoje concluído' : 'Hoje é dia de descanso'}</h3></div></div>
+      ${reasons}
+      <div class="row" style="gap:8px;margin-top:6px;flex-wrap:wrap"><button class="hbtn small" data-start="${k}">Treinar mesmo assim: ${p.name}</button>${custom.replace('style="margin-top:10px"', '')}</div></div>`;
+  }
+  return `<div class="card hero ${k}" style="margin-top:16px">
+    <div class="row between"><div class="row"><span class="tag ${k}">${k}</span>
+      <div><div class="muted small">Treino de hoje</div><h3>${p.name} · ${esc(p.focus)}</h3></div></div>
+      <button class="go-btn" data-start="${k}" aria-label="Começar"><svg viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8"/></svg></button></div>
+    ${reasons}${planList(k)}
+    <button class="btn" style="margin-top:16px" data-start="${k}">Começar ${p.name}</button>
+    <div class="row between" style="margin-top:10px"><button class="hbtn small" data-goto="plans">Escolher outro</button>${custom.replace('style="margin-top:10px"', '')}</div></div>`;
+}
+/* Mapa de recuperação (Coach) */
+function recoveryCard() {
+  const st = groupStatus(); const lbl = { cansado: 'Cansado', recuperando: 'Recuperando', pronto: 'Pronto', parado: 'Parado', novo: 'Sem registro' };
+  return `<div class="card"><div class="muted small" style="margin-bottom:8px">Pela carga dos últimos treinos, incluindo os personalizados</div>
+    ${Object.entries(RG).map(([g, n]) => `<div class="rec-row"><span>${n}</span><span class="muted small">${agoTxt(st[g].hours)}</span><span class="rec ${st[g].state}">${lbl[st[g].state]}</span></div>`).join('')}</div>`;
+}
+
+/* ============================================================
+   TREINO PERSONALIZADO — montar na hora (ex.: treino do amigo)
+   ============================================================ */
+function startCustomPrompt() {
+  if (S.active) { if (!confirm(`Há um ${PLANS[S.active.plan].name} em andamento. Descartar e começar um treino personalizado?`)) return; S.active = null; endRest(false); }
+  const el = sheet(`<h3>Treino personalizado</h3><p class="note" style="margin:4px 0 12px">Monte o treino na hora, por exemplo o do seu amigo. Ele entra no histórico, conta para o coach, e o treino de amanhã é recalculado pelos músculos que você trabalhou.</p>
+    <label class="ob-f">Nome (opcional)<input id="ctName" placeholder="Ex.: Treino com o João" maxlength="40"></label>
+    <button class="btn" id="ctGo">Começar e adicionar exercícios</button>`);
+  $('#ctGo', el).onclick = () => { const n = $('#ctName', el).value.trim(); el.remove(); startCustom(n); };
+}
+function startCustom(title) {
+  S.active = { plan: 'P', custom: true, title: title || 'Treino livre', start: Date.now(), exs: [], sets: {}, swaps: {}, order: [], skipped: {}, cardio: newCardio('A'), view: 'focus', cur: 0, travel: travelOn() };
+  save(); go('session'); setTimeout(openAddExercise, 50);
+}
+function addExerciseToCustom(e) {
+  const a = S.active; if (!a || !a.custom) return false;
+  if (a.exs.some(x => x.id === e.id)) { alert('Esse exercício já está no treino.'); return false; }
+  const ex = { ...e, sets: 3, reps: e.unit === 's' ? '30s' : '8–12', rest: 90, step: 5 };
+  delete ex.slot;
+  a.exs.push(ex); a.sets[ex.id] = newSets(ex, false); orderOf(a).push(a.exs.length - 1); a.cur = a.exs.length - 1;
+  save(); return true;
+}
+function removeFromCustom(ei) {
+  const a = S.active; const e = a.exs[ei];
+  if ((a.sets[e.id] || []).some(s => s.done) && !confirm(`Remover ${e.name} e as séries já feitas?`)) return;
+  a.exs.splice(ei, 1); delete a.sets[e.id];
+  a.order = (a.order || []).filter(i => i !== ei).map(i => i > ei ? i - 1 : i);
+  const sk = {}; Object.keys(a.skipped || {}).forEach(i => { i = +i; if (i !== ei) sk[i > ei ? i - 1 : i] = true; }); a.skipped = sk;
+  a.cur = Math.max(0, Math.min(a.cur > ei ? a.cur - 1 : a.cur, a.exs.length - 1)); save();
+}
+function addSet(ei) {
+  const a = S.active; const e = exList(a)[ei]; const sets = a.sets[e.id]; const lastS = sets[sets.length - 1] || {};
+  sets.push({ kg: lastS.kg ?? null, reps: null, done: false }); if (a.custom) e.sets = sets.length; save();
+}
+const CUSTOM_GROUPS = [['chest', 'Peito'], ['lats', 'Costas'], ['shoulders', 'Ombros'], ['biceps', 'Bíceps'], ['triceps', 'Tríceps'], ['quadriceps', 'Quadríceps'], ['hamstrings', 'Posterior'], ['glutes', 'Glúteos'], ['calves', 'Panturrilhas'], ['abdominals', 'Abdômen']];
+function openAddExercise() {
+  let q = '', m = '';
+  const el = sheet(`<h3>Adicionar exercício</h3>
+    <input class="search" id="axQ" placeholder="Buscar (ex.: supino, puxada, rosca)" autocomplete="off" style="margin-top:10px">
+    <div class="chips" id="axM">${LIB_GROUPS.map(([v, l]) => `<button class="${v === '' ? 'on' : ''}" data-m="${v}">${l}</button>`).join('')}</div>
+    <div id="axList" class="stack"><p class="note">Carregando exercícios…</p></div>
+    <details class="ax-new"><summary>Não encontrei o exercício</summary>
+      <label class="ob-f" style="margin-top:10px">Nome<input id="axName" placeholder="Ex.: Remada na máquina do Fulano"></label>
+      <div class="seg" id="axG">${CUSTOM_GROUPS.map(([v, l], i) => `<button class="${i === 0 ? 'on' : ''}" data-g="${v}">${l}</button>`).join('')}</div>
+      <button class="btn ghost" id="axCreate" style="margin-top:10px">Adicionar exercício</button></details>`);
+  const draw = () => {
+    if (!LIB) return;
+    const nq = norm(q.trim()); const ms = m ? m.split('|') : null;
+    const r = [...LIB.values()].filter(x => ['strength', 'powerlifting', 'plyometrics', 'olympic weightlifting', 'strongman'].includes(x.c) && (!travelOn() || NO_GYM(x)) &&
+      (!ms || x.p.some(p => ms.includes(p))) && (!nq || norm((EXMETA[x.id] || {}).name || x.n).includes(nq) || norm(x.n).includes(nq)))
+      .sort((a, b) => (EXMETA[b.id] ? 1 : 0) - (EXMETA[a.id] ? 1 : 0)).slice(0, 40);
+    $('#axList', el).innerHTML = r.map(x => `<button class="opt" data-add="${esc(x.id)}"><span><b>${esc((EXMETA[x.id] || {}).name || x.n)}</b><br><span class="muted small">${esc(musclesPt(x))} · ${esc(EQ_PT[x.e] || '—')}</span></span><span class="opt-r"><span class="info-btn" data-axinfo="${esc(x.id)}" role="button" aria-label="Ver execução">i</span><span class="add-plus">＋</span></span></button>`).join('') || '<p class="note">Nada encontrado. Use "Não encontrei o exercício".</p>';
+    el.querySelectorAll('[data-axinfo]').forEach(b => b.onclick = ev => { ev.stopPropagation(); openExDetail(b.dataset.axinfo); });
+    el.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { const e = libEx(b.dataset.add); if (e && addExerciseToCustom(e)) { el.remove(); render(); window.scrollTo(0, 0); } });
+  };
+  loadLib().then(draw).catch(() => { $('#axList', el).innerHTML = '<p class="note">Sem conexão para carregar a biblioteca. Use "Não encontrei o exercício".</p>'; });
+  $('#axQ', el).addEventListener('input', ev => { q = ev.target.value; draw(); });
+  el.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { m = b.dataset.m; el.querySelectorAll('[data-m]').forEach(x => x.classList.toggle('on', x === b)); draw(); });
+  let g = CUSTOM_GROUPS[0][0];
+  el.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { g = b.dataset.g; el.querySelectorAll('[data-g]').forEach(x => x.classList.toggle('on', x === b)); });
+  $('#axCreate', el).onclick = () => {
+    const name = $('#axName', el).value.trim(); if (!name) { $('#axName', el).classList.add('need'); return; }
+    const e = { id: 'u_' + norm(name).replace(/[^a-z0-9]+/g, '_').slice(0, 40), name, muscles: (CUSTOM_GROUPS.find(x => x[0] === g) || [])[1] || '', prim: g, equip: '', tip: '' };
+    if (addExerciseToCustom(e)) { el.remove(); render(); window.scrollTo(0, 0); }
+  };
+}
+
 /* ============================== Eventos gerais ============================== */
 function bind() {
-  bindCoach(); bindCloud();
+  bindCoach(); bindCloud(); bindExtras();
   if (tab === 'onboard') bindOnboard();
   if (tab === 'library') bindLibrary();
   document.querySelectorAll('[data-travel]').forEach(b => b.onclick = () => setTravel(b.dataset.travel === 'on' || (b.dataset.travel === 'toggle' && !travelOn())));
@@ -2889,13 +3108,16 @@ function bind() {
   }
 }
 document.querySelectorAll('#tabs button[data-tab]').forEach(b => b.onclick = () => go(b.dataset.tab));
-$('#fab').onclick = () => { if (S.active) go('session'); else startSession(S.next); };
+$('#fab').onclick = () => { if (S.active) return go('session'); const t = todayPlan();
+  if (t.type !== 'train' && !confirm(`${t.type === 'done' ? 'Você já treinou hoje' : 'Hoje a sugestão é descansar'}. Começar ${PLANS[t.best.k].name} mesmo assim?`)) return;
+  startSession(t.best.k); };
 
 if (S.active) tab = 'home';
 applyTheme();
 applyPlan();
 runCoach();
 render();
+loadLib().then(() => { if (tab === 'home' || tab === 'coach') window.safeRender(); }).catch(() => {});
 
 if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 </script>
