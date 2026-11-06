@@ -342,6 +342,7 @@
   .tip-pop { position: absolute; transform: translateX(-50%); background: rgba(27,38,64,.88); color: #fff; font-size: 12px; padding: 5px 9px; border-radius: 999px; white-space: nowrap; pointer-events: none; }
   .gsets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; } .gs { font-size: 13px; min-width: 0; } .gs b { font-weight: 500; }
   .gs .gtrack { display: block; margin-top: 4px; height: 6px; } .gtrack i.full { background: var(--ok); }
+  .calc-ref { margin-top: 10px; } .calc-ref summary { cursor: pointer; list-style: none; } .calc-ref summary::-webkit-details-marker { display: none; } .calc-ref summary::after { content: " ›"; }
   .pr-mini { font-size: 11px; color: var(--accent); margin-top: 2px; font-weight: 600; }
   .gbar { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; align-items: center; padding: 5px 0; font-size: 14px; }
   .gtrack { height: 10px; background: var(--w85); border: 1px solid var(--edge); border-radius: 999px; overflow: hidden; }
@@ -1002,12 +1003,6 @@ function viewHome() {
       <div class="stat"><b>${S.history.filter(isStrength).length}</b><span>treinos no total</span></div>
       <div class="stat"><b>${last ? fmtDate(last.end).split(',')[0] : '—'}</b><span>último treino</span></div>
     </div>
-    ${S.history.filter(isStrength).length >= 3 ? '' : `<h2>Como funciona</h2>
-    <div class="card note stack">
-      <div>O cartão <b>Treino de hoje</b> escolhe o treino pela recuperação de cada músculo; o botão ▶ começa direto.</div>
-      <div>O treino abre no <b>Modo Foco</b>: um exercício e uma série por vez. Ao concluir a série, o descanso começa sozinho. Toque em <b>Lista</b> para ver tudo.</div>
-      <div><b>Progressão:</b> quando conseguir fazer todas as séries no topo da faixa de repetições, o coach sugere subir a carga.</div>
-    </div>`}
   </div>`;
 }
 
@@ -1017,8 +1012,7 @@ function viewPlans() {
   const lbl = r => r.ok ? (r.k === t.best.k && t.type === 'train' ? '<span class="pill rec-pill">Sugerido hoje</span>' : '<span class="pill">Recuperado</span>')
     : `<span class="pill warn-pill">${r.blockers.map(gp => RG[gp]).slice(0, 2).join(', ')} ${st[r.blockers[0]].state === 'dor' ? 'com dor' : 'em recuperação'}</span>`;
   return `<div class="wrap"><h1 class="page-title">Treinos</h1><p class="muted page-sub" style="margin-top:0">${tp}</p>
-    <p class="note" style="margin:-4px 0 12px">Não há treino fixo: a cada dia o app monta as opções abaixo pela recuperação de cada músculo, usando os exercícios que você tem feito e a biblioteca.</p>
-    <button class="card custom-card" data-custom><b>＋ Treino personalizado</b><span class="note">Monte na hora, por exemplo o treino do seu amigo. Fica no histórico e o treino de amanhã se ajusta.</span></button>
+    <button class="card custom-card" data-custom><b>＋ Treino personalizado</b></button>
     <div class="row" style="gap:8px;margin-bottom:12px"><button class="btn ghost" data-goto="library" style="flex:1">Biblioteca</button>${travelOn() ? '<button class="btn ghost" data-travel="off" style="flex:1">Sair do modo viagem</button>' : '<button class="btn ghost" data-redo style="flex:1">Ajustar objetivo</button>'}</div>
     <h2>Opções de hoje</h2>
     ${t.ranked.map(r => { const k = r.k; const p = PLANS[k]; return `<div class="card ${r.ok ? '' : 'dim'}">
@@ -1027,7 +1021,6 @@ function viewPlans() {
       ${planList(k)}
       <button class="btn ${r.ok && r.k === t.best.k ? '' : 'ghost'}" style="margin-top:14px" data-start="${k}">${S.active && S.active.plan === k ? 'Continuar' : 'Começar ' + esc(p.name.toLowerCase())}</button>
     </div>`; }).join('')}
-    <p class="note">Antes de cada treino, faça 5–10 min de aquecimento (bicicleta, esteira ou mobilidade) e 1–2 séries leves do primeiro exercício.</p>
   </div>`;
 }
 
@@ -1055,10 +1048,9 @@ function viewHistory() {
       </div>
     </div>`;
   }).join('');
-  return `<div class="wrap"><h1 class="page-title">Histórico</h1><p class="muted small">Toque num treino para ver as cargas ou excluí-lo.</p>
+  return `<div class="wrap"><h1 class="page-title">Histórico</h1>
     <button class="btn ghost" data-custom-past style="margin-bottom:12px">＋ Registrar treino de outro dia</button>${items}
-    <button class="btn danger" id="clearHist" style="margin-top:8px">Excluir todo o histórico</button>
-    <p class="note">As cargas da “última vez” de cada exercício são mantidas, para você não perder a referência.</p></div>`;
+    <button class="btn danger" id="clearHist" style="margin-top:8px">Excluir todo o histórico</button></div>`;
 }
 
 function calcProfile() {
@@ -1098,23 +1090,20 @@ function viewProfile() {
       <div class="kv"><span>Proteína sugerida</span><b>${Math.round(c.protMin)}–${Math.round(c.protMax)} g/dia</b></div>
       <div class="kv"><span>Água</span><b>~${(c.agua / 1000).toFixed(1).replace('.', ',')} L/dia</b></div>
     </div>
-    <p class="note">Cálculos de referência: Mifflin-St Jeor (metabolismo basal), atividade leve 1–3x, moderada 3–5x e alta 6–7x por semana, 1,6–2,2 g/kg de proteína e 35 ml/kg de água. O IMC não diferencia massa muscular de gordura. São estimativas e não substituem a avaliação de um profissional de educação física, médico ou nutricionista.</p>
-    <button class="btn ghost" data-redo style="margin-top:12px">Refazer avaliação e gerar novo treino</button>
-    <p class="note">Ao mudar objetivo, tempo ou frequência, gere um novo treino para ajustar séries, repetições e exercícios.</p>
+    <details class="calc-ref"><summary class="muted small">Como estes valores são calculados</summary><p class="note">Mifflin-St Jeor (metabolismo basal), atividade leve 1–3x, moderada 3–5x e alta 6–7x por semana, 1,6–2,2 g/kg de proteína e 35 ml/kg de água. O IMC não diferencia massa muscular de gordura. São estimativas e não substituem a avaliação de um profissional de educação física, médico ou nutricionista.</p></details>
+    <button class="btn ghost" data-redo style="margin-top:12px">Refazer avaliação</button>
     <h2>Modo viagem</h2>
-    <div class="card"><div class="row between"><div><b>Treinar sem academia</b><div class="note" style="margin-top:2px">Mostra só exercícios para quarto de hotel e sugere aeróbicos. Os treinos ficam no histórico como Viagem.</div></div>
+    <div class="card"><div class="row between"><div><b>Treinar sem academia</b><div class="note" style="margin-top:2px">Só exercícios sem equipamento</div></div>
       <button class="switch ${travelOn() ? 'on' : ''}" data-travel="toggle" role="switch" aria-checked="${travelOn()}" aria-label="Modo viagem"></button></div>
       ${travelOn() ? `<button class="btn ghost" data-travel-ideas style="margin-top:12px">Ver treinos e aeróbicos sugeridos</button>` : ''}</div>
     <h2>Aparência</h2>
-    <div class="card"><div class="seg">${[['auto', 'Automático'], ['light', 'Claro'], ['dark', 'Escuro']].map(([v, l]) => `<button class="${(S.theme || 'auto') === v ? 'on' : ''}" data-theme-set="${v}">${l}</button>`).join('')}</div>
-      <p class="note" style="margin:10px 0 0">No automático, o app acompanha o modo claro ou escuro do iPhone.</p></div>
+    <div class="card"><div class="seg">${[['auto', 'Automático'], ['light', 'Claro'], ['dark', 'Escuro']].map(([v, l]) => `<button class="${(S.theme || 'auto') === v ? 'on' : ''}" data-theme-set="${v}">${l}</button>`).join('')}</div></div>
     <h2>Mídia dos exercícios</h2>
     <div class="card">
       <div class="row between"><div><b>Fotos do free-exercise-db</b><div class="note">Início e fim do movimento. A origem dos direitos das fotos não é confirmada.</div></div>
         <button class="switch ${mediaOn('photos') ? 'on' : ''}" data-media="photos" role="switch" aria-checked="${mediaOn('photos')}" aria-label="Mostrar fotos"></button></div>
       <div class="row between" style="margin-top:14px"><div><b>Ilustrações do wger.de</b><div class="note">Licença aberta (CC-BY-SA), com crédito ao autor. Nem todo exercício tem.</div></div>
         <button class="switch ${mediaOn('wger') ? 'on' : ''}" data-media="wger" role="switch" aria-checked="${mediaOn('wger')}" aria-label="Mostrar ilustrações do wger"></button></div>
-      <p class="note" style="margin:12px 0 0">O mapa muscular e o link para vídeos no YouTube aparecem sempre.</p>
     </div>
     <h2>Conta</h2>
     <div class="card">${cloudBox()}</div>
@@ -1820,12 +1809,10 @@ function viewSummary() {
       ${d.rows.map(r => `<div class="cmp-row"><div class="cmp-name">${esc(r.e.name)}</div>
         <div class="cmp-vals"><b>${fmtSet(r.e, r.best)}</b> ${arrow(r.cmp)}${r.pBest ? `<span class="muted small">antes ${fmtSet(r.e, r.pBest)}</span>` : '<span class="muted small">primeira vez</span>'}</div></div>`).join('') || '<div class="muted">Nenhuma série registrada.</div>'}
     </div>
-    ${d.vol ? `<p class="note">Volume de carga (carga × repetições): ${d.vol.toLocaleString('pt-BR')} kg. Serve só para comparar o mesmo treino; entre treinos diferentes, compare as séries.</p>` : ''}
+    ${d.vol ? `<p class="note">Volume de carga: ${d.vol.toLocaleString('pt-BR')} kg</p>` : ''}
     ${(h.skipped || []).length ? `<p class="note">Pulados: ${h.skipped.map(i => esc(ex[i].name)).join(', ')}.</p>` : ''}
     ${h.cardio ? `<p class="note"><b style="color:var(--text)">Aeróbico:</b> ${esc(h.cardio.type)} · ${h.cardio.min} min${h.cardio.km ? ' · ' + fmtKg(h.cardio.km) + ' km' : ''} · ${esc(h.cardio.int)}</p>` : ''}
-    ${!d.prev ? `<p class="note">Este é o seu primeiro ${p.name} registrado. Na próxima vez, o app compara cada exercício com hoje.</p>` : ''}
     ${isLatest ? backupCard() : ''}
-    ${isLatest ? `<div class="card" style="margin-top:12px"><div class="muted small">Próximo treino</div><div class="note" style="margin-top:2px">Será montado no dia, pela recuperação de cada músculo e pelos exercícios que você vem fazendo.</div></div>` : ''}
     <div class="stack" style="margin-top:12px"><button class="btn" data-goto="home">Concluir</button><button class="btn ghost" data-goto="history">Ver histórico</button></div>
   </div>`;
 }
@@ -1842,7 +1829,7 @@ function backupCard() {
   const n = backupPending(); const last = S.backup && S.backup.at;
   return `<div class="card backup-card">
     <b>Hora de fazer backup</b>
-    <div class="note" style="margin-top:4px">${last ? `${n} treinos desde o último backup (${fmtDate(last)}).` : `Você já tem ${n} treinos registrados e ainda não fez backup.`} Os dados ficam só neste iPhone: salve uma cópia no iCloud Drive ou no app Arquivos.</div>
+    <div class="note" style="margin-top:4px">${last ? `${n} treinos desde o último backup (${fmtDate(last)}).` : `${n} treinos sem backup.`} Salve uma cópia no iCloud Drive ou no Arquivos.</div>
     <div class="row" style="gap:8px;margin-top:12px"><button class="btn" data-backup style="flex:1">Fazer backup agora</button><button class="btn ghost" data-snooze style="width:auto">Depois</button></div>
   </div>`;
 }
@@ -2171,10 +2158,9 @@ function viewCoach() {
     <h2>Bloco de treino</h2>
     <div class="card"><div class="row between"><b>Bloco ${bi.n} · semana ${bi.week} de 4</b><span class="muted small">${bi.deload ? 'semana leve' : 'progressão'}</span></div>
       <div class="blk">${[1, 2, 3, 4].map(i => `<i class="${i < bi.week ? 'past' : i === bi.week ? 'cur' : ''} ${i === 4 ? 'dl' : ''}">${i === 4 ? 'leve' : 'S' + i}</i>`).join('')}</div>
-      <p class="note" style="margin:8px 0 0">Semanas 1 a 3: progressão de carga. Semana 4: menos séries e ~10% menos carga para recuperar. Quando um exercício para de evoluir, o coach propõe uma variação.</p>
       ${bi.deload ? '' : `<button class="btn ghost" id="antDeload" style="margin-top:12px">Antecipar semana leve</button>`}</div>
     <h2>Força estimada</h2>
-    ${(() => { const c = strengthCards(); return c ? `<p class="note" style="margin-top:-6px">1RM estimado (fórmula de Epley) dos exercícios que você mais fez nos últimos 90 dias. Compara cada exercício com ele mesmo.</p>${c}` : '<div class="card"><p class="note" style="margin:0">Aparece depois de pelo menos 2 treinos com o mesmo exercício com carga.</p></div>'; })()}
+    ${(() => { const c = strengthCards(); return c ? c : '<div class="card"><p class="note" style="margin:0">Aparece depois de pelo menos 2 treinos com o mesmo exercício com carga.</p></div>'; })()}
     <h2>Peso corporal</h2>
     <div class="card">${lw ? `<div class="row between"><div><b style="font-size:24px">${fmtKg(lw.kg)} kg</b><div class="muted small">${fmtDate(lw.t)}</div></div>
       ${tr ? `<div style="text-align:right"><b>${tr.rate > 0 ? '+' : ''}${tr.rate.toFixed(1).replace('.', ',')}%</b><div class="muted small">por semana (4 sem.)</div></div>` : ''}</div>
@@ -2183,7 +2169,7 @@ function viewCoach() {
     <h2>Relatórios mensais</h2>
     ${monthsWithData().length ? `<div class="stack">${monthsWithData().map(([y, mo]) => `<button class="btn ghost rep-btn" data-report="${y}-${mo}">Relatório de ${MONTHS[mo]} de ${y}</button>`).join('')}</div>` : '<p class="note">O primeiro relatório aparece depois do seu primeiro treino.</p>'}
     ${done.length ? `<h2>Decisões recentes</h2><div class="card">${done.map(p => `<div class="kv"><span>${esc(p.type === 'deload' ? 'Semana leve antecipada' : p.name)}</span><b class="muted">${{ swap: 'trocado', reset: 'carga reduzida', deload: 'aceita', decline: 'mantido' }[p.action] || ''}</b></div>`).join('')}</div>` : ''}
-    <p class="note" style="margin-top:16px">O coach usa regras gerais de treino (progressão dupla, semana leve a cada 4, troca de variação após estagnação) e referências gerais de ritmo de peso. Ele não substitui um profissional de educação física, médico ou nutricionista, principalmente em caso de dor ou lesão.</p>
+    <p class="note" style="margin-top:16px">Orientações gerais: não substituem um profissional de educação física, médico ou nutricionista.</p>
   </div>`;
 }
 
@@ -2250,7 +2236,7 @@ function viewReport() {
       ${GROUPS.map(([g]) => g).filter(g => d.groups[g] || p.groups[g]).map(g => `<div class="gbar"><span class="gname">${g}</span>
         <span class="gtrack"><i style="width:${(d.groups[g] || 0) / gmax * 100}%"></i></span><span class="gval">${d.groups[g] || 0}${p.hs.length ? ` <span class="muted">(${p.groups[g] || 0})</span>` : ''}</span></div>`).join('')}</div>
     ${prs.length ? `<h2>★ Recordes do mês</h2><div class="card pr-card">${prs.map(r => `<div class="kv"><span>${esc(r.e.name)}<br><span class="muted small">${r.n > 1 ? `${r.n} recordes no mês · último em ` : ''}${fmtDate(r.t)}</span></span><b>${esc(r.text)}</b></div>`).join('')}</div>` : ''}
-    ${evo ? `<h2>Evolução da força</h2><p class="note" style="margin-top:-6px">Últimos 90 dias. 1RM estimado = carga que você levantaria uma vez, calculada pela fórmula de Epley a partir da melhor série (até 12 repetições). Toque no gráfico para ver cada treino.</p>${evo}` : ''}
+    ${evo ? `<h2>Evolução da força</h2><p class="muted small" style="margin-top:-6px">Últimos 90 dias · 1RM estimado (Epley)</p>${evo}` : ''}
     <h2>Peso e check-in</h2>
     <div class="card">
       <div class="kv"><span>Peso no mês</span><b>${wsM.length ? (wsM.length > 1 ? `${fmtKg(wsM[0].kg)} → ${fmtKg(wsM[wsM.length - 1].kg)} kg` : `${fmtKg(wsM[0].kg)} kg`) : 'sem registro'}</b></div>
@@ -2265,7 +2251,7 @@ function reportReadyCard() {
   const now = new Date(); if (now.getDate() > 10) return '';
   const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear(), mo = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
   if ((S.reportsSeen || {})[`${y}-${mo}`] || !monthData(y, mo).hs.length) return '';
-  return `<button class="card report-card" data-report="${y}-${mo}"><b>Seu relatório de ${MONTHS[mo]} está pronto</b><span class="note">Frequência, recordes, evolução das cargas e pontos de atenção. Toque para abrir.</span></button>`;
+  return `<button class="card report-card" data-report="${y}-${mo}"><b>Seu relatório de ${MONTHS[mo]} está pronto</b></button>`;
 }
 
 /* ---------- Check-in pós-treino (no resumo) ---------- */
@@ -2624,8 +2610,7 @@ function viewOnboard() {
     </div>
     ${prev && prev.p ? `<div class="card plan-opt sel"><div class="muted small">${prev.ok ? 'Treino de hoje' : 'Exemplo de treino'} · ~${prev.p.mins} min</div><h3 style="margin-top:2px">${esc(prev.p.name)}</h3>
       <ul class="ex-list">${prev.p.exercises.map(e => `<li><span>${esc(e.name)}</span><span>${e.sets} × ${esc(e.reps)}</span></li>`).join('')}</ul></div>` : ''}
-    <button class="btn xl" data-choose="dynamic" style="margin-top:8px">Começar</button>
-    <p class="note">Os exercícios vêm da biblioteca exercicios-bd-ptbr. Dentro do treino você pode trocar qualquer um por uma alternativa (aparelho ocupado, preferência ou limitação).</p></div>`;
+    <button class="btn xl" data-choose="dynamic" style="margin-top:8px">Começar</button></div>`;
 }
 function bindOnboard() {
   const d = draft();
@@ -2849,8 +2834,7 @@ function weekCard() {
       <span class="d">${'STQQSSD'[i]}</span></div>`).join('')}</div>
     <div class="muted small" style="margin:14px 0 4px">Séries por grupo muscular</div>
     <div class="gsets">${Object.keys(RG).map(g => { const v = Math.round(G[g] || 0), t = WEEK_TARGET[g]; return `<div class="gs"><div class="row between"><span>${RG[g] === 'Posterior e glúteos' ? 'Posterior' : RG[g]}</span><b>${v}<span class="muted">/${t}</span></b></div>
-      <span class="gtrack"><i class="${v >= t ? 'full' : ''}" style="width:${Math.min(100, v / t * 100)}%"></i></span></div>`; }).join('')}</div>
-    <p class="note" style="margin:8px 0 0">Referência geral de séries por semana (grupos grandes ~10). Exercício que trabalha o grupo como secundário conta meia série.</p></div>`;
+      <span class="gtrack"><i class="${v >= t ? 'full' : ''}" style="width:${Math.min(100, v / t * 100)}%"></i></span></div>`; }).join('')}</div></div>`;
 }
 function openKeypad(inp, unit, decimal, onOk) {
   let v = String(inp.value || '').replace('.', ',');
@@ -2925,7 +2909,7 @@ function openTravelSheet() {
   if (!travelOn()) return;
   const t = todayPlan(); const opts = t.ranked.filter(r => r.ok).slice(0, 3);
   const el = sheet(`<div class="travel-ico">✈︎</div><h3 style="text-align:center">Modo viagem ativado</h3>
-    <p class="note" style="text-align:center;margin:6px 0 14px">O treino do dia passa a usar só o peso do corpo, uma cadeira firme, a cama ou uma toalha. Tudo fica registrado no histórico como <b>Viagem</b>.</p>
+    <p class="note" style="text-align:center;margin:6px 0 14px">Só peso do corpo, cadeira, cama ou toalha.</p>
     <div class="muted small" style="margin-bottom:6px">Opções para hoje no quarto</div>
     ${opts.map(r => `<div class="opt" style="display:block"><b>${esc(PLANS[r.k].name)} · ~${PLANS[r.k].mins} min</b><div class="muted small" style="margin-top:3px">${PLANS[r.k].exercises.map(e => esc(e.name)).join(' · ')}</div></div>`).join('') || '<p class="note">Hoje os músculos ainda estão se recuperando. Prefira um aeróbico leve.</p>'}
     <div class="muted small" style="margin:16px 0 6px">Aeróbico sugerido</div>
@@ -2935,7 +2919,7 @@ function openTravelSheet() {
 }
 function travelBanner() {
   if (!travelOn()) return '';
-  return `<div class="card travel-card"><div class="row between"><div><b>✈︎ Modo viagem ativo</b><div class="note" style="margin-top:2px">Treinos sem academia, registrados como Viagem.</div></div></div>
+  return `<div class="card travel-card"><div class="row between"><div><b>✈︎ Modo viagem ativo</b></div></div>
     <div class="row" style="gap:8px;margin-top:12px"><button class="btn ghost" data-travel-ideas style="flex:1">Ver sugestões</button><button class="btn ghost" data-travel="off" style="flex:1">Desativar</button></div></div>`;
 }
 
@@ -3206,7 +3190,7 @@ function startCustomPrompt(past) {
   const ymd = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   const today = dayKeyOf(Date.now());
   const el = sheet(`<h3>${past ? 'Registrar treino de outro dia' : 'Treino personalizado'}</h3>
-    <p class="note" style="margin:4px 0 12px">${past ? 'Lance um treino que você fez e não registrou. Ele entra no histórico na data escolhida, conta para o coach e muda a sugestão de hoje.' : 'Monte o treino na hora, por exemplo o do seu amigo. Ele entra no histórico, conta para o coach, e o treino de amanhã é recalculado pelos músculos que você trabalhou.'}</p>
+    
     <label class="ob-f">Nome (opcional)<input id="ctName" placeholder="Ex.: Treino com o João" maxlength="40"></label>
     <div class="ob-f">Quando foi o treino?
       <div class="seg" id="ctWhen"><button data-w="0" class="${past ? '' : 'on'}">Hoje</button><button data-w="1" class="${past ? 'on' : ''}">Ontem</button><button data-w="x">Outra data</button></div>
@@ -3328,7 +3312,7 @@ function openPainSheet() {
   const el = sheet(`<h3>Sentindo dor ou desconforto?</h3>
     ${ap.any ? `<div class="card" style="margin:10px 0"><b>Dor relatada nos últimos ${PAIN_DAYS} dias</b><div class="note" style="margin-top:2px">${ap.general ? 'Dor geral' : ''}${ap.general && painNames(ap) ? ' · ' : ''}${esc(painNames(ap))}</div>
       <button class="btn ghost" id="pnClear" style="margin-top:10px">Já melhorou</button></div>` : ''}
-    <p class="note" style="margin:6px 0 4px">Onde dói? O personal do dia passa a evitar os exercícios dessa região por ${PAIN_DAYS} dias.</p>
+    <p class="note" style="margin:6px 0 4px">Onde dói? A região fica de fora por ${PAIN_DAYS} dias.</p>
     ${areaChips([], 'data-pa')}
     <input class="w-in" id="pnNote" style="width:100%;margin-top:6px;text-align:left" placeholder="Detalhe (opcional), ex.: ombro direito ao levantar o braço">
     <button class="btn" id="pnSave" style="margin-top:12px">Registrar dor</button>
