@@ -1384,7 +1384,7 @@ function viewFocus(a) {
     return `<div class="focus">${header}
       <div class="f-meta">Exercício concluído ✓</div>
       <div class="dots">${dots}</div>
-      ${a.custom ? `<div class="row" style="gap:6px;margin:-4px 0 8px"><button class="hbtn small" data-addset="${ei}">＋ Série</button><button class="hbtn small" data-addex>＋ Exercício</button></div>` : ''}
+      ${a.custom ? `<div class="row" style="gap:6px;margin:-4px 0 8px"><button class="hbtn small" data-addset="${ei}">＋ Série</button><button class="hbtn small" data-delset="${ei}">− Série</button><button class="hbtn small" data-addex>＋ Exercício</button></div>` : ''}
       <div class="card" style="margin-top:8px">${sets.map((s, j) => `<div class="kv"><span>Série ${j + 1}</span><b>${fmtSet(e, s)}</b></div>`).join('')}</div>
       <div class="f-cta"><button class="btn xl" id="fGoNext">Ir para a próxima série pendente</button>${nav}</div>
     </div>`;
@@ -1410,7 +1410,7 @@ function viewFocus(a) {
   return `<div class="focus">${header}
       <div class="f-meta">Série <b>${si + 1}</b> de ${sets.length} · meta <b>${esc(e.reps)}</b> · descanso ${fmtTime(e.rest)}</div>
       <div class="dots">${dots}</div>
-      ${a.custom ? `<div class="row" style="gap:6px;margin:-4px 0 8px"><button class="hbtn small" data-addset="${ei}">＋ Série</button><button class="hbtn small" data-addex>＋ Exercício</button></div>` : ''}
+      ${a.custom ? `<div class="row" style="gap:6px;margin:-4px 0 8px"><button class="hbtn small" data-addset="${ei}">＋ Série</button><button class="hbtn small" data-delset="${ei}">− Série</button><button class="hbtn small" data-addex>＋ Exercício</button></div>` : ''}
       <div class="f-last">${last ? `Última vez: ${fmtSet(e, last)}` : 'Primeira vez neste exercício'}
         · <button class="tip-toggle" id="fTipBtn" style="margin:0">Como executar</button></div>
       <div class="tip" id="fTip">${howHtml(e)}</div>
@@ -1585,6 +1585,7 @@ function openActions(ei) {
     ${sk ? '' : `<button class="opt" data-act="later"><span><b>↓ Fazer depois</b><br><span class="muted small">Move para o fim do treino e segue para o próximo</span></span></button>`}
     <button class="opt" data-act="skip"><span><b>${sk ? '↺ Retomar exercício' : '⤼ Pular hoje'}</b><br><span class="muted small">${sk ? 'Volta a fazer parte do treino de hoje' : 'Não entra no treino de hoje'}</span></span></button>
     <button class="opt" data-act="addset"><span><b>＋ Adicionar série</b><br><span class="muted small">Fazer uma série a mais deste exercício hoje</span></span></button>
+    ${(a.sets[e.id] || []).length > 1 ? `<button class="opt" data-act="delset"><span><b>− Remover série</b><br><span class="muted small">${(a.sets[e.id] || []).some(x => !x.done) ? 'Tira a última série que ainda não foi feita' : 'Apaga a última série registrada'}</span></span></button>` : ''}
     <button class="opt" data-act="order"><span><b>⇅ Reordenar treino</b><br><span class="muted small">Mudar a sequência dos exercícios de hoje</span></span></button>
     <button class="btn ghost" data-act="close" style="margin-top:12px">Cancelar</button>`);
   el.querySelectorAll('[data-act]').forEach(b => b.onclick = () => {
@@ -1593,6 +1594,7 @@ function openActions(ei) {
     if (act === 'order') return openReorder();
     if (act === 'remove') removeFromCustom(ei);
     if (act === 'addset') addSet(ei);
+    if (act === 'delset') removeSet(ei);
     if (act === 'later') moveLater(ei);
     if (act === 'skip') skipToday(ei, !sk);
     if (act !== 'close') { render(); window.scrollTo(0, 0); }
@@ -1627,6 +1629,7 @@ function bindExtras() {
   document.querySelectorAll('[data-custom-past]').forEach(b => b.onclick = () => startCustomPrompt(true));
   document.querySelectorAll('[data-addex]').forEach(b => b.onclick = openAddExercise);
   document.querySelectorAll('[data-addset]').forEach(b => b.onclick = () => { addSet(+b.dataset.addset); render(); });
+  document.querySelectorAll('[data-delset]').forEach(b => b.onclick = () => { if (removeSet(+b.dataset.delset)) render(); });
   document.querySelectorAll('[data-discard]').forEach(b => b.onclick = () => { if (confirm('Cancelar este treino? Nada será salvo.')) { S.active = null; save(); endRest(false); go('home'); } });
 }
 function bindSwapApply(a) {
@@ -3433,6 +3436,16 @@ function removeFromCustom(ei) {
   a.order = (a.order || []).filter(i => i !== ei).map(i => i > ei ? i - 1 : i);
   const sk = {}; Object.keys(a.skipped || {}).forEach(i => { i = +i; if (i !== ei) sk[i > ei ? i - 1 : i] = true; }); a.skipped = sk;
   a.cur = Math.max(0, Math.min(a.cur > ei ? a.cur - 1 : a.cur, a.exs.length - 1)); save();
+}
+/* Remove uma série: a última ainda não feita; se todas já foram feitas, a última feita (com confirmação). Fica ao menos 1 série */
+function removeSet(ei) {
+  const a = S.active; const e = exList(a)[ei]; const sets = a.sets[e.id] || [];
+  if (sets.length <= 1) { alert('O exercício precisa de pelo menos 1 série. Para tirar o exercício de hoje, use "Pular hoje".'); return false; }
+  let i = -1; for (let j = sets.length - 1; j >= 0; j--) if (!sets[j].done) { i = j; break; }
+  if (i < 0) { if (!confirm(`Todas as séries de ${e.name} já foram feitas. Apagar a última (${fmtSet(e, sets[sets.length - 1])})?`)) return false; i = sets.length - 1; }
+  sets.splice(i, 1); if (a.custom) e.sets = sets.length;
+  if (a.cur === ei && !sets.some(x => !x.done)) { const n = nextPending(a, ei); if (n) a.cur = n.ei; }
+  save(); return true;
 }
 function addSet(ei) {
   const a = S.active; const e = exList(a)[ei]; const sets = a.sets[e.id]; const lastS = sets[sets.length - 1] || {};
