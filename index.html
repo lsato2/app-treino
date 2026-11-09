@@ -361,6 +361,8 @@
   .act-grid .hbtn { width: 100%; padding: 6px 8px; justify-content: center; text-align: center; white-space: normal; line-height: 1.2; min-width: 0; }
   .act-grid .hbtn:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .why-link { background: none; border: 0; padding: 2px 0; margin-top: 2px; color: var(--accent); font-size: 14px; font-weight: 500; cursor: pointer; }
+.pain-lvl button { display: grid; gap: 1px; padding: 6px 2px; } .pain-lvl button b { font-size: 16px; } .pain-lvl button span { font-size: 10px; opacity: .8; }
+  .pain-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); } .pain-row:first-of-type { border-top: 0; }
   .pr-mini { font-size: 11px; color: var(--accent); margin-top: 2px; font-weight: 600; }
   .gbar { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; align-items: center; padding: 5px 0; font-size: 14px; }
   .gtrack { height: 10px; background: var(--w85); border: 1px solid var(--edge); border-radius: 999px; overflow: hidden; }
@@ -815,7 +817,8 @@ function sugCard(e, a, compact) {
     const kg = (a.sets[e.id] || [])[0]?.kg;
     return `<div class="sug keep${compact ? ' compact' : ''}"><div><b>Semana leve</b><div>${a.sets[e.id].length} séries${kg ? ` com cerca de ${fmtKg(kg)} kg (90%)` : ''}. Foco em técnica e recuperação, sem buscar recordes.</div></div></div>`;
   }
-  const apx = activePain();
+  const apx = activePain(); const spx = softPain(e, apx);
+  if (spx) return `<div class="sug keep${compact ? ' compact' : ''}"><div><b>Dor nível ${spx} nesta região</b><div>Mantenha a carga da última vez e pare se a dor aumentar.</div></div></div>`;
   if (apx.groups.size && hitsPain(e, apx)) return `<div class="sug keep${compact ? ' compact' : ''}"><div><b>Dor relatada: ${esc(painNames(apx))}</b><div>Se for fazer este exercício, use carga leve e pare se doer.</div></div></div>`;
   let sg = suggestion(e); if (!sg) return '';
   const hold = coachHold();
@@ -1015,6 +1018,7 @@ function viewHome() {
     <div class="hello"><div><div class="muted">${greet()} · ${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
       <h1>${S.profile.nome ? esc(S.profile.nome.split(' ')[0]) : 'Bora treinar'}</h1></div>${avatarBtn()}</div>
     ${travelBanner()}
+    ${painDueCard()}
     ${todayCard()}
     ${S.active || (rotina() && nivel()) ? '' : `<button class="card report-card" data-goto="profile"><b>Complete seu perfil</b><span class="note">${[nivel() ? '' : 'experiência', rotina() ? '' : 'dia a dia'].filter(Boolean).join(' e ')}: ajusta o volume do treino e o aeróbico.</span></button>`}
     ${S.active ? '' : loginCard()}
@@ -1625,6 +1629,7 @@ function openReorder() {
 function bindExtras() {
   document.querySelectorAll('[data-custom]').forEach(b => b.onclick = () => startCustomPrompt(false));
   document.querySelectorAll('[data-pain-sheet]').forEach(b => b.onclick = openPainSheet);
+  document.querySelectorAll('[data-pans]').forEach(b => b.onclick = () => { const x = activePain().due[0]; if (x) answerPain(x, b.dataset.pans); });
   document.querySelectorAll('[data-cardio-only]').forEach(b => b.onclick = () => { if (S.active && !confirm('Há um treino em andamento. Descartar e registrar um aeróbico?')) return; S.active = null; startCardio(null); });
   document.querySelectorAll('[data-custom-past]').forEach(b => b.onclick = () => startCustomPrompt(true));
   document.querySelectorAll('[data-addex]').forEach(b => b.onclick = openAddExercise);
@@ -2066,7 +2071,7 @@ function runCoach() {
   }
   const last = S.history[S.history.length - 1];
   const apc = activePain(); const rep14 = Object.keys(PAIN_AREAS).find(a => painReports().filter(x => Date.now() - x.t < 14 * DAY && x.areas.includes(a)).length >= 2);
-  if (!bi.deload && (apc.general || rep14)) addProposal({ key: `deload:pain:${(painReports().slice(-1)[0] || {}).t}`, type: 'deload', reason: apc.general ? 'Você relatou dor ou desconforto recentemente.' : `Dor relatada mais de uma vez em ${PAIN_AREAS[rep14].toLowerCase()} nos últimos 14 dias.` });
+  if (!bi.deload && (apc.general || rep14)) addProposal({ key: `deload:pain:${(painReports().slice(-1)[0] || {}).t}`, type: 'deload', reason: apc.general ? `Você relatou dor geral nível ${apc.generalLvl}.` : `Dor relatada mais de uma vez em ${PAIN_AREAS[rep14].toLowerCase()} nos últimos 14 dias.` });
   const L = S.history.filter(h => !h.deload).slice(-2);
   if (L.length === 2 && L.every(h => h.feel === 5) && !bi.deload) addProposal({ key: `deload:feel:${L[1].end}`, type: 'deload', reason: 'Seus dois últimos treinos foram marcados como "no limite".' });
   save(false);
@@ -2326,7 +2331,8 @@ function checkinCard(h) {
   return `<div class="card checkin" style="margin-top:12px"><b>Como foi o treino?</b>
     <div class="feel">${L.map((l, i) => `<button class="${h.feel === i + 1 ? 'on' : ''}" data-feel="${i + 1}"><b>${i + 1}</b><span>${l}</span></button>`).join('')}</div>
     <div class="row" style="gap:8px;margin-top:12px"><button class="hbtn small ${h.pain ? '' : 'sel'}" data-pain="0">Sem dor</button><button class="hbtn small ${h.pain ? 'sel warn' : ''}" data-pain="1">Senti dor ou desconforto</button></div>
-    ${h.pain ? `<div class="note" style="margin:12px 0 2px">Onde? Sem escolher a região, o app sugere descanso; escolhendo, ele só evita a região.</div>${areaChips(h.painAreas || [], 'data-ha')}
+    ${h.pain ? `<div class="note" style="margin:12px 0 4px">Intensidade (1 = pouca, 5 = muita)</div>${lvlSeg(h.painLvl || 0, 'data-hlv')}
+      <div class="note" style="margin:12px 0 2px">Onde? Sem escolher a região, a dor vale para o corpo todo (3 ou mais: o app sugere descanso).</div>${areaChips(h.painAreas || [], 'data-ha')}
       <input class="w-in" id="painTxt" style="width:100%;margin-top:6px;text-align:left" placeholder="Detalhe (opcional)" value="${esc(h.painTxt || '')}">` : ''}
   </div>`;
 }
@@ -2341,7 +2347,8 @@ function bindCoach() {
   const h = S.history.find(x => x.end === summaryEnd);
   if (h && tab === 'summary') {
     document.querySelectorAll('[data-feel]').forEach(b => b.onclick = () => { h.feel = +b.dataset.feel; h.mod = Date.now(); save(); runCoach(); render(); });
-    document.querySelectorAll('[data-pain]').forEach(b => b.onclick = () => { h.pain = b.dataset.pain === '1'; if (h.pain) h.painAt = Date.now(); else { delete h.painTxt; delete h.painAreas; delete h.painAt; } h.mod = Date.now(); save(); runCoach(); render(); });
+    document.querySelectorAll('[data-pain]').forEach(b => b.onclick = () => { h.pain = b.dataset.pain === '1'; if (h.pain) { h.painAt = Date.now(); h.painLvl = h.painLvl || 2; h.painCheckAt = h.painAt + PAIN_CHECK[h.painLvl] * DAY; } else { ['painTxt', 'painAreas', 'painAt', 'painLvl', 'painCheckAt', 'painResolvedAt', 'painChecks'].forEach(k => delete h[k]); } h.mod = Date.now(); save(); runCoach(); render(); });
+    document.querySelectorAll('[data-hlv]').forEach(b => b.onclick = () => { h.painLvl = +b.dataset.hlv; h.painCheckAt = (h.painAt || Date.now()) + PAIN_CHECK[h.painLvl] * DAY; h.mod = Date.now(); save(); runCoach(); render(); });
     document.querySelectorAll('[data-ha]').forEach(b => b.onclick = () => { const k = b.dataset.ha; const A = h.painAreas || []; h.painAreas = A.includes(k) ? A.filter(x => x !== k) : [...A, k]; h.painAt = Date.now(); h.mod = Date.now(); save(); runCoach(); render(); });
     if ($('#painTxt')) $('#painTxt').addEventListener('change', ev => { h.painTxt = ev.target.value; h.mod = Date.now(); save(); });
   }
@@ -3072,6 +3079,7 @@ function groupStatus(now = Date.now()) {
   }
   const ap = activePain();
   ap.groups.forEach(g => { if (out[g]) { out[g].state = 'dor'; out[g].score = -3; } });
+  ap.soft.forEach((l, g) => { if (out[g] && out[g].state !== 'dor') out[g].score -= 0.5 * l; });   // dor 1–2: o foco que usa o grupo perde pontos
   return out;
 }
 const calDays = hrs => Math.round((dayKeyOf(Date.now()) - dayKeyOf(Date.now() - hrs * 3.6e6)) / DAY);   // dias de calendário (hoje = 0, ontem = 1)
@@ -3251,6 +3259,7 @@ function generateWorkout(type, ctx) {
     if (ctx.travel && ['big', 'c', 'i'].includes(kind)) kind = 'bw';
     const e = { ...pk.ex, slot, ...prescribe(pk.ex, kind, g, tempo) };
     if (prio.some(gp => exGroups(e).p.includes(gp)) && e.sets < 4 && kind !== 'cond' && nivel() !== 'iniciante') e.sets += 1;   // +1 série nos grupos prioritários
+    const sp = softPain(e, ctx.pain); if (sp >= 2 && e.sets > 2) e.sets -= 1;                  // dor nível 2 na região: 1 série a menos
     if (list.length >= 4 && mins + exMinutes(e) > tempo) break;
     list.push(e); ctx.used.add(pk.id); mins += exMinutes(e);
   }
@@ -3315,6 +3324,7 @@ function todayPlan() {
   const pBest = prioGroups().filter(gp => best.main.includes(gp));
   if (pBest.length) why.splice(1, 0, `Prioridade: ${pBest.map(gp => RG[gp]).join(', ')} (${pBest.map(gp => `${Math.round(st[gp].week)}/${WEEK_TARGET[gp]}`).join(', ')} séries na semana).`);
   if (ap.groups.size) why.push(`Exercícios que trabalham a região com dor (${painNames(ap)}) ficaram de fora.`);
+  else if (ap.soft.size) why.push(ap.generalLvl && ap.generalLvl <= 2 ? `Dor geral nível ${ap.generalLvl}: treino um pouco mais leve, sem aumento de carga.` : `Dor leve (${painNames(ap)}): exercícios da região sem aumento de carga.`);
   if (bi.deload) why.push(`Semana leve (semana 4 do bloco ${bi.n}): menos séries e cerca de 10% menos carga.`);
   if (dsl !== null && dsl >= 5) why.push(`Faz ${dsl} dias sem treinar: volte com cerca de 10% menos carga nas primeiras séries.`);
   if (wk < f) why.push(`Semana: ${wk} de ${f} treinos.`);
@@ -3365,6 +3375,7 @@ function openWhy() {
     ${pr.length ? sec('Prioridades', ev, `${pr.map(gp => RG[gp]).join(', ')}: meta ~30% maior e um exercício a mais quando o foco inclui o grupo. Os demais ficam em manutenção (~70% da meta).`, 'Volume reduzido a cerca de 1/3 manteve os ganhos por meses: Bickel, Cross e Bamman (2011), Med Sci Sports Exerc. Os 30% e 70% são escolhas do app.') : ''}
     ${sec('Exercícios', app, 'Entram primeiro os que você fez nos últimos 90 dias (academia e viagem contam separado), alternando quando você usa mais de um para o mesmo movimento. Preferências marcadas valem mais. A região com dor fica de fora.', '')}
     ${(() => { const L = S.volAdj || {}; const adj = Object.keys(RG).filter(gp => (L[gp] || 1) !== 1); return sec('Ajuste automático do volume', app, `Uma vez por semana o app compara o 1RM estimado das últimas 3 semanas com as 3 anteriores, por grupo, junto com quantas repetições sobravam. Força caindo com esforço alto: −10% de volume. Força parada com a meta cumprida: +10%. Limites de −20% a +20%.${adj.length ? ' Hoje: ' + adj.map(gp => `${RG[gp]} ${L[gp] > 1 ? '+' : '−'}${Math.round(Math.abs(L[gp] - 1) * 100)}%`).join(', ') + '.' : ' Nenhum ajuste ativo.'}`, 'Autorregulação por repetições em reserva (RIR): Helms et al. (2016), Strength Cond J; Zourdos et al. (2016), J Strength Cond Res. Os percentuais são do app.'); })()}
+    ${(() => { const ap = activePain(); return ap.any ? sec('Dor', app, `${esc(ap.list.map(painLabel).join('; '))}. Nível 1–2: exercícios da região sem aumento de carga (2 também tira 1 série). Nível 3: saem os que têm a região como músculo principal. Nível 4–5: saem também os que a usam como secundário. Dor geral 3 ou mais: descanso.`, 'Escala e efeitos definidos pelo app, não orientação médica. Dor forte ou persistente: procure um profissional.') : ''; })()}
     ${limitList().length ? sec('Limitações permanentes', app, limitList().map(k => `${LIMITS[k].label}: ${LIMITS[k].txt}.`).join(' '), 'Lista de exclusão do app, não orientação médica. Em caso de lesão, siga a orientação de um profissional.') : ''}
     ${sec('Séries, repetições e descanso', ev, `Pelo objetivo (${GOALS[g] || ''}): básicos ${sc.big[0]} reps com ${sc.big[1]} s de descanso, complementares ${sc.c[0]}, isolados ${sc.i[0]}.${nv === 'iniciante' ? ' Iniciante: até 3 séries por exercício.' : ''}`, 'Faixas de prescrição do posicionamento do ACSM sobre progressão no treino de força (2009), Med Sci Sports Exerc.')}
     ${sec('Progressão e semana leve', app, 'Ao fazer todas as séries no topo da faixa, sobe a carga (progressão dupla); se ainda sobravam 3+ repetições em todas, sobe o dobro ou sobe antes do topo. A cada 4 semanas, uma semana com menos séries e ~10% menos carga. Sem evolução em 3 treinos, o coach propõe troca ou redução de carga.', 'Prática consolidada no treino de força; não há um estudo único que fixe as 4 semanas.')}
@@ -3377,7 +3388,7 @@ function openWhy() {
 function recoveryCard() {
   const st = groupStatus(); const lbl = { cansado: 'Cansado', recuperando: 'Recuperando', pronto: 'Pronto', parado: 'Parado', novo: 'Sem registro', dor: 'Com dor' };
   const ap = activePain();
-  return `${ap.any ? `<div class="card pain-card"><div class="row between"><div><b>Dor relatada</b><div class="note" style="margin-top:2px">${ap.general ? 'Dor geral' : ''}${ap.general && painNames(ap) ? ' · ' : ''}${esc(painNames(ap))} · vale por ${PAIN_DAYS} dias</div></div>
+  return `${ap.any ? `<div class="card pain-card"><div class="row between"><div><b>Dor em acompanhamento</b><div class="note" style="margin-top:2px">${esc(ap.list.map(painLabel).join(' · '))}</div></div>
       <button class="hbtn small" data-pain-sheet>Atualizar</button></div></div>` : ''}
   <div class="card"><div class="row between" style="margin-bottom:8px"><span class="muted small">Pela carga dos últimos treinos, incluindo os personalizados</span>${ap.any ? '' : '<button class="hbtn small" data-pain-sheet>Relatar dor</button>'}</div>
     ${Object.entries(RG).map(([g, n]) => `<div class="rec-row"><span>${n}</span><span class="muted small">${agoTxt(st[g].hours)}</span><span class="rec ${st[g].state}">${lbl[st[g].state]}</span></div>`).join('')}</div>`;
@@ -3499,39 +3510,87 @@ setInterval(() => { if (dayKeyOf(Date.now()) !== shownDay) refreshIfStale(); }, 
 const PAIN_AREAS = { ombros: 'Ombros', peito: 'Peito', costas: 'Costas', lombar: 'Lombar', biceps: 'Bíceps', triceps: 'Tríceps', cotovelo: 'Cotovelo', punho: 'Punho',
   pernas: 'Quadríceps', joelho: 'Joelho', posterior: 'Posterior e glúteos', core: 'Abdômen' };
 const AREA2G = { lombar: ['posterior', 'costas'], joelho: ['pernas', 'posterior'], cotovelo: ['biceps', 'triceps'], punho: ['biceps', 'triceps', 'peito'] };
-const PAIN_DAYS = 3;
+/* Dor com intensidade (1 = pouca, 5 = muita). Depois de X dias (pela intensidade) o app pergunta se passou.
+   Efeito no treino: 1–2 mantém os exercícios da região, mas sem subir carga (2 também tira 1 série);
+   3 tira os exercícios que têm a região como músculo principal; 4–5 tira também os que a usam como secundário.
+   Dor geral (sem região): 1–2 deixa o treino mais leve; 3+ sugere descanso. Regras do app, não orientação médica. */
+const PAIN_LVL = ['', 'Pouca', 'Leve', 'Moderada', 'Forte', 'Muito forte'];
+const PAIN_CHECK = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 7 };      // dias até perguntar se passou
+const PAIN_DAYS = 3;                                       // relatos antigos, sem intensidade
+const PAIN_GRACE = 7;                                      // sem resposta, deixa de valer 7 dias depois da pergunta
+/* Cada relato com a referência do objeto original (o relato do Coach ou o check-in do treino), para responder a pergunta */
 function painReports() {
   const r = [];
-  S.history.forEach(h => { if (h.pain) r.push({ t: h.painAt || h.end, areas: h.painAreas || [], note: h.painTxt || '', src: 'treino' }); });   // vale a partir de quando foi relatada
-  (S.pains || []).forEach(x => r.push({ ...x, src: 'relato' }));
+  S.history.forEach(h => { if (h.pain) r.push({ t: h.painAt || h.end, areas: h.painAreas || [], note: h.painTxt || '', src: 'treino', lvl: h.painLvl, checkAt: h.painCheckAt, resolvedAt: h.painResolvedAt, checks: h.painChecks || 0, ref: h, k: 'h' }); });
+  (S.pains || []).forEach(x => r.push({ ...x, src: 'relato', ref: x, k: 'p' }));
   return r.filter(x => x.t > (S.painClearedAt || 0)).sort((a, b) => a.t - b.t);
 }
-function activePain(now = Date.now()) {
-  const r = painReports().filter(x => now - x.t < PAIN_DAYS * DAY && x.t <= now);
-  const areas = {}; let general = false;
-  r.forEach(x => { if (!x.areas.length) general = true; x.areas.forEach(a => { areas[a] = Math.max(areas[a] || 0, x.t); }); });
-  const groups = new Set(); Object.keys(areas).forEach(a => (AREA2G[a] || [a]).forEach(g => groups.add(g)));
-  return { general, areas, groups, any: general || Object.keys(areas).length > 0 };
+const painLvl = x => x.lvl || 3;
+const painCheckAt = x => x.checkAt || (x.lvl ? x.t + PAIN_CHECK[x.lvl] * DAY : x.t + PAIN_DAYS * DAY);
+function painOpen(x, now = Date.now()) {
+  if (x.resolvedAt || x.t > now) return false;
+  if (!x.lvl && !x.checkAt) return now - x.t < PAIN_DAYS * DAY;                     // relato antigo: vale 3 dias
+  return now < painCheckAt(x) + PAIN_GRACE * DAY;
 }
-const painNames = ap => Object.keys(ap.areas).map(a => PAIN_AREAS[a]).join(', ');
-const hitsPain = (e, ap) => exGroups(e).p.some(g => ap.groups.has(g));
+function activePain(now = Date.now()) {
+  const r = painReports().filter(x => painOpen(x, now));
+  const areas = {}; let general = 0;
+  r.forEach(x => { const l = painLvl(x); if (!x.areas.length) general = Math.max(general, l); x.areas.forEach(a => { areas[a] = Math.max(areas[a] || 0, l); }); });
+  const groups = new Set(), soft = new Map(), sec = new Set();
+  for (const [a, l] of Object.entries(areas)) (AREA2G[a] || [a]).forEach(g => { if (l >= 3) { groups.add(g); if (l >= 4) sec.add(g); } else soft.set(g, Math.max(soft.get(g) || 0, l)); });
+  if (general && general <= 2) Object.keys(RG).forEach(g => { if (!groups.has(g)) soft.set(g, Math.max(soft.get(g) || 0, general)); });
+  return { general: general >= 3, generalLvl: general, areas, groups, sec, soft, any: general > 0 || Object.keys(areas).length > 0, due: r.filter(x => now >= painCheckAt(x)), list: r };
+}
+const painNames = ap => Object.entries(ap.areas).map(([a, l]) => `${PAIN_AREAS[a]} (${l})`).join(', ');
+const hitsPain = (e, ap) => { const g = exGroups(e); return g.p.some(x => ap.groups.has(x)) || g.s.some(x => ap.sec.has(x)); };
+const softPain = (e, ap) => Math.max(0, ...exGroups(e).p.map(g => ap.soft.get(g) || 0));
 function areaChips(sel, attr) {
   return `<div class="chips wrap-chips">${Object.entries(PAIN_AREAS).map(([k, l]) => `<button class="${sel.includes(k) ? 'on' : ''}" ${attr}="${k}">${l}</button>`).join('')}</div>`;
 }
+function lvlSeg(cur, attr) {
+  return `<div class="seg pain-lvl">${[1, 2, 3, 4, 5].map(v => `<button class="${cur === v ? 'on' : ''}" ${attr}="${v}"><b>${v}</b><span>${PAIN_LVL[v]}</span></button>`).join('')}</div>`;
+}
+const painLabel = x => `${x.areas.length ? x.areas.map(a => PAIN_AREAS[a]).join(', ') : 'Dor geral'} · nível ${painLvl(x)}`;
+/* Resposta à pergunta "a dor passou?" */
+function answerPain(x, ans) {
+  const o = x.ref; const H = x.k === 'h'; const now = Date.now();
+  const set = (f, v) => { if (H) o['pain' + f[0].toUpperCase() + f.slice(1)] = v; else o[f] = v; };
+  let l = painLvl(x);
+  if (ans === 'gone') { set('resolvedAt', now); }
+  else {
+    if (ans === 'better') l = l - 1; if (ans === 'worse') l = Math.min(5, l + 1);
+    if (l <= 0) set('resolvedAt', now);
+    else { set('lvl', l); set('checkAt', now + PAIN_CHECK[l] * DAY); set('checks', (x.checks || 0) + 1); }
+  }
+  if (H) o.mod = now;
+  save(); runCoach(); render();
+}
+function painDueCard() {
+  if (S.active) return '';
+  const ap = activePain(); const x = ap.due[0]; if (!x) return '';
+  const persist = ((x.checks || 0) >= 1 && painLvl(x) >= 4) || ((x.checks || 0) >= 2 && painLvl(x) >= 3);   // forte, ou moderada que não passa
+  return `<div class="card pain-card" style="margin-top:12px"><b>A dor passou?</b><div class="note" style="margin-top:2px">${esc(painLabel(x))} · relatada em ${fmtDate(x.t)}</div>
+    ${persist ? '<div class="note" style="margin-top:6px;color:var(--danger)">Dor forte que continua: vale procurar um profissional de saúde.</div>' : ''}
+    <div class="act-grid"><button class="hbtn small" data-pans="gone">Passou</button><button class="hbtn small" data-pans="better">Melhorou</button><button class="hbtn small" data-pans="same">Continua igual</button><button class="hbtn small" data-pans="worse">Piorou</button></div></div>`;
+}
 function openPainSheet() {
-  const ap = activePain(); let sel = [];
+  const ap = activePain(); let sel = [], lvl = 0;
   const el = sheet(`<h3>Sentindo dor ou desconforto?</h3>
-    ${ap.any ? `<div class="card" style="margin:10px 0"><b>Dor relatada nos últimos ${PAIN_DAYS} dias</b><div class="note" style="margin-top:2px">${ap.general ? 'Dor geral' : ''}${ap.general && painNames(ap) ? ' · ' : ''}${esc(painNames(ap))}</div>
-      <button class="btn ghost" id="pnClear" style="margin-top:10px">Já melhorou</button></div>` : ''}
-    <p class="note" style="margin:6px 0 4px">Onde dói? A região fica de fora por ${PAIN_DAYS} dias.</p>
+    ${ap.list.length ? `<div class="card" style="margin:10px 0"><b>Dores em acompanhamento</b>${ap.list.map((x, i) => `<div class="pain-row"><div><span>${esc(painLabel(x))}</span><div class="muted small">pergunto de novo em ${fmtDate(painCheckAt(x))}</div></div><button class="hbtn small" data-pgone="${i}">Passou</button></div>`).join('')}</div>` : ''}
+    <p class="note" style="margin:6px 0 4px">Onde dói?</p>
     ${areaChips([], 'data-pa')}
+    <p class="note" style="margin:12px 0 4px">Intensidade (1 = pouca, 5 = muita)</p>
+    ${lvlSeg(0, 'data-plv')}
+    <p class="note" id="pnHint" style="margin:6px 0 0"></p>
     <input class="w-in" id="pnNote" style="width:100%;margin-top:6px;text-align:left" placeholder="Detalhe (opcional), ex.: ombro direito ao levantar o braço">
     <button class="btn" id="pnSave" style="margin-top:12px">Registrar dor</button>
     <p class="note" style="margin-top:10px">Se a dor for forte, persistir ou vier com inchaço, formigamento ou perda de força, procure um profissional.</p>`);
+  const hint = () => { $('#pnHint', el).textContent = !lvl ? '' : `${lvl <= 2 ? 'Os exercícios da região continuam, sem aumento de carga' + (lvl === 2 ? ' e com 1 série a menos' : '') : lvl === 3 ? 'Os exercícios que trabalham a região ficam de fora' : 'Os exercícios que trabalham a região, mesmo como secundária, ficam de fora'}. Pergunto se passou em ${PAIN_CHECK[lvl]} dias.`; };
   el.querySelectorAll('[data-pa]').forEach(b => b.onclick = () => { const k = b.dataset.pa; sel = sel.includes(k) ? sel.filter(x => x !== k) : [...sel, k]; b.classList.toggle('on', sel.includes(k)); });
-  $('#pnSave', el).onclick = () => { if (!sel.length) { alert('Escolha pelo menos uma região.'); return; }
-    S.pains = [...(S.pains || []), { t: Date.now(), areas: sel, note: $('#pnNote', el).value.trim() }]; save(); runCoach(); el.remove(); render(); };
-  if ($('#pnClear', el)) $('#pnClear', el).onclick = () => { S.painClearedAt = Date.now(); save(); runCoach(); el.remove(); render(); };
+  el.querySelectorAll('[data-plv]').forEach(b => b.onclick = () => { lvl = +b.dataset.plv; el.querySelectorAll('[data-plv]').forEach(x => x.classList.toggle('on', +x.dataset.plv === lvl)); hint(); });
+  el.querySelectorAll('[data-pgone]').forEach(b => b.onclick = () => { el.remove(); answerPain(ap.list[+b.dataset.pgone], 'gone'); });
+  $('#pnSave', el).onclick = () => { if (!sel.length) { alert('Escolha pelo menos uma região.'); return; } if (!lvl) { alert('Escolha a intensidade da dor, de 1 a 5.'); return; }
+    const t = Date.now(); S.pains = [...(S.pains || []), { t, areas: sel, lvl, checkAt: t + PAIN_CHECK[lvl] * DAY, note: $('#pnNote', el).value.trim() }]; save(); runCoach(); el.remove(); render(); };
 }
 
 /* ============================== Consistência depois de excluir ou importar ============================== */
