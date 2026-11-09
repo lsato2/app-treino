@@ -1036,6 +1036,7 @@ function viewHome() {
 }
 
 function viewPlans() {
+  if (!LIB) return `<div class="wrap"><h1 class="page-title">Treinos</h1><p class="note">${libFailed ? 'Sem conexão para carregar a biblioteca de exercícios.' : 'Carregando exercícios…'}</p>${libFailed ? '<button class="btn ghost" data-lib-retry>Tentar de novo</button>' : ''}</div>`;
   const g = (S.plan && S.plan.goal) || goal(); const t = todayPlan(); const st = t.st;
   const tp = `${travelOn() ? '✈︎ Modo viagem' : GOALS[g] || ''} · ~${Math.min(travelOn() ? 45 : 999, (S.plan && S.plan.tempo) || (S.goal && S.goal.tempo) || 60)} min`;
   const lbl = r => r.ok ? '<span class="pill">Recuperado</span>'
@@ -1940,7 +1941,7 @@ const countIn = (a, b) => S.history.filter(h => isStrength(h) && h.end >= a && h
 const roundStep = (v, st) => Math.max(0, Math.round(v / st) * st);
 function daysSinceLast() {
   const last = [...S.history].reverse().find(isStrength); if (!last) return null;
-  const d0 = new Date(last.end); d0.setHours(0, 0, 0, 0); const d1 = new Date(); d1.setHours(0, 0, 0, 0);
+  const d0 = new Date(last.end); d0.setHours(0, 0, 0, 0); const d1 = new Date(Date.now()); d1.setHours(0, 0, 0, 0);
   return Math.round((d1 - d0) / DAY);
 }
 function thisWeek() { const ws = weekStart(Date.now()); return S.history.filter(h => isStrength(h) && h.end >= ws); }
@@ -2060,6 +2061,7 @@ function runCoach() {
   try { autoVolume(); } catch (err) {}
   const bi = blockInfo();
   for (const e of recentExercises()) {
+    if (S.proposals.filter(x => x.type === 'stall' && x.status === 'pending').length >= 2) break;   // no máximo 2 propostas de troca abertas
     const st = stagnation(e); if (!st) continue;
     const alt = pickAlt(e);
     const canReset = metric(e) === 'reps' && !e.bodyweight && !e.assist && st.kg > 0;
@@ -2114,7 +2116,7 @@ function coachMessages() {
   if (!S.history.length) m.push({ t: 'info', text: 'Bem-vindo! O coach começa a propor ajustes depois de 3 a 4 semanas de registros. Por enquanto, foque na constância.' });
   if (pend) m.push({ t: 'prop', text: `O coach tem ${pend} proposta${pend > 1 ? 's' : ''} de ajuste para você.`, go: 'coach' });
   if (bi.deload) m.push({ t: 'deload', text: `Semana leve (semana 4 do bloco ${bi.n}): menos séries e cerca de 10% menos carga. É quando o corpo assimila o treino.` });
-  if (!S.active && tab !== 'home' && S.history.length) {   // a mesma decisão do cartão "Treino de hoje"
+  if (!S.active && tab !== 'home' && S.history.length && LIB) {   // a mesma decisão do cartão "Treino de hoje"
     const tp = todayPlan();
     m.unshift({ t: tp.type === 'train' ? 'today' : 'restday', go: 'home', text: tp.type === 'train'
       ? `Hoje: ${PLANS[tp.best.k].name} (${PLANS[tp.best.k].focus.toLowerCase()}).${dsl != null && dsl >= 3 ? ` ${dsl} dias sem treinar.` : ''}`
@@ -2515,7 +2517,7 @@ const SCHEME = {
   saude: { big: ['8–12', 90], c: ['10–12', 75], i: ['12–15', 60] },
 };
 
-let LIB = null, libLoading = null;
+let LIB = null, libLoading = null, libFailed = false;
 function loadLib() {
   if (LIB) return Promise.resolve(LIB);
   if (!libLoading) libLoading = fetch('exercicios.json').then(r => r.json()).then(a => { LIB = new Map(a.map(x => [x.id, x])); return LIB; })
@@ -2591,7 +2593,7 @@ function migrateToDynamic() {
   S.dynamicSince = Date.now();
   if (S.plan) { S.plan.type = 'dynamic'; delete S.plan.plans; }
   S.prefPattern = S.prefPattern || {};
-  for (const [baseId, altId] of Object.entries(S.prefSwaps || {})) { const pt = patternOf({ id: altId }) || patternOf({ id: baseId }); if (pt && !S.prefPattern[pt]) S.prefPattern[pt] = altId; }
+  for (const [baseId, altId] of Object.entries(S.prefSwaps || {})) { const pt = patternOf({ id: altId }) || patternOf({ id: baseId }); if (pt && !S.prefPattern[pt]) S.prefPattern[pt] = LEGACY_MAP[altId] || altId; }
   for (const [leg, nid] of Object.entries(LEGACY_MAP)) if (S.last[leg] && !S.last[nid]) S.last[nid] = S.last[leg];
   if (S.plan && S.travelPlan) S.plan.exdb = { ...(S.travelPlan.exdb || {}), ...(S.plan.exdb || {}) };
   S.prefSwaps = {}; delete S.travelPlan;
@@ -2612,6 +2614,7 @@ function applyPlan() {
     if (old) { a.gen = JSON.parse(JSON.stringify(old)); changed = true; }
   }
   if (S.onboarded && migrateToDynamic()) changed = true;
+  for (const [pt, id] of Object.entries(S.prefPattern || {})) if (LEGACY_MAP[id]) { S.prefPattern[pt] = LEGACY_MAP[id]; changed = true; }   // preferência gravada com código antigo
   PLANS = genPlans();
   if (a && a.custom) PLANS.P = { name: 'Personalizado', focus: a.title || 'Treino livre', exercises: a.exs };
   else if (a && a.gen) PLANS[a.plan] = a.gen;
@@ -3152,6 +3155,8 @@ function autoVolume() {
   }
   if (log.length) S.volAdjLog = { t: Date.now(), items: log };
 }
+const SLOT_G = { hpush: 'peito', ipush: 'peito', fly: 'peito', vpush: 'ombros', lateral: 'ombros', reardelt: 'ombros', triceps: 'triceps', biceps: 'biceps', vpull: 'costas', hpull: 'costas',
+  squat: 'pernas', legpress: 'pernas', legext: 'pernas', lunge: 'pernas', calf: 'pernas', hinge: 'posterior', legcurl: 'posterior', glute: 'posterior', lowback: 'posterior', core: 'core' };
 const PRIO_SLOT = { peito: ['fly', 'ipush'], costas: ['hpull', 'vpull'], ombros: ['reardelt', 'lateral'], biceps: ['biceps'], triceps: ['triceps'], pernas: ['legext', 'lunge'], posterior: ['legcurl', 'glute'], core: ['core'] };
 function prioChips(sel, attr) {
   return `<div class="chips wrap-chips"><button class="none-chip ${sel.length ? '' : 'on'}" ${attr}="">Sem preferência</button>${Object.entries(RG).map(([k, l]) => `<button class="${sel.includes(k) ? 'on' : ''}" ${attr}="${k}">${l}</button>`).join('')}</div>`;
@@ -3218,9 +3223,14 @@ function exFor(id, fallback) {
 }
 const travelOk = (id, ex) => { const x = LIB && LIB.get(id); return (x ? NO_GYM(x) : !!ex.bodyweight || ex.unit === 's') && !NO_TRAVEL.test(id); };
 /* Candidatos de um padrão: os que você já fez + os da biblioteca para aquele movimento */
+let POOL_IDS = null;
+function strengthOk(id) {
+  POOL_IDS = POOL_IDS || new Set(Object.values(CATALOG).flatMap(c => c.pool));
+  const x = LIB && LIB.get(id); return !x || POOL_IDS.has(id) || ['strength', 'powerlifting'].includes(x.c);
+}
 function candidatesFor(pattern, usage, travel) {
   const pool = (CATALOG[pattern] || {}).pool || [];
-  const ids = new Set([...Object.values(usage).filter(u => u.pt === pattern).map(u => u.id), ...pool]);
+  const ids = new Set([...Object.values(usage).filter(u => u.pt === pattern && strengthOk(u.id)).map(u => u.id), ...pool]);
   if (travel) for (const [tk, p] of Object.entries(TRAVEL2P)) if (p === pattern) CATALOG[tk].pool.forEach(i => ids.add(i));
   return [...ids];
 }
@@ -3230,6 +3240,9 @@ function pickExercise(pattern, ctx) {
   const ids = candidatesFor(pattern, ctx.usage, ctx.travel); if (pref && !ids.includes(pref)) ids.unshift(pref);
   const mine = ids.map(id => ctx.usage[id]).filter(u => u && u.pt === pattern).sort((a, b) => b.last - a.last);
   const recent = mine.length >= 2 ? mine[0].id : null;          // alterna entre os que você já faz
+  const kind0 = (CATALOG[pattern] || {}).kind;
+  // acessórios (não os básicos): quando os que você usa já estão bem repetidos, entra uma opção nova da biblioteca (até 3 por movimento)
+  const fresh = kind0 !== 'big' && !pref && mine.length >= 1 && mine.length < 3 && mine.every(u => u.n >= 4) ? pool.find(id => { if (ctx.usage[id] || ctx.used.has(id) || limitHit(id)) return false; const ex = exFor(id); return !!ex && !(ctx.travel && !travelOk(id, ex)) && !(ctx.pain.groups.size && hitsPain(ex, ctx.pain)); }) : null;
   let best = null;
   for (const id of ids) {
     if (ctx.used.has(id)) continue;
@@ -3238,8 +3251,9 @@ function pickExercise(pattern, ctx) {
     if (ctx.pain.groups.size && hitsPain(ex, ctx.pain)) continue;
     if (limitHit(id)) continue;
     const u = ctx.usage[id]; const idx = pool.indexOf(id);
-    let sc = (id === pref ? 6 : 0) + (u ? 1 + Math.min(u.n, 4) : 0) + (idx >= 0 ? 0.6 * (pool.length - idx) / pool.length : 0);
+    let sc = (id === pref ? 6 : 0) + (u ? 3 + 0.25 * Math.min(u.n, 4) : 0) + (idx >= 0 ? 0.6 * (pool.length - idx) / pool.length : 0);
     if (id === recent && id !== pref) sc -= 1.5;
+    if (id === fresh) sc += 4.5;
     if (!best || sc > best.sc) best = { id, ex, sc };
   }
   return best;
@@ -3253,21 +3267,34 @@ function generateWorkout(type, ctx) {
   const slots = [...T.slots];
   if (['legs', 'full'].includes(type) && !slots.includes('lowback')) slots.splice(rotina() === 'sentado' ? 4 : slots.length - (type === 'legs' ? 1 : 0), 0, 'lowback');   // lombar: mais cedo para quem passa o dia sentado
   prio.forEach(gp => slots.splice(Math.min(3, slots.length), 0, PRIO_SLOT[gp].find(x => !slots.includes(x)) || PRIO_SLOT[gp][0]));   // um exercício a mais para cada prioridade do foco
-  for (const slot of ctx.travel ? [...slots, 'cond'] : slots) {
+  const st = ctx.st || groupStatus(); const tally = Object.fromEntries(Object.keys(RG).map(gp => [gp, st[gp].week]));
+  const minEx = tempo <= 30 ? 3 : 4;
+  const head = slots.slice(0, 2).map((sl, i) => ({ sl, i: i - 2 })); let tail = slots.slice(2).map((sl, i) => ({ sl, i }));
+  const deficit = o => { const gp = SLOT_G[o.sl]; if (!gp) return 0; const tg = WEEK_TARGET[gp];
+    return (tg - tally[gp]) / tg + (prio.includes(gp) && tally[gp] < tg ? 0.5 : 0) + (o.sl === 'lowback' && rotina() === 'sentado' ? 0.3 : 0); };
+  const nextSlot = () => { if (head.length) return head.shift(); if (!tail.length) return null;
+    tail.sort((a, b) => deficit(b) - deficit(a) || a.i - b.i); const o = tail.shift();
+    return deficit(o) <= -0.3 && list.length >= minEx ? nextSlot() : o; };                       // grupo 30% acima da meta: fica de fora
+  for (let so = nextSlot(); so; so = nextSlot()) {
+    const slot = so.sl;
     const pk = pickExercise(slot, ctx); if (!pk) continue;
     let kind = (CATALOG[slot] || {}).kind || 'c';
     if (ctx.travel && ['big', 'c', 'i'].includes(kind)) kind = 'bw';
     const e = { ...pk.ex, slot, ...prescribe(pk.ex, kind, g, tempo) };
     if (prio.some(gp => exGroups(e).p.includes(gp)) && e.sets < 4 && kind !== 'cond' && nivel() !== 'iniciante') e.sets += 1;   // +1 série nos grupos prioritários
     const sp = softPain(e, ctx.pain); if (sp >= 2 && e.sets > 2) e.sets -= 1;                  // dor nível 2 na região: 1 série a menos
-    if (list.length >= 4 && mins + exMinutes(e) > tempo) break;
+    if (list.length >= minEx && mins + exMinutes(e) > tempo) break;
+    e._o = so.i + (['core', 'lowback'].includes(slot) ? 100 : 0);       // a escolha segue o que falta; a execução segue a ordem do treino (básicos primeiro, abdômen e lombar no fim)
     list.push(e); ctx.used.add(pk.id); mins += exMinutes(e);
+    const eg = exGroups(e); eg.p.forEach(gp => { if (gp in tally) tally[gp] += e.sets; }); eg.s.forEach(gp => { if (gp in tally) tally[gp] += e.sets * 0.5; });
   }
+  list.sort((a, b) => a._o - b._o); list.forEach(e => delete e._o);
+  if (ctx.travel) { const pk = pickExercise('cond', ctx); if (pk) { const e = { ...pk.ex, slot: 'cond', ...prescribe(pk.ex, 'cond', g, tempo) }; if (mins + exMinutes(e) <= tempo + 4) { list.push(e); mins += exMinutes(e); } } }   // viagem: fecha com condicionamento
   return { name: T.name, focus: T.focus, type, gen: true, desc: `${list.length} exercícios · cerca de ${Math.round(mins)} min`, exercises: list, mins: Math.round(mins) };
 }
 /* Monta as opções de hoje (uma por foco) */
 function genPlans() {
-  const ctx = { usage: exerciseUsage(90, travelOn()), travel: travelOn(), pain: activePain() };
+  const ctx = { usage: exerciseUsage(90, travelOn()), travel: travelOn(), pain: activePain(), st: groupStatus() };
   return Object.fromEntries(TYPE_KEYS.map(t => [t, generateWorkout(t, ctx)]));
 }
 /* Ordena os focos: só entra quem tem todos os grupos recuperados */
@@ -3300,6 +3327,7 @@ function todayPlan() {
   const ranked = rankTypes(st);
   const best = ranked[0]; const why = [];
   const wk = thisWeek().length, f = freq(), streak = trainedDaysStreak(), dsl = daysSinceLast();
+  const last7 = new Set(S.history.filter(h => isStrength(h) && dayKeyOf(h.end) > dayKeyOf(now) - 7 * DAY).map(h => dayKeyOf(h.end))).size;   // dias treinados nos últimos 7 dias de calendário (hoje incluso)
   const flags = recoveryFlags(); const bi = blockInfo();
   const tired = Object.entries(st).filter(([, o]) => o.state === 'cansado' || o.state === 'recuperando').map(([g]) => g);
   const ap = activePain();
@@ -3307,9 +3335,11 @@ function todayPlan() {
   let rest = null;
   if (flags.pain) rest = 'Você relatou dor recentemente, sem indicar a região. Hoje é melhor descansar ou fazer só mobilidade.';
   else if (flags.limit) rest = 'Seus dois últimos treinos foram "no limite". Um dia de descanso vai render mais.';
-  else if (streak >= 3) rest = `Você treinou ${streak} dias seguidos. Hoje o corpo pede descanso.`;
-  else if (wk >= f && streak >= 1) rest = `Meta da semana já cumprida (${wk} de ${f}) e você treinou ontem. Descansar hoje ajuda a recuperar.`;
+  else if (streak >= (f >= 6 ? 6 : 3)) rest = `Você treinou ${streak} dias seguidos. Hoje o corpo pede descanso.`;
+  else if (last7 >= f) rest = `Você já fez ${last7} treino${last7 > 1 ? 's' : ''} nos últimos 7 dias, que é a sua meta por semana. Hoje é dia de recuperar.`;
+  else if (f <= 2 && dsl !== null && dsl < 3) rest = `Com meta de ${f} treino${f > 1 ? 's' : ''} por semana, o melhor é espaçar: o próximo fica para daqui a ${3 - dsl} dia${3 - dsl > 1 ? 's' : ''}.`;
   else if (!best.ok && best.blockers.some(g => ap.groups.has(g))) rest = `Os músculos disponíveis estão em recuperação ou na região com dor (${painNames(ap)}). Prefira descanso ou mobilidade.`;
+  else if (!best.ok && !ranked.some(r => r.blockers.length)) rest = 'Não há exercícios suficientes para montar um treino hoje com as suas restrições (viagem, dor ou limitações).';
   else if (!best.ok) rest = 'Todos os grupos grandes ainda estão se recuperando do último treino.';
   if (rest) {
     why.push(rest);
@@ -3328,7 +3358,7 @@ function todayPlan() {
   else if (ap.soft.size) why.push(ap.generalLvl && ap.generalLvl <= 2 ? `Dor geral nível ${ap.generalLvl}: treino um pouco mais leve, sem aumento de carga.` : `Dor leve (${painNames(ap)}): exercícios da região sem aumento de carga.`);
   if (bi.deload) why.push(`Semana leve (semana 4 do bloco ${bi.n}): menos séries e cerca de 10% menos carga.`);
   if (dsl !== null && dsl >= 5) why.push(`Faz ${dsl} dias sem treinar: volte com cerca de 10% menos carga nas primeiras séries.`);
-  if (wk < f) why.push(`Semana: ${wk} de ${f} treinos.`);
+  why.push(`${last7} de ${f} treinos nos últimos 7 dias.`);
   return { type: 'train', best, ranked, st, why };
 }
 function suggestedKey() { const t = todayPlan(); return t.best.k; }
@@ -3345,6 +3375,9 @@ function todayCard() {
       <button class="go-btn" data-goto="session" aria-label="Continuar"><svg viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8"/></svg></button></div>
       <button class="btn" style="margin-top:16px" data-goto="session">Continuar treino</button></div>`;
   }
+  if (!LIB) return `<div class="card hero" style="margin-top:16px"><div class="muted small">Treino de hoje</div><h3 style="margin-top:2px">${libFailed ? 'Sem conexão para montar o treino' : 'Montando o treino…'}</h3>
+      <p class="note" style="margin:6px 0 0">${libFailed ? 'A biblioteca de exercícios ainda não foi baixada neste aparelho. Conecte-se à internet e toque em Tentar de novo.' : 'Carregando a biblioteca de exercícios.'}</p>
+      ${libFailed ? '<button class="btn ghost" data-lib-retry style="margin-top:12px">Tentar de novo</button>' : ''}</div>`;
   const t = todayPlan(); const k = t.best.k; const p = PLANS[k];
   const reasons = `<ul class="why">${t.why.slice(0, 2).map(w => `<li>${esc(w)}</li>`).join('')}</ul>`;
   const custom = `<button class="hbtn small" data-custom>＋ Personalizado</button><button class="hbtn small" data-pain-sheet>${activePain().any ? 'Dor relatada' : 'Sentindo dor?'}</button>`;
@@ -3373,8 +3406,9 @@ function openWhy() {
     ${sec('Foco do dia', app, `${t.type === 'rest' ? esc(t.why[0]) + ' ' : ''}O foco só entra quando todos os grupos grandes dele tiveram ao menos um dia de descanso. Hoje: ${(SESSION_TYPES[k] || { groups: [] }).groups.map(gp => `${RG[gp]} ${stLbl[st[gp].state]}`).join(', ')}.`, 'Inspirado na prática comum de ~48 h entre sessões do mesmo grupo muscular.')}
     ${sec('Volume da semana', ev, `Meta por grupo para o nível ${nv ? NIVEL[nv].label.toLowerCase() : 'não informado'}, contada nos últimos 7 dias corridos (não zera na segunda). O foco com mais séries faltando ganha pontos; quem já passou da meta perde. Formato: séries feitas/meta · vezes nos últimos 7 dias.${grp ? `<div style="margin-top:6px">${grp}</div>` : ''}`, 'Mais séries semanais tendem a gerar mais hipertrofia: Schoenfeld, Ogborn e Krieger (2017), J Sports Sci; Baz-Valle et al. (2022), J Hum Kinet. Os números por nível são uma tradução do app dessas faixas.')}
     ${sec('Frequência', ev, 'Grupos treinados menos de 2 vezes nos últimos 7 dias dão preferência ao foco que os inclui.', 'Treinar cada músculo pelo menos 2x por semana tende a superar 1x: Schoenfeld, Ogborn e Krieger (2016), Sports Med.')}
+    ${sec('Dias de treino e descanso', app, `Sua meta é ${freq()} treino${freq() > 1 ? 's' : ''} por semana: ao chegar a esse número nos últimos 7 dias, o app sugere descanso. Também sugere descanso depois de ${freq() >= 6 ? 6 : 3} dias seguidos${freq() <= 2 ? ' e, com meta de até 2 treinos, pede 2 dias de intervalo entre eles' : ''}. Você pode treinar mesmo assim.`, '')}
     ${pr.length ? sec('Prioridades', ev, `${pr.map(gp => RG[gp]).join(', ')}: meta ~30% maior e um exercício a mais quando o foco inclui o grupo. Os demais ficam em manutenção (~70% da meta).`, 'Volume reduzido a cerca de 1/3 manteve os ganhos por meses: Bickel, Cross e Bamman (2011), Med Sci Sports Exerc. Os 30% e 70% são escolhas do app.') : ''}
-    ${sec('Exercícios', app, 'Entram primeiro os que você fez nos últimos 90 dias (academia e viagem contam separado), alternando quando você usa mais de um para o mesmo movimento. Preferências marcadas valem mais. A região com dor fica de fora.', '')}
+    ${sec('Exercícios', app, 'Os dois primeiros são os básicos do foco. Os demais entram pela ordem do que mais falta para a meta de cada grupo; grupo que já passou 30% da meta fica de fora. Entram primeiro os exercícios que você fez nos últimos 90 dias (academia e viagem contam separado), alternando quando você usa mais de um para o mesmo movimento. Nos acessórios, depois de 4 repetições do mesmo exercício, entra uma opção nova da biblioteca (até 3 por movimento). Preferências marcadas valem mais. Abdômen e lombar ficam no fim do treino.', '')}
     ${(() => { const L = S.volAdj || {}; const adj = Object.keys(RG).filter(gp => (L[gp] || 1) !== 1); return sec('Ajuste automático do volume', app, `Uma vez por semana o app compara o 1RM estimado das últimas 3 semanas com as 3 anteriores, por grupo, junto com quantas repetições sobravam. Força caindo com esforço alto: −10% de volume. Força parada com a meta cumprida: +10%. Limites de −20% a +20%.${adj.length ? ' Hoje: ' + adj.map(gp => `${RG[gp]} ${L[gp] > 1 ? '+' : '−'}${Math.round(Math.abs(L[gp] - 1) * 100)}%`).join(', ') + '.' : ' Nenhum ajuste ativo.'}`, 'Autorregulação por repetições em reserva (RIR): Helms et al. (2016), Strength Cond J; Zourdos et al. (2016), J Strength Cond Res. Os percentuais são do app.'); })()}
     ${(() => { const ap = activePain(); return ap.any ? sec('Dor', app, `${esc(ap.list.map(painLabel).join('; '))}. Nível 1–2: exercícios da região sem aumento de carga (2 também tira 1 série). Nível 3: saem os que têm a região como músculo principal. Nível 4–5: saem também os que a usam como secundário. Dor geral 3 ou mais: descanso.`, 'Escala e efeitos definidos pelo app, não orientação médica. Dor forte ou persistente: procure um profissional.') : ''; })()}
     ${limitList().length ? sec('Limitações permanentes', app, limitList().map(k => `${LIMITS[k].label}: ${LIMITS[k].txt}.`).join(' '), 'Lista de exclusão do app, não orientação médica. Em caso de lesão, siga a orientação de um profissional.') : ''}
@@ -3615,6 +3649,7 @@ function bind() {
   document.querySelectorAll('[data-travel]').forEach(b => b.onclick = () => setTravel(b.dataset.travel === 'on' || (b.dataset.travel === 'toggle' && !travelOn())));
   document.querySelectorAll('[data-travel-ideas]').forEach(b => b.onclick = openTravelSheet);
   document.querySelectorAll('[data-why]').forEach(b => b.onclick = openWhy);
+  document.querySelectorAll('[data-lib-retry]').forEach(b => b.onclick = () => { bootLib(); render(); });
   document.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => { S.theme = b.dataset.themeSet; save(); render(); });
   document.querySelectorAll('[data-media]').forEach(b => b.onclick = () => { S.media = { ...(S.media || {}), [b.dataset.media]: !mediaOn(b.dataset.media) }; save(); render(); });
   document.querySelectorAll('[data-redo]').forEach(b => b.onclick = () => { obRedo = true; obDraft = null; obStep = 1; go('onboard'); });
@@ -3658,7 +3693,7 @@ function bind() {
   }
 }
 document.querySelectorAll('#tabs button[data-tab]').forEach(b => b.onclick = () => go(b.dataset.tab));
-$('#fab').onclick = () => { if (S.active) return go('session'); const t = todayPlan();
+$('#fab').onclick = () => { if (S.active) return go('session'); if (!LIB) { bootLib(); return go('home'); } const t = todayPlan();
   if (t.type !== 'train' && !confirm(`${t.type === 'done' ? 'Você já treinou hoje' : 'Hoje a sugestão é descansar'}. Começar ${PLANS[t.best.k].name.toLowerCase()} mesmo assim?`)) return;
   startSession(t.best.k); };
 
@@ -3667,7 +3702,8 @@ applyTheme();
 applyPlan();
 runCoach();
 render();
-loadLib().then(() => { applyPlan(); if (['home', 'coach', 'plans'].includes(tab)) window.safeRender(); }).catch(() => {});
+function bootLib() { libFailed = false; return loadLib().then(() => { applyPlan(); if (['home', 'coach', 'plans'].includes(tab)) window.safeRender(); }).catch(() => { libFailed = true; if (tab === 'home') window.safeRender(); }); }
+bootLib(); window.addEventListener('online', () => { if (!LIB) bootLib(); });
 
 /* Atualização: ao achar versão nova, recarrega sozinho (se não houver treino em andamento); confere de novo sempre que o app volta para a frente */
 if ('serviceWorker' in navigator) {
