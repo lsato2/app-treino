@@ -2933,13 +2933,13 @@ function weekCard() {
     const hs = S.history.filter(h => h.end >= a && h.end < b); return { hs, n: hs.reduce((t, h) => t + setsDone(h) + (h.cardio ? 4 : 0), 0) }; });
   const max = Math.max(1, ...days.map(d => d.n)); const n = days.filter(d => d.hs.some(isStrength)).length;
   const tot = days.reduce((t, d) => t + d.hs.reduce((u, h) => u + setsDone(h), 0), 0);
-  const G = groupSets(ws, ws + 7 * DAY); const F = {};
-  for (const h of S.history) if (h.end >= ws && h.end < ws + 7 * DAY) for (const [g, v] of Object.entries(sessionLoad(h))) if (v >= 2) F[g] = (F[g] || 0) + 1;
+  const st7 = groupStatus(); const G = {}, F = {};                     // mesma janela do treino do dia: últimos 7 dias corridos (não zera na segunda)
+  Object.keys(RG).forEach(g => { G[g] = st7[g].week; F[g] = st7[g].sess; });
   return `<div class="card"><div class="row between"><span class="muted small">Esta semana</span><span class="pill">${n} de ${freq()} treinos</span></div>
     <div class="week-sum" style="margin-top:6px"><b>${tot}</b><span class="muted small">série${tot === 1 ? '' : 's'}</span></div>
     <div class="week">${days.map((d, i) => `<div class="day"><div class="bar ${d.hs.length ? 'on' : ''} ${i === today ? 'today' : ''}" style="height:${d.hs.length ? 34 + 50 * d.n / max : 30}px" title="${d.hs.map(h => planMeta(h).name).join(', ')}"></div>
       <span class="d">${'STQQSSD'[i]}</span></div>`).join('')}</div>
-    <div class="row between" style="margin:14px 0 4px"><span class="muted small">Séries por grupo · vezes na semana</span><button class="hbtn small" data-why>Por quê?</button></div>
+    <div class="row between" style="margin:14px 0 4px"><span class="muted small">Séries por grupo · últimos 7 dias</span><button class="hbtn small" data-why>Por quê?</button></div>
     <div class="gsets">${Object.keys(RG).map(g => { const v = Math.round(G[g] || 0), t = WEEK_TARGET[g]; return `<div class="gs"><div class="row between"><span>${volMode(g) === 'prio' ? '★ ' : ''}${g === 'posterior' ? 'Posterior e lombar' : RG[g]}<span class="muted"> · ${F[g] || 0}×</span></span><b>${v}<span class="muted">/${t}</span></b></div>
       <span class="gtrack"><i class="${v >= t ? 'full' : ''}" style="width:${Math.min(100, v / t * 100)}%"></i></span></div>`; }).join('')}</div></div>`;
 }
@@ -3281,9 +3281,10 @@ function rankTypes(st) {
     const ready = T.groups.reduce((a, gp) => a + Math.min(1.5, st[gp].score), 0) / T.groups.length;
     const fit = f <= 3 ? (type === 'full' ? 0.6 : type === 'upper' ? 0.2 : 0) : (type === 'full' ? -0.2 : 0.1);
     const pr = prioGroups(); const prioHit = pr.filter(gp => T.groups.includes(gp)).length;
-    const lowFreq = T.groups.filter(gp => st[gp].sess < 2);                     // meta: cada grupo ao menos 2x na semana
+    const lowFreq = T.groups.filter(gp => st[gp].sess < 2);
+    const over = T.groups.reduce((a, gp) => a + Math.min(1, Math.max(0, (st[gp].week - WEEK_TARGET[gp]) / WEEK_TARGET[gp])), 0) / T.groups.length;   // já passou da meta nos últimos 7 dias                     // meta: cada grupo ao menos 2x na semana
     const ok = !blockers.length && p && p.exercises.length >= 3;
-    return { k: type, T, ok, blockers, soft, need, main: T.groups, prioHit, lowFreq, score: (ok ? 0 : -10 - blockers.length) + ready + need - 0.5 * soft.length + fit + (pr.length ? 0.6 * prioHit / pr.length : 0) + 0.4 * lowFreq.length / T.groups.length };
+    return { k: type, T, ok, blockers, soft, need, main: T.groups, prioHit, lowFreq, score: (ok ? 0 : -10 - blockers.length) + ready + need - 0.5 * soft.length + fit + (pr.length ? 0.6 * prioHit / pr.length : 0) + 0.4 * lowFreq.length / T.groups.length - 0.8 * over };
   }).sort((a, b) => b.score - a.score);
 }
 function dayKeyOf(t) { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
@@ -3370,7 +3371,7 @@ function openWhy() {
   const grp = Object.keys(RG).map(gp => `<div class="kv"><span>${volMode(gp) === 'prio' ? '★ ' : ''}${RG[gp]}${volMode(gp) === 'manut' ? ' <span class="muted small">manutenção</span>' : ''}</span><b>${Math.round(st[gp].week)}/${WEEK_TARGET[gp]} · ${st[gp].sess}×</b></div>`).join('');
   const el = sheet(`<h3>Por que este treino</h3><p class="muted small" style="margin:2px 0 10px">${t.type === 'train' ? `Hoje: ${esc(p.name)}` : t.type === 'done' ? 'Treino de hoje concluído' : 'Hoje: descanso'}</p>
     ${sec('Foco do dia', app, `${t.type === 'rest' ? esc(t.why[0]) + ' ' : ''}O foco só entra quando todos os grupos grandes dele tiveram ao menos um dia de descanso. Hoje: ${(SESSION_TYPES[k] || { groups: [] }).groups.map(gp => `${RG[gp]} ${stLbl[st[gp].state]}`).join(', ')}.`, 'Inspirado na prática comum de ~48 h entre sessões do mesmo grupo muscular.')}
-    ${sec('Volume da semana', ev, `Meta por grupo para o nível ${nv ? NIVEL[nv].label.toLowerCase() : 'não informado'}. O foco com mais séries faltando ganha pontos. Formato: séries feitas/meta · vezes nos últimos 7 dias.${grp ? `<div style="margin-top:6px">${grp}</div>` : ''}`, 'Mais séries semanais tendem a gerar mais hipertrofia: Schoenfeld, Ogborn e Krieger (2017), J Sports Sci; Baz-Valle et al. (2022), J Hum Kinet. Os números por nível são uma tradução do app dessas faixas.')}
+    ${sec('Volume da semana', ev, `Meta por grupo para o nível ${nv ? NIVEL[nv].label.toLowerCase() : 'não informado'}, contada nos últimos 7 dias corridos (não zera na segunda). O foco com mais séries faltando ganha pontos; quem já passou da meta perde. Formato: séries feitas/meta · vezes nos últimos 7 dias.${grp ? `<div style="margin-top:6px">${grp}</div>` : ''}`, 'Mais séries semanais tendem a gerar mais hipertrofia: Schoenfeld, Ogborn e Krieger (2017), J Sports Sci; Baz-Valle et al. (2022), J Hum Kinet. Os números por nível são uma tradução do app dessas faixas.')}
     ${sec('Frequência', ev, 'Grupos treinados menos de 2 vezes nos últimos 7 dias dão preferência ao foco que os inclui.', 'Treinar cada músculo pelo menos 2x por semana tende a superar 1x: Schoenfeld, Ogborn e Krieger (2016), Sports Med.')}
     ${pr.length ? sec('Prioridades', ev, `${pr.map(gp => RG[gp]).join(', ')}: meta ~30% maior e um exercício a mais quando o foco inclui o grupo. Os demais ficam em manutenção (~70% da meta).`, 'Volume reduzido a cerca de 1/3 manteve os ganhos por meses: Bickel, Cross e Bamman (2011), Med Sci Sports Exerc. Os 30% e 70% são escolhas do app.') : ''}
     ${sec('Exercícios', app, 'Entram primeiro os que você fez nos últimos 90 dias (academia e viagem contam separado), alternando quando você usa mais de um para o mesmo movimento. Preferências marcadas valem mais. A região com dor fica de fora.', '')}
