@@ -754,10 +754,30 @@ function slotEx(plan, ei, swaps) {
 }
 function exList(x) { if (x.exs) return x.exs; if (!PLANS[x.plan]) return []; return PLANS[x.plan].exercises.map((_, i) => slotEx(x.plan, i, x.swaps)); }
 function prefSwaps() { return {}; }   // as preferências (S.prefPattern) já entram na geração do treino
-function newSets(e, deload) {
-  const last = S.last[e.id] || {};
-  const n = deload ? Math.max(2, Math.ceil(e.sets * 0.6)) : e.sets;                 // semana leve: ~40% menos séries
-  const kg = deload && last.kg && !e.assist ? roundStep(last.kg * 0.9, e.step || 2.5) : last.kg;   // e ~10% menos carga
+/* ---------- Perfil (Fase 3): idade, IMC, disposição do dia e tempo parado ---------- */
+const ageOf = () => +(S.profile && S.profile.idade) || 0;
+const imcOf = () => { const p = S.profile || {}; const h = p.altura / 100; return p.peso && h ? p.peso / (h * h) : 0; };
+const HIGH_IMPACT = /Jump|Skipping|Star_|Tuck|Scissors|Plyo|Box_|Burpee|Sprint|Bound/i;
+const lowImpact = () => ageOf() >= 60 || imcOf() >= 30;          // sem saltos: 60 anos ou mais, ou IMC 30 ou mais
+const readyToday = () => (S.ready && S.ready.day === dayKeyOf(Date.now())) ? S.ready.v : null;   // 1 cansado · 2 normal · 3 muito bem
+/* Tempo sem fazer o exercício: 2–4 semanas −10%, 4–8 semanas −20%, mais de 8 semanas −30% da carga */
+function lastDoneAt(id) { for (let k = S.history.length - 1; k >= 0; k--) if (setsOf(S.history[k], id).some(x => x.done)) return S.history[k].end; return 0; }
+/* Última vez que o movimento (ex.: empurrar horizontal) foi treinado, com qualquer exercício: trocar de exercício não conta como tempo parado */
+function lastPatternAt(pt) {
+  if (!pt) return 0;
+  for (let k = S.history.length - 1; k >= 0; k--) { const h = S.history[k]; if (exList(h).some(x => (h.sets[x.id] || []).some(y => y.done) && patternOf(x) === pt)) return h.end; }
+  return 0;
+}
+function detrain(e) {
+  if (!lastDoneAt(e.id)) return null;
+  const t = Math.max(lastDoneAt(e.id), lastPatternAt(patternOf(e)));
+  const d = Math.floor((Date.now() - t) / DAY); const f = d >= 56 ? 0.7 : d >= 28 ? 0.8 : d >= 14 ? 0.9 : 1;
+  return f < 1 ? { days: d, f, pct: Math.round((1 - f) * 100) } : null;
+}
+function newSets(e, deload, tired) {
+  const last = S.last[e.id] || {}; const dt = detrain(e);
+  const n = deload ? Math.max(2, Math.ceil(e.sets * 0.6)) : tired ? Math.max(2, e.sets - 1) : e.sets;   // semana leve: ~40% menos séries; dia cansado: 1 a menos
+  const kg = last.kg && !e.assist && (deload || dt) ? roundStep(last.kg * Math.min(deload ? 0.9 : 1, dt ? dt.f : 1), e.step || 2.5) : last.kg;   // ~10% menos na semana leve; menos também depois de tempo parado
   return Array.from({ length: n }, () => ({ kg: kg ?? null, reps: null, done: false }));
 }
 
@@ -800,7 +820,9 @@ function suggestion(e) {
   }
   const kg = Math.max(...ss.map(s => s.kg || 0)); if (!kg) return null;
   const atKg = ss.filter(s => s.kg === kg);
-  const rirs = ss.map(s => s.rir).filter(v => v != null); const minRir = rirs.length === ss.length ? Math.min(...rirs) : null;   // esforço informado em todas as séries
+  const rirs = ss.map(s => s.rir).filter(v => v != null); const minRir = rirs.length === ss.length && ageOf() < 50 ? Math.min(...rirs) : null;   // esforço informado em todas as séries (a partir de 50 anos a progressão é sempre de um passo)
+  const dt = detrain(e);
+  if (dt) { const nkg = roundStep(kg * dt.f, step); return { type: 'keep', kg: nkg, text: `Faz ${dt.days} dias desde a última vez (${fmtKg(kg)} kg). Recomece com ${fmtKg(nkg)} kg (−${dt.pct}%) e volte a subir aos poucos.` }; }
   if (full && atKg.length === ss.length && ss.every(s => (s.reps || 0) >= r.hi)) {
     const big = minRir != null && minRir >= 3; const nkg = Math.round((kg + step * (big ? 2 : 1)) * 100) / 100;
     return { type: 'up', kg: nkg, text: `Na última vez: ${fmtKg(kg)} kg × ${list}, todas no topo da faixa (${r.hi})${big ? ' e ainda sobravam 3+ repetições' : ''}. Suba para ${fmtKg(nkg)} kg.` };
@@ -821,6 +843,7 @@ function sugCard(e, a, compact) {
   if (spx) return `<div class="sug keep${compact ? ' compact' : ''}"><div><b>Dor nível ${spx} nesta região</b><div>Mantenha a carga da última vez e pare se a dor aumentar.</div></div></div>`;
   if (apx.groups.size && hitsPain(e, apx)) return `<div class="sug keep${compact ? ' compact' : ''}"><div><b>Dor relatada: ${esc(painNames(apx))}</b><div>Se for fazer este exercício, use carga leve e pare se doer.</div></div></div>`;
   let sg = suggestion(e); if (!sg) return '';
+  if (a && a.tired && sg.type === 'up') sg = { type: 'keep', kg: undefined, text: 'Você começou cansado hoje: mantenha a carga da última vez. A subida fica para o próximo treino.' };
   const hold = coachHold();
   if (hold && sg.type === 'up') sg = { type: 'keep', text: hold };
   const pending = a ? a.sets[e.id].filter(s => !s.done) : [];
@@ -884,7 +907,7 @@ function swapExercise(ei, altId, remember) {
     a.swaps = a.swaps || {};
     if (altId) a.swaps[ei] = altId; else delete a.swaps[ei];
     const ne = slotEx(a.plan, ei, a.swaps);
-    a.sets[ne.id] = newSets(ne, a.deload);
+    a.sets[ne.id] = newSets(ne, a.deload, a.tired);
   }
   const slot = PLANS[a.plan].exercises[ei].slot;
   if (slot) { S.prefPattern = S.prefPattern || {}; const chosen = altId || baseId;
@@ -1185,6 +1208,15 @@ function defaultReps(e) {
   return isNaN(n) ? null : n;
 }
 
+/* Antes de começar: "como você está hoje?" (uma vez por dia). Cansado = 1 série a menos e sem aumento de carga */
+function startFlow(k) {
+  if (S.active || readyToday() || blockInfo().deload) return startSession(k);
+  const el = sheet(`<h3>Como você está hoje?</h3><p class="muted small" style="margin:2px 0 12px">Sono e energia mudam o quanto o treino rende.</p>
+    <button class="opt" data-rd="1"><span><b>Cansado ou dormi mal</b><br><span class="muted small">Treino com 1 série a menos por exercício e sem aumento de carga</span></span></button>
+    <button class="opt" data-rd="2"><span><b>Normal</b><br><span class="muted small">Treino como planejado</span></span></button>
+    <button class="opt" data-rd="3"><span><b>Muito bem</b><br><span class="muted small">Treino como planejado</span></span></button>`);
+  el.querySelectorAll('[data-rd]').forEach(b => b.onclick = () => { S.ready = { day: dayKeyOf(Date.now()), v: +b.dataset.rd }; save(); el.remove(); startSession(k); });
+}
 function startSession(k) {
   if (!PLANS[k] && !(S.active && S.active.plan === k)) k = todayPlan().best.k;   // chave antiga (A/B/C): usa o treino do dia
   if (S.active && S.active.plan !== k) {
@@ -1195,8 +1227,9 @@ function startSession(k) {
     const swaps = {}; const sets = {};
     const deload = blockInfo().deload; const gen = JSON.parse(JSON.stringify(PLANS[k]));   // o treino fica congelado durante a sessão
     PLANS[k] = gen;
-    for (const e of exList({ plan: k, swaps })) sets[e.id] = newSets(e, deload);
-    S.active = { plan: k, gen, start: Date.now(), travel: travelOn(), deload, sets, swaps, order: gen.exercises.map((_, i) => i), skipped: {}, cardio: newCardio(k), view: 'focus', cur: 0 };
+    const tired = readyToday() === 1 && !deload;
+    for (const e of exList({ plan: k, swaps })) sets[e.id] = newSets(e, deload, tired);
+    S.active = { plan: k, gen, start: Date.now(), travel: travelOn(), deload, tired, ready: readyToday(), sets, swaps, order: gen.exercises.map((_, i) => i), skipped: {}, cardio: newCardio(k), view: 'focus', cur: 0 };
     const ap = activePain(); const exs = exList(S.active);
     if (ap.groups.size) {
       const hit = exs.map((e, i) => hitsPain(e, ap) ? i : -1).filter(i => i >= 0);
@@ -1211,7 +1244,7 @@ function newCardio(k) {
   if (travelOn()) return { on: false, type: TRAVEL_CARDIO_TYPES[0], min: TRAVEL_CARDIO_SUG.min, km: null, int: TRAVEL_CARDIO_SUG.int };
   const prev = S.lastCardio || {};
   const cs = CARDIO_SUG[k === 'legs' ? 'B' : 'A'];
-  return { on: false, type: prev.type || 'Esteira', min: cs.min, km: null, int: cs.int };
+  return { on: false, type: prev.type || (lowImpact() ? 'Bicicleta' : 'Esteira'), min: cs.min, km: null, int: lowImpact() && /HIIT/.test(cs.int) ? 'Moderado' : cs.int };
 }
 
 function viewCardio(a) {
@@ -1225,7 +1258,7 @@ function viewCardio(a) {
       <button class="switch ${c.on ? 'on' : ''}" id="cardioSw" role="switch" aria-checked="${c.on}" aria-label="Incluir aeróbico"></button>
     </div>
     <div class="cardio-body">
-      <div class="note" style="margin-top:10px"><b style="color:var(--text)">Sugestão:</b> ${esc(rotina() === 'bracal' && !a.travel ? 'Opcional para você: seu dia a dia já é fisicamente ativo. Se fizer, prefira ritmo leve.' : sug.txt)}</div>
+      <div class="note" style="margin-top:10px"><b style="color:var(--text)">Sugestão:</b> ${esc(rotina() === 'bracal' && !a.travel ? 'Opcional para você: seu dia a dia já é fisicamente ativo. Se fizer, prefira ritmo leve.' : sug.txt + (lowImpact() && !a.travel ? ' Prefira baixo impacto: bicicleta, elíptico ou caminhada.' : ''))}</div>
       <div class="cardio-grid">
         <label>Modalidade<select data-c="type">${opt(types.includes(c.type) ? types : [c.type, ...types], c.type)}</select></label>
         <label>Intensidade<select data-c="int">${opt(CARDIO_INT, c.int)}</select></label>
@@ -1324,6 +1357,7 @@ function viewSession() {
       </div>
       <div class="progress"><i id="prog" style="width:${progressPct()}%"></i></div>
       ${a.deload ? '<div class="deload-bar">Semana leve · menos séries e ~10% menos carga</div>' : ''}
+      ${a.tired ? '<div class="deload-bar">Dia cansado · 1 série a menos e sem aumento de carga</div>' : ''}
       ${a.painSkipped && a.painSkipped.length ? `<div class="deload-bar pain-bar">Pulados por dor: ${esc(a.painSkipped.join(', '))} · retome em Opções se estiver bem</div>` : ''}
     </div></div>`;
   return head + (a.view === 'focus' ? viewFocus(a) : viewList(a));
@@ -1674,7 +1708,7 @@ function finishSession() {
   }
   const cardio = a.cardio && a.cardio.on && a.cardio.min ? { type: a.cardio.type, min: a.cardio.min, km: a.cardio.km, int: a.cardio.int } : null;
   if (cardio) S.lastCardio = { type: cardio.type };
-  S.history.push({ plan: a.plan, exs: exList(a).map(stripEx), pname: PLANS[a.plan].name, pfocus: PLANS[a.plan].focus, planId: a.custom ? 'custom' : a.gen ? 'dynamic' : (curPlan() && curPlan().id) || 'legacy', travel: !!a.travel, custom: !!a.custom, past: !!a.past, cardioOnly: !doneCount, start, end, mod: Date.now(), deload: !!a.deload, sets: a.sets, swaps: a.swaps || {}, skipped: Object.keys(a.skipped || {}).map(Number), cardio });
+  S.history.push({ plan: a.plan, exs: exList(a).map(stripEx), pname: PLANS[a.plan].name, pfocus: PLANS[a.plan].focus, planId: a.custom ? 'custom' : a.gen ? 'dynamic' : (curPlan() && curPlan().id) || 'legacy', travel: !!a.travel, custom: !!a.custom, past: !!a.past, cardioOnly: !doneCount, start, end, mod: Date.now(), deload: !!a.deload, ...(a.ready ? { ready: a.ready } : {}), sets: a.sets, swaps: a.swaps || {}, skipped: Object.keys(a.skipped || {}).map(Number), cardio });
   S.history.sort((x, y) => x.end - y.end);   // um registro de outro dia entra no lugar certo
   S.active = null; save(); endRest(false);
   runCoach(); summaryEnd = end; go('summary');
@@ -2074,6 +2108,8 @@ function runCoach() {
   const last = S.history[S.history.length - 1];
   const apc = activePain(); const rep14 = Object.keys(PAIN_AREAS).find(a => painReports().filter(x => Date.now() - x.t < 14 * DAY && x.areas.includes(a)).length >= 2);
   if (!bi.deload && (apc.general || rep14)) addProposal({ key: `deload:pain:${(painReports().slice(-1)[0] || {}).t}`, type: 'deload', reason: apc.general ? `Você relatou dor geral nível ${apc.generalLvl}.` : `Dor relatada mais de uma vez em ${PAIN_AREAS[rep14].toLowerCase()} nos últimos 14 dias.` });
+  const T3 = S.history.filter(h => isStrength(h) && !h.deload).slice(-3);
+  if (T3.length === 3 && T3.every(h => h.ready === 1) && !bi.deload) addProposal({ key: `deload:tired:${T3[2].end}`, type: 'deload', reason: 'Você começou os três últimos treinos cansado ou com sono ruim.' });
   const L = S.history.filter(h => !h.deload).slice(-2);
   if (L.length === 2 && L.every(h => h.feel === 5) && !bi.deload) addProposal({ key: `deload:feel:${L[1].end}`, type: 'deload', reason: 'Seus dois últimos treinos foram marcados como "no limite".' });
   save(false);
@@ -2555,7 +2591,7 @@ function altsFor(base) {
   const ids = [...new Set([...candidatesFor(base.slot, usage, tr), ...((P.custom || {})[base.slot] || []), ...((P.custom || {})[base.id] || [])])].filter(id => id !== base.id);
   const kind = (CATALOG[base.slot] || {}).kind || 'c';
   return ids.map(id => {
-    const x = exFor(id, (usage[id] || {}).ex); if (!x || (tr && !travelOk(id, x)) || limitHit(id)) return null;
+    const x = exFor(id, (usage[id] || {}).ex); if (!x || (tr && !travelOk(id, x)) || limitHit(id) || (lowImpact() && HIGH_IMPACT.test(id))) return null;
     const a = { ...x, slot: base.slot };
     if (metric(a) !== metric(base)) Object.assign(a, prescribe(a, tr && ['big', 'c', 'i'].includes(kind) ? 'bw' : kind, P.goal || goal(), P.tempo || 60));
     return a;
@@ -3025,7 +3061,7 @@ function openTravelSheet() {
     <div class="muted small" style="margin:16px 0 6px">Aeróbico sugerido</div>
     ${TRAVEL_IDEAS.map(([t, d]) => `<div class="opt" style="display:block"><b>${t}</b><div class="muted small" style="margin-top:3px">${d}</div></div>`).join('')}
     ${opts.length && t.type === 'train' ? `<button class="btn" data-start="${opts[0].k}" style="margin-top:14px">Começar ${esc(PLANS[opts[0].k].name.toLowerCase())}</button>` : ''}`);
-  el.querySelectorAll('[data-start]').forEach(b => b.onclick = () => { el.remove(); startSession(b.dataset.start); });
+  el.querySelectorAll('[data-start]').forEach(b => b.onclick = () => { el.remove(); startFlow(b.dataset.start); });
 }
 function travelBanner() {
   if (!travelOn()) return '';
@@ -3077,7 +3113,7 @@ function groupStatus(now = Date.now()) {
   for (const [g, o] of Object.entries(out)) {
     // Pelo calendário: hoje = cansado; ontem = recuperando (grupos pequenos já liberam após ~30 h); 2+ dias = pronto; 8+ dias = parado
     const d = o.hours === null ? null : calDays(o.hours);
-    o.state = d === null ? 'novo' : d === 0 ? 'cansado' : d === 1 ? (BIG.has(g) || o.hours < 30 ? 'recuperando' : 'pronto') : d > 7 ? 'parado' : 'pronto';
+    o.state = d === null ? 'novo' : d === 0 ? 'cansado' : d === 1 ? (BIG.has(g) || o.hours < 30 ? 'recuperando' : 'pronto') : d === 2 && BIG.has(g) && ageOf() >= 60 ? 'recuperando' : d > 7 ? 'parado' : 'pronto';   // 60 anos ou mais: um dia a mais de recuperação nos grupos grandes
     o.score = { cansado: -2, recuperando: -1, pronto: 1, parado: 1.5, novo: 1 }[o.state];
   }
   const ap = activePain();
@@ -3123,7 +3159,7 @@ const prioGroups = () => ((S.goal && S.goal.prio) || []).filter(g => g in WEEK_B
 const baseVol = g => (LEVEL_VOL[nivel()] || WEEK_BASE)[g];
 const volMode = g => { const pr = prioGroups(); return !pr.length ? 'normal' : pr.includes(g) ? 'prio' : g === 'core' ? 'normal' : 'manut'; };
 const volAdj = g => ((S.volAdj || {})[g] || 1);
-const WEEK_TARGET = new Proxy(WEEK_BASE, { get: (t, g) => { if (t[g] == null) return undefined; const b = baseVol(g) * volAdj(g), m = volMode(g);
+const WEEK_TARGET = new Proxy(WEEK_BASE, { get: (t, g) => { if (t[g] == null) return undefined; const b = baseVol(g) * volAdj(g) * (rotina() === 'bracal' ? 0.85 : 1), m = volMode(g);   // trabalho físico pesado: 15% menos volume
   return m === 'prio' ? Math.round(b * 1.3) : m === 'manut' ? Math.max(Math.ceil(baseVol(g) / 3), Math.round(b * 0.7)) : Math.round(b); } });
 /* Uma vez por semana: compara o 1RM estimado das últimas 3 semanas com as 3 anteriores, por grupo, junto com o esforço (RIR) */
 function groupTrend(g, now = Date.now()) {
@@ -3249,7 +3285,7 @@ function pickExercise(pattern, ctx) {
     const ex = exFor(id, (ctx.usage[id] || {}).ex); if (!ex) continue;
     if (ctx.travel && !travelOk(id, ex)) continue;
     if (ctx.pain.groups.size && hitsPain(ex, ctx.pain)) continue;
-    if (limitHit(id)) continue;
+    if (limitHit(id) || (lowImpact() && HIGH_IMPACT.test(id))) continue;
     const u = ctx.usage[id]; const idx = pool.indexOf(id);
     let sc = (id === pref ? 6 : 0) + (u ? 3 + 0.25 * Math.min(u.n, 4) : 0) + (idx >= 0 ? 0.6 * (pool.length - idx) / pool.length : 0);
     if (id === recent && id !== pref) sc -= 1.5;
@@ -3265,7 +3301,7 @@ function generateWorkout(type, ctx) {
   const list = []; let mins = 5;                                  // 5 min de aquecimento
   const prio = prioGroups().filter(gp => T.groups.includes(gp) || (gp === 'core' && T.slots.includes('core')));
   const slots = [...T.slots];
-  if (['legs', 'full'].includes(type) && !slots.includes('lowback')) slots.splice(rotina() === 'sentado' ? 4 : slots.length - (type === 'legs' ? 1 : 0), 0, 'lowback');   // lombar: mais cedo para quem passa o dia sentado
+  if (['legs', 'full'].includes(type) && !slots.includes('lowback') && rotina() !== 'bracal') slots.splice(rotina() === 'sentado' ? 4 : slots.length - (type === 'legs' ? 1 : 0), 0, 'lowback');   // lombar: mais cedo para quem passa o dia sentado
   prio.forEach(gp => slots.splice(Math.min(3, slots.length), 0, PRIO_SLOT[gp].find(x => !slots.includes(x)) || PRIO_SLOT[gp][0]));   // um exercício a mais para cada prioridade do foco
   const st = ctx.st || groupStatus(); const tally = Object.fromEntries(Object.keys(RG).map(gp => [gp, st[gp].week]));
   const minEx = tempo <= 30 ? 3 : 4;
@@ -3282,6 +3318,7 @@ function generateWorkout(type, ctx) {
     if (ctx.travel && ['big', 'c', 'i'].includes(kind)) kind = 'bw';
     const e = { ...pk.ex, slot, ...prescribe(pk.ex, kind, g, tempo) };
     if (prio.some(gp => exGroups(e).p.includes(gp)) && e.sets < 4 && kind !== 'cond' && nivel() !== 'iniciante') e.sets += 1;   // +1 série nos grupos prioritários
+    if (ageOf() >= 50 && kind === 'big') e.rest += 30;                                          // 50 anos ou mais: 30 s a mais de descanso nos básicos
     const sp = softPain(e, ctx.pain); if (sp >= 2 && e.sets > 2) e.sets -= 1;                  // dor nível 2 na região: 1 série a menos
     if (list.length >= minEx && mins + exMinutes(e) > tempo) break;
     e._o = so.i + (['core', 'lowback'].includes(slot) ? 100 : 0);       // a escolha segue o que falta; a execução segue a ordem do treino (básicos primeiro, abdômen e lombar no fim)
@@ -3357,7 +3394,8 @@ function todayPlan() {
   if (ap.groups.size) why.push(`Exercícios que trabalham a região com dor (${painNames(ap)}) ficaram de fora.`);
   else if (ap.soft.size) why.push(ap.generalLvl && ap.generalLvl <= 2 ? `Dor geral nível ${ap.generalLvl}: treino um pouco mais leve, sem aumento de carga.` : `Dor leve (${painNames(ap)}): exercícios da região sem aumento de carga.`);
   if (bi.deload) why.push(`Semana leve (semana 4 do bloco ${bi.n}): menos séries e cerca de 10% menos carga.`);
-  if (dsl !== null && dsl >= 5) why.push(`Faz ${dsl} dias sem treinar: volte com cerca de 10% menos carga nas primeiras séries.`);
+  if (dsl !== null && dsl >= 14) why.push(`Faz ${dsl} dias sem treinar: as cargas sugeridas já vêm ${dsl >= 56 ? 30 : dsl >= 28 ? 20 : 10}% menores para a retomada.`);
+  else if (dsl !== null && dsl >= 5) why.push(`Faz ${dsl} dias sem treinar: retome com calma nas primeiras séries.`);
   why.push(`${last7} de ${f} treinos nos últimos 7 dias.`);
   return { type: 'train', best, ranked, st, why };
 }
@@ -3414,6 +3452,11 @@ function openWhy() {
     ${limitList().length ? sec('Limitações permanentes', app, limitList().map(k => `${LIMITS[k].label}: ${LIMITS[k].txt}.`).join(' '), 'Lista de exclusão do app, não orientação médica. Em caso de lesão, siga a orientação de um profissional.') : ''}
     ${sec('Séries, repetições e descanso', ev, `Pelo objetivo (${GOALS[g] || ''}): básicos ${sc.big[0]} reps com ${sc.big[1]} s de descanso, complementares ${sc.c[0]}, isolados ${sc.i[0]}.${nv === 'iniciante' ? ' Iniciante: até 3 séries por exercício.' : ''}`, 'Faixas de prescrição do posicionamento do ACSM sobre progressão no treino de força (2009), Med Sci Sports Exerc.')}
     ${sec('Progressão e semana leve', app, 'Ao fazer todas as séries no topo da faixa, sobe a carga (progressão dupla); se ainda sobravam 3+ repetições em todas, sobe o dobro ou sobe antes do topo. A cada 4 semanas, uma semana com menos séries e ~10% menos carga. Sem evolução em 3 treinos, o coach propõe troca ou redução de carga.', 'Prática consolidada no treino de força; não há um estudo único que fixe as 4 semanas.')}
+    ${sec('Tempo parado', ev, 'A carga sugerida de cada exercício cai conforme o tempo sem fazê-lo: 2 a 4 semanas −10%, 4 a 8 semanas −20%, mais de 8 semanas −30%. Depois volta a subir pela progressão normal.', 'A força se mantém bem por cerca de 3 a 4 semanas sem treino e cai depois disso: Bosquet et al. (2013), Scand J Med Sci Sports. Os percentuais são do app.')}
+    ${(() => { const L = []; if (ageOf() >= 60) L.push('60 anos ou mais: um dia a mais de recuperação nos grupos grandes e nada de saltos'); if (ageOf() >= 50) L.push('50 anos ou mais: 30 s a mais de descanso nos básicos e progressão sempre de um passo'); if (imcOf() >= 30) L.push('IMC 30 ou mais: sem saltos e aeróbico de baixo impacto');
+      if (rotina() === 'bracal') L.push('trabalho físico pesado: 15% menos volume e sem exercício extra de lombar'); if (rotina() === 'sentado') L.push('dia todo sentado: exercício de lombar nos treinos de pernas e corpo inteiro');
+      return L.length ? sec('Ajustes pelo seu perfil', app, L.join('; ') + '.', 'Regras do app a partir de recomendações gerais para idosos e iniciantes com sobrepeso (ACSM); não substituem avaliação individual.') : ''; })()}
+    ${sec('Como você está hoje', ev, 'Antes do treino o app pergunta sua disposição. "Cansado ou dormi mal": 1 série a menos por exercício e sem aumento de carga. Três treinos seguidos assim geram proposta de semana leve.', 'Sono insuficiente reduz o desempenho de força: Knowles et al. (2018), J Sci Med Sport. O ajuste é do app.')}
     ${sec('Aeróbico', ev, `Meta de ${cardioTarget()} dia(s) por semana, pelo objetivo e pelo seu dia a dia${rotina() ? ` (${ROTINA[rotina()].label.toLowerCase()})` : ''}.`, 'Recomendação geral de 150 a 300 min por semana de atividade aeróbica moderada para adultos: OMS (2020). Os dias por perfil são uma tradução do app.')}
     <p class="note" style="margin-top:12px">Referências gerais, que podem ter sido atualizadas: confira nas fontes originais antes de citar. A forma de combinar as regras é do app, não um método validado.</p>
     <button class="btn ghost" data-close style="margin-top:8px">Fechar</button>`);
@@ -3653,7 +3696,7 @@ function bind() {
   document.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => { S.theme = b.dataset.themeSet; save(); render(); });
   document.querySelectorAll('[data-media]').forEach(b => b.onclick = () => { S.media = { ...(S.media || {}), [b.dataset.media]: !mediaOn(b.dataset.media) }; save(); render(); });
   document.querySelectorAll('[data-redo]').forEach(b => b.onclick = () => { obRedo = true; obDraft = null; obStep = 1; go('onboard'); });
-  document.querySelectorAll('[data-start]').forEach(b => b.onclick = () => startSession(b.dataset.start));
+  document.querySelectorAll('[data-start]').forEach(b => b.onclick = () => startFlow(b.dataset.start));
   document.querySelectorAll('[data-hist]').forEach(c => c.onclick = () => c.classList.toggle('open'));
   document.querySelectorAll('[data-sum]').forEach(b => b.onclick = ev => { ev.stopPropagation(); summaryEnd = +b.dataset.sum; go('summary'); });
   document.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => go(b.dataset.goto));
@@ -3695,7 +3738,7 @@ function bind() {
 document.querySelectorAll('#tabs button[data-tab]').forEach(b => b.onclick = () => go(b.dataset.tab));
 $('#fab').onclick = () => { if (S.active) return go('session'); if (!LIB) { bootLib(); return go('home'); } const t = todayPlan();
   if (t.type !== 'train' && !confirm(`${t.type === 'done' ? 'Você já treinou hoje' : 'Hoje a sugestão é descansar'}. Começar ${PLANS[t.best.k].name.toLowerCase()} mesmo assim?`)) return;
-  startSession(t.best.k); };
+  startFlow(t.best.k); };
 
 if (S.active) tab = 'home';
 applyTheme();
