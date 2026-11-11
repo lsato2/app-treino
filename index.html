@@ -175,10 +175,16 @@
   /* Descanso flutuante (modo lista) */
   .rest { position: fixed; left: 12px; right: 12px; bottom: calc(110px + var(--safe-b)); z-index: 20; max-width: 536px; margin: 0 auto;
     background: var(--w80); border: 1px solid var(--edge); border-radius: 24px; padding: 12px 14px; display: none; align-items: center; gap: 12px; box-shadow: var(--shadow); }
-  .rest.show { display: flex; }
+  .rest.show { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto; }
   .rest .time { font-size: 32px; font-weight: 300; font-variant-numeric: tabular-nums; min-width: 82px; }
-  .rest .lbl { flex: 1; font-size: 13px; color: var(--muted); line-height: 1.3; }
-  .rest button { padding: 9px 12px; border-radius: 999px; background: var(--w85); border: 1px solid var(--edge); font-weight: 500; font-size: 14px; }
+  .rest .lbl { min-width: 0; font-size: 13px; color: var(--muted); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .rest button { padding: 9px 12px; border-radius: 999px; background: var(--w85); border: 1px solid var(--edge); font-weight: 500; font-size: 14px; white-space: nowrap; }
+  @media (max-width: 480px) {   /* celular: rótulo em cima, botões embaixo, nada sai da barra */
+    .rest.show { grid-template-columns: auto repeat(3, minmax(0, 1fr)); row-gap: 8px; column-gap: 8px; padding: 10px 12px; }
+    .rest .time { grid-row: 1 / 3; align-self: center; font-size: 30px; min-width: 70px; }
+    .rest .lbl { grid-column: 2 / 5; -webkit-line-clamp: 1; }
+    .rest button { padding: 8px 6px; font-size: 13px; }
+  }
   .rest.over .time { color: var(--ok); }
   body.in-session { padding-bottom: var(--safe-b); }
   body.in-session nav.tabs { display: none; }
@@ -1807,6 +1813,14 @@ function endRest(rerender) {
   if (rerender && inFocus()) { render(); window.scrollTo(0, 0); }
 }
 $('#restSkip').onclick = () => endRest(true);
+/* iPhone: depois que o teclado abre e fecha, o Safari às vezes deixa elementos fixos fora do lugar. Reposiciona pela área visível e força o recálculo ao fechar o teclado */
+function placeFixed() {
+  const vv = window.visualViewport; const bar = $('#rest'); if (!vv || !bar) return;
+  const off = Math.max(0, Math.round(window.innerHeight - (vv.height + vv.offsetTop)));
+  bar.style.transform = off > 1 ? `translateY(${-off}px)` : '';
+}
+if (window.visualViewport) { visualViewport.addEventListener('resize', placeFixed); visualViewport.addEventListener('scroll', placeFixed); }
+document.addEventListener('focusout', ev => { if (ev.target && ev.target.matches && ev.target.matches('input, select, textarea')) setTimeout(() => { window.scrollTo(window.scrollX, window.scrollY); placeFixed(); }, 80); });
 $('#restPlus').onclick = () => adjustRest(15);
 $('#restMinus').onclick = () => adjustRest(-15);
 
