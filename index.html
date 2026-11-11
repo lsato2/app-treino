@@ -369,6 +369,7 @@
   .why-link { background: none; border: 0; padding: 2px 0; margin-top: 2px; color: var(--accent); font-size: 14px; font-weight: 500; cursor: pointer; }
 .pain-lvl button { display: grid; gap: 1px; padding: 6px 2px; } .pain-lvl button b { font-size: 16px; } .pain-lvl button span { font-size: 10px; opacity: .8; }
   .pain-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); } .pain-row:first-of-type { border-top: 0; }
+.x-mini { margin-left: 6px; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--edge); background: var(--w85); font-size: 11px; color: var(--muted); line-height: 1; }
   .pr-mini { font-size: 11px; color: var(--accent); margin-top: 2px; font-weight: 600; }
   .gbar { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; align-items: center; padding: 5px 0; font-size: 14px; }
   .gtrack { height: 10px; background: var(--w85); border: 1px solid var(--edge); border-radius: 999px; overflow: hidden; }
@@ -1035,10 +1036,11 @@ function render() {
   if (typeof updateRest === 'function') updateRest();
 }
 
-function planList(k) {
+function planList(k, editable) {
   const pref = S.prefPattern || {};
   return `<ul class="ex-list">${exList({ plan: k }).map(e =>
-    `<li><span>${esc(e.name)}${pref[e.slot] === e.id ? ' <span class="pill">preferido</span>' : ''}</span><span>${e.sets} × ${esc(e.reps)}</span></li>`).join('')}</ul>`;
+    `<li><span>${esc(e.name)}${e.added ? ' <span class="pill">adicionado</span>' : pref[e.slot] === e.id ? ' <span class="pill">preferido</span>' : ''}</span><span>${e.sets} × ${esc(e.reps)}${editable && e.added ? ` <button class="x-mini" data-prerm="${k}|${esc(e.id)}" aria-label="Tirar ${esc(e.name)}">✕</button>` : ''}</span></li>`).join('')}</ul>
+    ${editable ? `<button class="hbtn small" data-preadd="${k}" style="margin-top:8px">＋ Adicionar exercício</button>` : ''}`;
 }
 
 function viewHome() {
@@ -1074,7 +1076,7 @@ function viewPlans() {
   const topK = S.active && !S.active.custom ? S.active.plan : t.type === 'train' ? t.best.k : null;
   const top = topK ? (() => { const p = PLANS[topK]; return `<div class="card hero ${topK}"><div class="row"><span class="tag ${topK}">${tagOf(topK)}</span>
       <div style="min-width:0;flex:1"><div class="muted small">${S.active && S.active.plan === topK ? 'Em andamento' : 'Sugerido hoje'} · ~${p.mins} min</div><h3 class="hero-t">${esc(p.name)}</h3><div class="hero-f">${esc(p.focus)}</div></div></div>
-      ${planList(topK)}${startBtn(topK, true)}</div>`; })()
+      ${planList(topK, !(S.active && S.active.plan === topK))}${startBtn(topK, true)}</div>`; })()
     : `<div class="card hero rest-hero"><div class="row"><span class="tag R">${t.type === 'done' ? '✓' : 'Zz'}</span><div><div class="muted small">Hoje</div><h3>${t.type === 'done' ? 'Treino concluído' : 'Dia de descanso'}</h3></div></div>
       <p class="note" style="margin:10px 0 0">${esc(t.why[0])}</p></div>`;
   const others = t.ranked.filter(r => r.k !== topK);
@@ -1083,7 +1085,7 @@ function viewPlans() {
     <h2>${topK ? 'Trocar o foco' : 'Treinar mesmo assim'}</h2>
     <div class="card focus-list">${others.map(r => { const k = r.k; const p = PLANS[k]; return `<details class="focus-row ${r.ok ? '' : 'dim'}">
       <summary><span class="tag ${k}">${tagOf(k)}</span><span class="fr-t"><b>${esc(p.name)}</b><span class="muted small">~${p.mins} min${r.ok ? '' : ' · ' + r.blockers.map(gp => RG[gp]).slice(0, 2).join(', ').toLowerCase()}</span></span>${lbl(r)}</summary>
-      <div class="fr-body">${planList(k)}${startBtn(k, false)}</div></details>`; }).join('')}</div>
+      <div class="fr-body">${planList(k, true)}${startBtn(k, false)}</div></details>`; }).join('')}</div>
     <div class="row" style="gap:8px;margin-top:16px;flex-wrap:wrap"><button class="hbtn small" data-custom>＋ Treino personalizado</button><button class="hbtn small" data-goto="library">Biblioteca</button>${travelOn() ? '<button class="hbtn small" data-travel="off">Sair do modo viagem</button>' : '<button class="hbtn small" data-redo>Ajustar objetivo</button>'}</div>
   </div>`;
 }
@@ -1400,7 +1402,7 @@ function viewFocus(a) {
       <p class="muted" style="text-align:center;margin-top:0">${n} séries · ${elapsedTxt(true)}</p>
       ${Object.keys(a.skipped || {}).length ? `<p class="note" style="text-align:center">Pulados hoje: ${Object.keys(a.skipped).map(i => esc(ex[i].name)).join(', ')}. Para retomar, use a lista.</p>` : ''}
       ${viewCardio(a)}
-      <div class="f-cta stack">${a.custom ? '<button class="btn ghost" data-addex>＋ Adicionar outro exercício</button>' : ''}${swipeHtml('finishBtn', 'Deslize para finalizar')}
+      <div class="f-cta stack"><button class="btn ghost" data-addex>＋ Adicionar outro exercício</button>${swipeHtml('finishBtn', 'Deslize para finalizar')}
       <button class="btn ghost" id="toList">Revisar séries</button></div>
     </div>`;
   }
@@ -1563,7 +1565,7 @@ function viewList(a) {
     </div>`;
   }).join('');
   return `<div class="wrap">${cards}
-      ${a.custom ? '<button class="btn ghost" data-addex style="margin-bottom:12px">＋ Adicionar exercício</button>' : ''}
+      <button class="btn ghost" data-addex style="margin-bottom:12px">＋ Adicionar exercício</button>
       ${viewCardio(a)}
       <div style="margin-top:8px">${swipeHtml('finishBtn', 'Deslize para finalizar')}</div>
       <button class="btn danger" id="discardBtn" style="margin-top:10px">Descartar treino</button>
@@ -1632,6 +1634,7 @@ function openActions(ei) {
     <button class="opt" data-act="skip"><span><b>${sk ? '↺ Retomar exercício' : '⤼ Pular hoje'}</b><br><span class="muted small">${sk ? 'Volta a fazer parte do treino de hoje' : 'Não entra no treino de hoje'}</span></span></button>
     <button class="opt" data-act="addset"><span><b>＋ Adicionar série</b><br><span class="muted small">Fazer uma série a mais deste exercício hoje</span></span></button>
     ${(a.sets[e.id] || []).length > 1 ? `<button class="opt" data-act="delset"><span><b>− Remover série</b><br><span class="muted small">${(a.sets[e.id] || []).some(x => !x.done) ? 'Tira a última série que ainda não foi feita' : 'Apaga a última série registrada'}</span></span></button>` : ''}
+    <button class="opt" data-act="addex"><span><b>＋ Adicionar exercício ao treino</b><br><span class="muted small">Inclui outro exercício da biblioteca no treino de hoje</span></span></button>
     <button class="opt" data-act="order"><span><b>⇅ Reordenar treino</b><br><span class="muted small">Mudar a sequência dos exercícios de hoje</span></span></button>
     <button class="btn ghost" data-act="close" style="margin-top:12px">Cancelar</button>`);
   el.querySelectorAll('[data-act]').forEach(b => b.onclick = () => {
@@ -1639,6 +1642,7 @@ function openActions(ei) {
     if (act === 'swap') return openSwap(ei);
     if (act === 'order') return openReorder();
     if (act === 'remove') removeFromCustom(ei);
+    if (act === 'addex') return openAddExercise();
     if (act === 'addset') addSet(ei);
     if (act === 'delset') removeSet(ei);
     if (act === 'later') moveLater(ei);
@@ -2667,6 +2671,8 @@ function applyPlan() {
   if (S.onboarded && migrateToDynamic()) changed = true;
   for (const [pt, id] of Object.entries(S.prefPattern || {})) if (LEGACY_MAP[id]) { S.prefPattern[pt] = LEGACY_MAP[id]; changed = true; }   // preferência gravada com código antigo
   PLANS = genPlans();
+  for (const k of TYPE_KEYS) for (const e of preAddFor(k)) if (PLANS[k] && !PLANS[k].exercises.some(x => x.id === e.id)) {   // adicionados por você antes de começar
+    const ex = prescribeAdded(exFor(e.id, e) || e); PLANS[k].exercises.push(ex); PLANS[k].mins = Math.round(PLANS[k].mins + exMinutes(ex)); }
   if (a && a.custom) PLANS.P = { name: 'Personalizado', focus: a.title || 'Treino livre', exercises: a.exs };
   else if (a && a.gen) PLANS[a.plan] = a.gen;
   else if (a && !PLANS[a.plan]) { S.active = null; changed = true; }
@@ -3453,7 +3459,7 @@ function suggestedKey() { const t = todayPlan(); return t.best.k; }
 
 function exPeek(k) {
   const exs = exList({ plan: k }); const mins = PLANS[k].mins;
-  return `<details class="ex-peek"><summary><span>${exs.length} exercícios · ~${mins} min</span><span class="muted small">${esc(exs.slice(0, 2).map(e => e.name).join(', '))}${exs.length > 2 ? '…' : ''}</span></summary>${planList(k)}</details>`;
+  return `<details class="ex-peek" ${S.preAdd && S.preAdd.open === k ? 'open' : ''}><summary><span>${exs.length} exercícios · ~${mins} min</span><span class="muted small">${esc(exs.slice(0, 2).map(e => e.name).join(', '))}${exs.length > 2 ? '…' : ''}</span></summary>${planList(k, true)}</details>`;
 }
 function todayCard() {
   if (S.active) {
@@ -3589,6 +3595,32 @@ function startCustom(title, past, cardioOnly) {
   if (cardioOnly) { S.active.cardioOnly = true; S.active.cardio = { ...S.active.cardio, on: true, type: travelOn() ? TRAVEL_CARDIO_TYPES[0] : 'Caminhada/corrida na rua', int: 'Leve' }; }
   save(); go('session'); if (!cardioOnly) setTimeout(openAddExercise, 50);
 }
+/* Exercício adicionado a um treino sugerido: prescrição pelo movimento e pelo objetivo */
+function prescribeAdded(e) {
+  const slot = patternOf(e); const known = LIB && LIB.get(e.id);
+  const kind = !known ? (e.unit === 's' ? 'core' : 'c') : (CATALOG[slot] || {}).kind || (e.unit === 's' ? 'core' : 'i');   // criado por você: prescrição de complementar
+  const g = (S.plan && S.plan.goal) || goal(); const tempo = (S.plan && S.plan.tempo) || (S.goal && S.goal.tempo) || 60;
+  const { sets, reps, rest, base, ...r } = e;
+  return { ...r, ...(slot ? { slot } : {}), ...prescribe(e, travelOn() && ['big', 'c', 'i'].includes(kind) ? 'bw' : kind, g, tempo), added: true };
+}
+/* Durante o treino sugerido */
+function addExerciseToSession(e) {
+  const a = S.active; if (!a) return false;
+  if (a.custom) return addExerciseToCustom(e);
+  if (exList(a).some(x => x.id === e.id)) { alert('Esse exercício já está no treino.'); return false; }
+  const ex = prescribeAdded(e); a.gen.exercises.push(ex); PLANS[a.plan] = a.gen;
+  a.sets[ex.id] = newSets(ex, a.deload, a.tired); orderOf(a).push(a.gen.exercises.length - 1);
+  if (!nextPending(a, a.cur) || !(a.sets[exList(a)[a.cur].id] || []).some(x => !x.done)) a.cur = a.gen.exercises.length - 1;
+  save(); return true;
+}
+/* Antes de começar: fica guardado para o foco escolhido, só no dia */
+const preAddFor = k => (S.preAdd && S.preAdd.day === dayKeyOf(Date.now()) && S.preAdd[k]) || [];
+function preAddExercise(k, e) {
+  if (exList({ plan: k }).some(x => x.id === e.id)) { alert('Esse exercício já está no treino.'); return false; }
+  const day = dayKeyOf(Date.now()); if (!S.preAdd || S.preAdd.day !== day) S.preAdd = { day };
+  S.preAdd[k] = [...(S.preAdd[k] || []), stripEx(e)]; save(); applyPlan(); return true;
+}
+function preRemove(k, id) { if (!S.preAdd || !S.preAdd[k]) return; S.preAdd[k] = S.preAdd[k].filter(x => x.id !== id); save(); applyPlan(); }
 function addExerciseToCustom(e) {
   const a = S.active; if (!a || !a.custom) return false;
   if (a.exs.some(x => x.id === e.id)) { alert('Esse exercício já está no treino.'); return false; }
@@ -3620,7 +3652,8 @@ function addSet(ei) {
   sets.push({ kg: lastS.kg ?? null, reps: null, done: false }); if (a.custom) e.sets = sets.length; save();
 }
 const CUSTOM_GROUPS = [['chest', 'Peito'], ['lats', 'Costas'], ['shoulders', 'Ombros'], ['biceps', 'Bíceps'], ['triceps', 'Tríceps'], ['quadriceps', 'Quadríceps'], ['hamstrings', 'Posterior'], ['glutes', 'Glúteos'], ['calves', 'Panturrilhas'], ['abdominals', 'Abdômen'], ['lower back', 'Lombar']];
-function openAddExercise() {
+function openAddExercise(onPick) {
+  if (typeof onPick !== 'function') onPick = addExerciseToSession;
   let q = '', m = '';
   const el = sheet(`<h3>Adicionar exercício</h3>
     <input class="search" id="axQ" placeholder="Buscar (ex.: supino, puxada, rosca)" autocomplete="off" style="margin-top:10px">
@@ -3638,7 +3671,7 @@ function openAddExercise() {
       .sort((a, b) => (EXMETA[b.id] ? 1 : 0) - (EXMETA[a.id] ? 1 : 0)).slice(0, 40);
     $('#axList', el).innerHTML = r.map(x => `<button class="opt" data-add="${esc(x.id)}"><span><b>${esc((EXMETA[x.id] || {}).name || x.n)}</b><br><span class="muted small">${esc(musclesPt(x))} · ${esc(EQ_PT[x.e] || '—')}</span></span><span class="opt-r"><span class="info-btn" data-axinfo="${esc(x.id)}" role="button" aria-label="Ver execução">i</span><span class="add-plus">＋</span></span></button>`).join('') || '<p class="note">Nada encontrado. Use "Não encontrei o exercício".</p>';
     el.querySelectorAll('[data-axinfo]').forEach(b => b.onclick = ev => { ev.stopPropagation(); openExDetail(b.dataset.axinfo); });
-    el.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { const e = libEx(b.dataset.add); if (e && addExerciseToCustom(e)) { el.remove(); render(); window.scrollTo(0, 0); } });
+    el.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { const e = libEx(b.dataset.add); if (e && onPick(e)) { el.remove(); render(); } });
   };
   loadLib().then(draw).catch(() => { $('#axList', el).innerHTML = '<p class="note">Sem conexão para carregar a biblioteca. Use "Não encontrei o exercício".</p>'; });
   $('#axQ', el).addEventListener('input', ev => { q = ev.target.value; draw(); });
@@ -3648,7 +3681,7 @@ function openAddExercise() {
   $('#axCreate', el).onclick = () => {
     const name = $('#axName', el).value.trim(); if (!name) { $('#axName', el).classList.add('need'); return; }
     const e = { id: 'u_' + norm(name).replace(/[^a-z0-9]+/g, '_').slice(0, 40), name, muscles: (CUSTOM_GROUPS.find(x => x[0] === g) || [])[1] || '', prim: g, equip: '', tip: '' };
-    if (addExerciseToCustom(e)) { el.remove(); render(); window.scrollTo(0, 0); }
+    if (onPick(e)) { el.remove(); render(); }
   };
 }
 
@@ -3771,6 +3804,8 @@ function bind() {
   document.querySelectorAll('[data-travel]').forEach(b => b.onclick = () => setTravel(b.dataset.travel === 'on' || (b.dataset.travel === 'toggle' && !travelOn())));
   document.querySelectorAll('[data-travel-ideas]').forEach(b => b.onclick = openTravelSheet);
   document.querySelectorAll('[data-why]').forEach(b => b.onclick = openWhy);
+  document.querySelectorAll('[data-preadd]').forEach(b => b.onclick = ev => { ev.preventDefault(); const k = b.dataset.preadd; openAddExercise(e => { const ok = preAddExercise(k, e); if (ok) S.preAdd.open = k; return ok; }); });
+  document.querySelectorAll('[data-prerm]').forEach(b => b.onclick = ev => { ev.preventDefault(); const [k, id] = b.dataset.prerm.split('|'); preRemove(k, id); if (S.preAdd) S.preAdd.open = k; render(); });
   document.querySelectorAll('[data-lib-retry]').forEach(b => b.onclick = () => { bootLib(); render(); });
   document.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => { S.theme = b.dataset.themeSet; save(); render(); });
   document.querySelectorAll('[data-media]').forEach(b => b.onclick = () => { S.media = { ...(S.media || {}), [b.dataset.media]: !mediaOn(b.dataset.media) }; save(); render(); });
