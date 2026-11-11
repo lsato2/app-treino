@@ -3099,6 +3099,15 @@ function sessionLoad(h) {
   }
   return L;
 }
+/* Séries diretas (o grupo é o músculo principal do exercício) */
+function directLoad(h) {
+  const L = {};
+  for (const e of exList(h)) { const n = (h.sets[e.id] || []).filter(x => x.done).length; if (n) exGroups(e).p.forEach(k => L[k] = (L[k] || 0) + n); }
+  return L;
+}
+/* Volume para decidir cortes: série indireta pesa 1/4 (na meta da semana pesa 1/2) */
+const cutVol = o => o.direct + 0.5 * (o.week - o.direct);
+const directDays = o => o.dHours === null ? 8 : Math.min(8, o.dHours / 24);
 /* Treino puxado: marcado "no limite" ou com média de RIR até 1 (ao menos 4 séries informadas) */
 function sessionHard(h) {
   if (h.feel >= 5) return true;
@@ -3108,9 +3117,10 @@ function sessionHard(h) {
 /* Estado de cada grupo: horas desde o último treino com pelo menos 3 séries */
 function groupStatus(now = Date.now()) {
   const out = {};
-  for (const g of Object.keys(RG)) out[g] = { hours: null, week: 0, sess: 0, load: 'normal', lastV: 0 };
+  for (const g of Object.keys(RG)) out[g] = { hours: null, week: 0, sess: 0, load: 'normal', lastV: 0, direct: 0, dHours: null };
   for (const h of S.history) {
     const L = sessionLoad(h); const hard = sessionHard(h);
+    for (const [g, v] of Object.entries(directLoad(h))) { if (!out[g]) continue; if (now - h.end < 7 * DAY) out[g].direct += v; if (v >= 2) out[g].dHours = (now - h.end) / 3.6e6; }
     for (const [g, v] of Object.entries(L)) {
       if (!out[g]) continue;
       if (now - h.end < 7 * DAY) { out[g].week += v; if (v >= 2) out[g].sess++; }
@@ -3315,17 +3325,23 @@ function generateWorkout(type, ctx) {
   const slots = [...T.slots];
   if (['legs', 'full'].includes(type) && !slots.includes('lowback') && rotina() !== 'bracal') slots.splice(rotina() === 'sentado' ? 4 : slots.length - (type === 'legs' ? 1 : 0), 0, 'lowback');   // lombar: mais cedo para quem passa o dia sentado
   prio.forEach(gp => slots.splice(Math.min(3, slots.length), 0, PRIO_SLOT[gp].find(x => !slots.includes(x)) || PRIO_SLOT[gp][0]));   // um exercício a mais para cada prioridade do foco
-  const st = ctx.st || groupStatus(); const tally = Object.fromEntries(Object.keys(RG).map(gp => [gp, st[gp].week]));
+  const st = ctx.st || groupStatus(); const tally = Object.fromEntries(Object.keys(RG).map(gp => [gp, cutVol(st[gp])]));
   const minEx = tempo <= 30 ? 3 : 4;
   const head = slots.slice(0, 2).map((sl, i) => ({ sl, i: i - 2 })); let tail = slots.slice(2).map((sl, i) => ({ sl, i }));
   const deficit = o => { const gp = SLOT_G[o.sl]; if (!gp) return 0; const tg = WEEK_TARGET[gp];
     return (tg - tally[gp]) / tg + (prio.includes(gp) && tally[gp] < tg ? 0.5 : 0) + (o.sl === 'lowback' && rotina() === 'sentado' ? 0.3 : 0); };
   const covered = gp => list.some(e => exGroups(e).p.includes(gp));
-  const needCover = o => { const gp = SLOT_G[o.sl]; return gp && T.groups.includes(gp) && (T.groups.length <= 3 || BIG.has(gp)) && !covered(gp); };   // treino dividido: todos os grupos do nome; amplo: só os grandes
+  const needCover = o => { const gp = SLOT_G[o.sl]; return gp && T.groups.includes(gp) && (T.groups.length <= 3 || BIG.has(gp) || directDays(st[gp]) >= 5) && !covered(gp); };   // dividido: todos os grupos do nome; amplo: os grandes e quem está há 5+ dias sem exercício direto
+  const skipped = [];
   const nextSlot = () => { if (head.length) return head.shift(); if (!tail.length) return null;
     tail.sort((a, b) => (needCover(b) - needCover(a)) || deficit(b) - deficit(a) || a.i - b.i); const o = tail.shift();
-    return deficit(o) <= -0.3 && list.length >= minEx && !needCover(o) ? nextSlot() : o; };   // grupo 30% acima da meta sai, mas nunca deixa um grupo do foco sem exercício
-  for (let so = nextSlot(); so; so = nextSlot()) {
+    if (deficit(o) <= -0.3 && list.length >= minEx && !needCover(o)) { skipped.push(o); return nextSlot(); }   // grupo 30% acima da meta sai, mas nunca deixa um grupo do foco sem exercício
+    return o; };
+  const fill = () => {                                                                      // treino curto (menos de 75% do tempo): completa com o grupo mais abaixo da meta, até 50% acima dela
+    if (mins >= tempo * 0.75 || !skipped.length) return null;
+    skipped.sort((a, b) => deficit(b) - deficit(a) || a.i - b.i); const o = skipped.shift();
+    return deficit(o) > -0.5 ? o : fill(); };
+  for (let so = nextSlot() || fill(); so; so = nextSlot() || fill()) {
     const slot = so.sl;
     const pk = pickExercise(slot, ctx); if (!pk) continue;
     let kind = (CATALOG[slot] || {}).kind || 'c';
@@ -3337,7 +3353,7 @@ function generateWorkout(type, ctx) {
     if (list.length >= minEx && mins + exMinutes(e) > tempo) break;
     e._o = so.i + (['core', 'lowback'].includes(slot) ? 100 : 0);       // a escolha segue o que falta; a execução segue a ordem do treino (básicos primeiro, abdômen e lombar no fim)
     list.push(e); ctx.used.add(pk.id); mins += exMinutes(e);
-    const eg = exGroups(e); eg.p.forEach(gp => { if (gp in tally) tally[gp] += e.sets; }); eg.s.forEach(gp => { if (gp in tally) tally[gp] += e.sets * 0.5; });
+    const eg = exGroups(e); eg.p.forEach(gp => { if (gp in tally) tally[gp] += e.sets; }); eg.s.forEach(gp => { if (gp in tally) tally[gp] += e.sets * 0.25; });
   }
   list.sort((a, b) => a._o - b._o); list.forEach(e => delete e._o);
   if (ctx.travel) { const pk = pickExercise('cond', ctx); if (pk) { const e = { ...pk.ex, slot: 'cond', ...prescribe(pk.ex, 'cond', g, tempo) }; if (mins + exMinutes(e) <= tempo + 4) { list.push(e); mins += exMinutes(e); } } }   // viagem: fecha com condicionamento
@@ -3350,20 +3366,22 @@ function genPlans() {
 }
 /* Ordena os focos: só entra quem tem todos os grupos recuperados */
 function rankTypes(st) {
-  const f = freq();
+  const f = freq(); const nowK = dayKeyOf(Date.now());
+  const extraDay = new Set(S.history.filter(h => isStrength(h) && dayKeyOf(h.end) > nowK - 7 * DAY).map(h => dayKeyOf(h.end))).size >= f;   // meta já cumprida: escolhe pelo que mais falta
   return TYPE_KEYS.map(type => {
     const T = SESSION_TYPES[type]; const p = PLANS[type];
     const blockers = T.groups.filter(gp => ['cansado', 'dor'].includes(st[gp].state) || (BIG.has(gp) && st[gp].state === 'recuperando'));
     const soft = T.groups.filter(gp => !BIG.has(gp) && st[gp].state === 'recuperando');
-    const need = T.groups.reduce((a, gp) => a + Math.max(0, (WEEK_TARGET[gp] - st[gp].week) / WEEK_TARGET[gp]), 0) / T.groups.length;
+    const need = T.groups.reduce((a, gp) => a + Math.max(0, (WEEK_TARGET[gp] - cutVol(st[gp])) / WEEK_TARGET[gp]), 0) / T.groups.length;
+    const since = T.groups.reduce((a, gp) => a + directDays(st[gp]), 0) / T.groups.length;           // dias, em média, sem exercício direto
     const ready = T.groups.reduce((a, gp) => a + Math.min(1.5, st[gp].score), 0) / T.groups.length;
     const fit = f <= 3 ? (type === 'full' ? 0.6 : type === 'upper' ? 0.2 : 0) : (type === 'full' ? -0.2 : 0.1);
     const pr = prioGroups(); const prioHit = pr.filter(gp => T.groups.includes(gp)).length;
     const lowFreq = T.groups.filter(gp => st[gp].sess < 2);
     const stale = T.groups.filter(gp => BIG.has(gp) && st[gp].hours !== null && st[gp].hours >= 5 * 24).length;   // grupo grande parado há 5+ dias
-    const over = T.groups.reduce((a, gp) => a + Math.min(1, Math.max(0, (st[gp].week - WEEK_TARGET[gp]) / WEEK_TARGET[gp])), 0) / T.groups.length;   // já passou da meta nos últimos 7 dias                     // meta: cada grupo ao menos 2x na semana
+    const over = T.groups.reduce((a, gp) => a + Math.min(1, Math.max(0, (cutVol(st[gp]) - WEEK_TARGET[gp]) / WEEK_TARGET[gp])), 0) / T.groups.length;   // já passou da meta nos últimos 7 dias                     // meta: cada grupo ao menos 2x na semana
     const ok = !blockers.length && p && p.exercises.length >= 3;
-    return { k: type, T, ok, blockers, soft, need, main: T.groups, prioHit, lowFreq, score: (ok ? 0 : -10 - blockers.length) + ready + need - 0.5 * soft.length + fit + (pr.length ? 0.6 * prioHit / pr.length : 0) + 0.4 * lowFreq.length / T.groups.length - 0.8 * over + 0.8 * stale };
+    return { k: type, T, ok, blockers, soft, need, main: T.groups, prioHit, lowFreq, score: (ok ? 0 : -10 - blockers.length) + ready + need - 0.5 * soft.length + fit + (pr.length ? 0.6 * prioHit / pr.length : 0) + 0.4 * lowFreq.length / T.groups.length - 0.8 * over + 0.8 * stale + 0.12 * since + (extraDay ? 1.2 * need : 0) };
   }).sort((a, b) => b.score - a.score);
 }
 function dayKeyOf(t) { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
