@@ -961,7 +961,9 @@ function mergeStates(local, rMeta, rHist) {
   const history = [...by.values()].sort((a, b) => a.end - b.end);
   const base = rMeta && ((rMeta.updatedAt || 0) > (local.updatedAt || 0) || (!local.onboarded && rMeta.onboarded)) ? rMeta : local;   // aparelho novo recebe a conta
   const { history: _h, ...meta } = base;
-  return Object.assign(structuredClone(DEFAULT), meta, { history, deleted: [...tomb] });
+  const out = Object.assign(structuredClone(DEFAULT), meta, { history, deleted: [...tomb] });
+  if (local.active) out.active = local.active;          // o treino em andamento é sempre o deste aparelho (mesmo objeto: cronômetro e botões continuam ligados)
+  return out;
 }
 
 /* ============================== Utilidades ============================== */
@@ -1015,7 +1017,7 @@ function strengthCards(n = 4, until = Date.now()) {
 
 /* ============================== Telas ============================== */
 let tab = 'home';
-function go(t) { if (sw) stopWatch(false); if (window.updatePending && !S.active && t === 'home') { location.reload(); return; } tab = t; render(); window.scrollTo(0, 0); }
+function go(t) { if (sw) stopWatch(t !== 'session'); if (window.updatePending && !S.active && t === 'home') { location.reload(); return; } tab = t; render(); window.scrollTo(0, 0); }
 
 function render() {
   applyPlan(); applyTheme();
@@ -1522,8 +1524,9 @@ function bindFocus(a) {
     };
     btn.onclick = () => {
       if (sw) return stopWatch(true);
-      startWatch(s, parseInt(e.reps, 10), () => { completeSet(a.cur, si); rr(); }, ui);
+      startWatch(s, parseInt(e.reps, 10), () => { completeSet(a.cur, si); rr(); }, ui, { id: e.id, i: si });
     };
+    if (watchOn(e.id, si)) { sw.ui = ui; ui.show('run', Math.max(0, Math.floor((Date.now() - sw.start) / 1000))); }   // cronômetro rodando: reconecta
   }
 }
 
@@ -1611,9 +1614,10 @@ function bindList(a) {
           play.innerHTML = mode === 'idle' ? PLAY : STOP;
         }
       };
-      play.onclick = () => { if (sw) return stopWatch(true); if (!s.done) startWatch(s, parseInt(ex.reps, 10), () => { completeSet(ei, i); refresh(); }, ui); };
+      play.onclick = () => { if (sw) return stopWatch(true); if (!s.done) startWatch(s, parseInt(ex.reps, 10), () => { completeSet(ei, i); refresh(); }, ui, { id, i }); };
+      if (watchOn(id, i)) { sw.ui = ui; ui.show('run', Math.max(0, Math.floor((Date.now() - sw.start) / 1000))); }   // cronômetro rodando: reconecta
     }
-    $('[data-done]', row).onclick = () => { if (sw && sw.s === s) return stopWatch(true); done(); };
+    $('[data-done]', row).onclick = () => { if (watchOn(id, i) || (sw && sw.s === s)) return stopWatch(true); done(); };
   });
 }
 
@@ -1735,34 +1739,41 @@ function tone(freq, dur = 0.15) {
     g.gain.setValueAtTime(0.2, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); o.start(t); o.stop(t + dur);
   } catch (e) {}
 }
-function startWatch(s, target, onDone, ui) {
+function startWatch(s, target, onDone, ui, key) {
   if (sw) stopWatch(false);
   endRest(false);
-  sw = { s, target, onDone, ui, hit: false, start: Date.now() + 3000 };   // 3 s para se posicionar
+  sw = { s, target, onDone, ui, key, hit: false, start: Date.now() + 3000 };   // 3 s para se posicionar
   let lastCount = null;
   const upd = () => {
     const ms = Date.now() - sw.start;
     if (ms < 0) {                    // contagem regressiva 3-2-1
       const c = Math.ceil(-ms / 1000);
       if (c !== lastCount) { lastCount = c; tone(660); }
-      ui.show('count', c); return;
+      sw.ui.show('count', c); return;
     }
     if (lastCount !== 0) { lastCount = 0; tone(990, 0.3); }
     const sec = Math.floor(ms / 1000);
     if (!sw.hit && target && sec >= target) { sw.hit = true; beep(); }
-    ui.show(sw.hit ? 'hit' : 'run', sec);
+    try { sw.ui.show(sw.hit ? 'hit' : 'run', sec); } catch (e) {}   // tela redesenhada: a nova se reconecta no próximo bind
   };
   upd(); sw.tick = setInterval(upd, 200);
   wakeLock(true);
 }
 function stopWatch(record) {
   if (!sw) return;
-  const { s, onDone, tick, ui } = sw; clearInterval(tick); wakeLock(false);
+  const { onDone, tick, ui, key } = sw; let { s } = sw; clearInterval(tick); wakeLock(false);
   const sec = Math.max(0, Math.floor((Date.now() - sw.start) / 1000));
   const started = Date.now() >= sw.start; sw = null;
-  ui.show('idle');
-  if (record && started && sec > 0) { s.reps = sec; save(); if (!s.done) onDone(); }
+  try { ui.show('idle'); } catch (e) {}
+  if (!(record && started && sec > 0)) return;
+  const a = S.active; const cur = key && a && a.sets[key.id] && a.sets[key.id][key.i];   // a série de agora, mesmo que a tela ou os dados tenham sido recarregados
+  if (cur) s = cur;
+  s.reps = sec; save();
+  if (s.done) { render(); return; }
+  if (key && a) { const ei = exList(a).findIndex(e => e.id === key.id); if (ei >= 0) { completeSet(ei, key.i); render(); return; } }
+  onDone();
 }
+const watchOn = (id, i) => sw && sw.key && sw.key.id === id && sw.key.i === i;
 let lock = null;
 function wakeLock(on) {
   try {
@@ -2446,9 +2457,10 @@ function bindCloud() {
 }
 /* Atualiza a tela quando a nuvem muda, sem atrapalhar um treino em andamento ou um campo sendo digitado */
 window.safeRender = () => {
-  if (tab === 'session' || document.querySelector('.sheet-bg')) return;
+  if (document.querySelector('.sheet-bg')) return;
   const ae = document.activeElement; if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'SELECT')) return;
-  render();
+  if (tab === 'session' && !S.active) return;
+  const y = window.scrollY; render(); if (tab === 'session') window.scrollTo(0, y);
 };
 window.onCloudStatus = () => {
   document.querySelectorAll('.cloud-st').forEach(el => { el.textContent = cloudStatusText(); el.className = `note cloud-st ${window.cloud.status}`; });
