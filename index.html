@@ -1019,7 +1019,10 @@ function strengthCards(n = 4, until = Date.now()) {
 
 /* ============================== Telas ============================== */
 let tab = 'home';
-function go(t) { if (sw) stopWatch(t !== 'session'); if (window.updatePending && !S.active && t === 'home') { location.reload(); return; } tab = t; render(); window.scrollTo(0, 0); }
+function go(t) {
+  const ae = document.activeElement; const typing = ae && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName);
+  if (typing) { ae.blur(); setTimeout(fixViewport, 350); setTimeout(fixViewport, 800); }   // fecha o teclado antes de trocar de tela
+  if (sw) stopWatch(t !== 'session'); if (window.updatePending && !S.active && t === 'home') { location.reload(); return; } tab = t; render(); window.scrollTo(0, 0); }
 
 function render() {
   applyPlan(); applyTheme();
@@ -1836,7 +1839,14 @@ function placeFixed() {
   const off = Math.max(0, Math.round(window.innerHeight - (vv.height + vv.offsetTop)));
   bar.style.transform = off > 1 ? `translateY(${-off}px)` : '';
 }
-if (window.visualViewport) { visualViewport.addEventListener('resize', placeFixed); visualViewport.addEventListener('scroll', placeFixed); }
+/* O iPhone às vezes mantém a área da tela "encolhida" depois que o teclado fecha: menu, botão ▶ e fundo ficam no meio da tela.
+   Um rolar de 1 px força o Safari a recalcular. Roda quando o teclado fecha e depois de trocar de tela vindo de um campo. */
+function fixViewport() { requestAnimationFrame(() => { const y = window.scrollY; window.scrollTo(window.scrollX, y + 1); window.scrollTo(window.scrollX, y); placeFixed(); }); }
+let vvH = window.visualViewport ? visualViewport.height : 0;
+if (window.visualViewport) {
+  visualViewport.addEventListener('resize', () => { const h = visualViewport.height; if (h > vvH + 80) setTimeout(fixViewport, 60); vvH = h; placeFixed(); });
+  visualViewport.addEventListener('scroll', placeFixed);
+}
 document.addEventListener('focusout', ev => { if (ev.target && ev.target.matches && ev.target.matches('input, select, textarea')) setTimeout(() => { window.scrollTo(window.scrollX, window.scrollY); placeFixed(); }, 80); });
 $('#restPlus').onclick = () => adjustRest(15);
 $('#restMinus').onclick = () => adjustRest(-15);
