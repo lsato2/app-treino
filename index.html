@@ -370,6 +370,8 @@
 .pain-lvl button { display: grid; gap: 1px; padding: 6px 2px; } .pain-lvl button b { font-size: 16px; } .pain-lvl button span { font-size: 10px; opacity: .8; }
   .pain-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); } .pain-row:first-of-type { border-top: 0; }
 .x-mini { margin-left: 6px; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--edge); background: var(--w85); font-size: 11px; color: var(--muted); line-height: 1; }
+.opt.did { border-color: rgba(61,90,134,.45); background: rgba(61,90,134,.08); } .did-pill { background: var(--accent); color: #fff; border: 0; font-size: 11px; }
+  .ax-sec { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 10px 2px 2px; }
   .pr-mini { font-size: 11px; color: var(--accent); margin-top: 2px; font-weight: 600; }
   .gbar { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; align-items: center; padding: 5px 0; font-size: 14px; }
   .gtrack { height: 10px; background: var(--w85); border: 1px solid var(--edge); border-radius: 999px; overflow: hidden; }
@@ -1239,7 +1241,7 @@ function startSession(k) {
     const deload = blockInfo().deload; const gen = JSON.parse(JSON.stringify(PLANS[k]));   // o treino fica congelado durante a sessão
     PLANS[k] = gen;
     const tired = readyToday() === 1 && !deload;
-    for (const e of exList({ plan: k, swaps })) sets[e.id] = newSets(e, deload, tired);
+    for (const e of exList({ plan: k, swaps })) sets[e.id] = e.added ? setsFromLast(e, deload, tired) : newSets(e, deload, tired);
     S.active = { plan: k, gen, start: Date.now(), travel: travelOn(), deload, tired, ready: readyToday(), sets, swaps, order: gen.exercises.map((_, i) => i), skipped: {}, cardio: newCardio(k), view: 'focus', cur: 0 };
     const ap = activePain(); const exs = exList(S.active);
     if (ap.groups.size) {
@@ -3621,7 +3623,7 @@ function addExerciseToSession(e) {
   if (a.custom) return addExerciseToCustom(e);
   if (exList(a).some(x => x.id === e.id)) { alert('Esse exercício já está no treino.'); return false; }
   const ex = prescribeAdded(e); a.gen.exercises.push(ex); PLANS[a.plan] = a.gen;
-  a.sets[ex.id] = newSets(ex, a.deload, a.tired); orderOf(a).push(a.gen.exercises.length - 1);
+  a.sets[ex.id] = setsFromLast(ex, a.deload, a.tired); ex.sets = a.sets[ex.id].length; orderOf(a).push(a.gen.exercises.length - 1);
   if (!nextPending(a, a.cur) || !(a.sets[exList(a)[a.cur].id] || []).some(x => !x.done)) a.cur = a.gen.exercises.length - 1;
   save(); return true;
 }
@@ -3636,9 +3638,8 @@ function preRemove(k, id) { if (!S.preAdd || !S.preAdd[k]) return; S.preAdd[k] =
 function addExerciseToCustom(e) {
   const a = S.active; if (!a || !a.custom) return false;
   if (a.exs.some(x => x.id === e.id)) { alert('Esse exercício já está no treino.'); return false; }
-  const ex = { ...e, sets: 3, reps: e.unit === 's' ? '30s' : '8–12', rest: 90, step: 5 };
-  delete ex.slot;
-  a.exs.push(ex); a.sets[ex.id] = newSets(ex, false); orderOf(a).push(a.exs.length - 1); a.cur = a.exs.length - 1;
+  const ex = prescribeAdded(e); delete ex.added; ex.step = ex.step || e.step || 2.5;
+  a.exs.push(ex); a.sets[ex.id] = setsFromLast(ex, false); ex.sets = a.sets[ex.id].length; orderOf(a).push(a.exs.length - 1); a.cur = a.exs.length - 1;
   save(); return true;
 }
 function removeFromCustom(ei) {
@@ -3664,6 +3665,23 @@ function addSet(ei) {
   sets.push({ kg: lastS.kg ?? null, reps: null, done: false }); if (a.custom) e.sets = sets.length; save();
 }
 const CUSTOM_GROUPS = [['chest', 'Peito'], ['lats', 'Costas'], ['shoulders', 'Ombros'], ['biceps', 'Bíceps'], ['triceps', 'Tríceps'], ['quadriceps', 'Quadríceps'], ['hamstrings', 'Posterior'], ['glutes', 'Glúteos'], ['calves', 'Panturrilhas'], ['abdominals', 'Abdômen'], ['lower back', 'Lombar']];
+/* Exercícios que você já fez: última vez, melhor série e o próprio exercício (inclui os criados por você) */
+function myExercises() {
+  const by = {};
+  for (const h of S.history) for (const e of exList(h)) {
+    const ss = (h.sets[e.id] || []).filter(x => x.done); if (!ss.length) continue;
+    by[e.id] = { id: e.id, e, t: h.end, best: bestSet(e, ss), n: (by[e.id] ? by[e.id].n : 0) + 1 };
+  }
+  return by;
+}
+const agoDays = t => { const d = Math.round((dayKeyOf(Date.now()) - dayKeyOf(t)) / DAY); return d <= 0 ? 'hoje' : d === 1 ? 'ontem' : `há ${d} dias`; };
+/* Séries de um exercício adicionado: repete carga e repetições da última vez, quando houver */
+function setsFromLast(ex, deload, tired) {
+  const ss = lastSessionSets(ex.id);
+  if (!ss || deload || tired) return newSets(ex, deload, tired);
+  const dt = detrain(ex); const f = dt ? dt.f : 1;
+  return ss.map(x => ({ kg: x.kg != null && f < 1 && !ex.assist ? roundStep(x.kg * f, ex.step || 2.5) : x.kg ?? null, reps: x.reps ?? null, done: false }));
+}
 function openAddExercise(onPick) {
   if (typeof onPick !== 'function') onPick = addExerciseToSession;
   let q = '', m = '';
@@ -3678,12 +3696,21 @@ function openAddExercise(onPick) {
   const draw = () => {
     if (!LIB) return;
     const nq = norm(q.trim()); const ms = m ? m.split('|') : null;
-    const r = [...LIB.values()].filter(x => ['strength', 'powerlifting', 'plyometrics', 'olympic weightlifting', 'strongman'].includes(x.c) && (!travelOn() || NO_GYM(x)) &&
+    const mine = myExercises();
+    const match = (name, prim) => (!nq || norm(name).includes(nq)) && (!ms || ms.includes(prim));
+    // 1) os que você já fez (inclusive os criados por você), do mais recente para o mais antigo
+    const done = Object.values(mine).filter(u => { const x = LIB.get(u.id); return match(x ? ((EXMETA[x.id] || {}).name || x.n) : u.e.name, x ? x.p[0] : u.e.prim) && (!travelOn() || !x || NO_GYM(x)); })
+      .sort((a, b) => b.t - a.t).slice(0, nq || ms ? 40 : 15);
+    // 2) os demais da biblioteca
+    const r = [...LIB.values()].filter(x => !mine[x.id] && ['strength', 'powerlifting', 'plyometrics', 'olympic weightlifting', 'strongman'].includes(x.c) && (!travelOn() || NO_GYM(x)) &&
       (!ms || x.p.some(p => ms.includes(p))) && (!nq || norm((EXMETA[x.id] || {}).name || x.n).includes(nq) || norm(x.n).includes(nq)))
       .sort((a, b) => (EXMETA[b.id] ? 1 : 0) - (EXMETA[a.id] ? 1 : 0)).slice(0, 40);
-    $('#axList', el).innerHTML = r.map(x => `<button class="opt" data-add="${esc(x.id)}"><span><b>${esc((EXMETA[x.id] || {}).name || x.n)}</b><br><span class="muted small">${esc(musclesPt(x))} · ${esc(EQ_PT[x.e] || '—')}</span></span><span class="opt-r"><span class="info-btn" data-axinfo="${esc(x.id)}" role="button" aria-label="Ver execução">i</span><span class="add-plus">＋</span></span></button>`).join('') || '<p class="note">Nada encontrado. Use "Não encontrei o exercício".</p>';
+    const doneHtml = done.map(u => { const x = LIB.get(u.id); const name = x ? ((EXMETA[x.id] || {}).name || x.n) : u.e.name;
+      return `<button class="opt did" data-add="${esc(u.id)}"><span><b>${esc(name)}</b> <span class="pill did-pill">já fez</span><br><span class="muted small">Última: ${esc(fmtSet(u.e, u.best))} · ${agoDays(u.t)}</span></span><span class="opt-r">${x ? `<span class="info-btn" data-axinfo="${esc(x.id)}" role="button" aria-label="Ver execução">i</span>` : ''}<span class="add-plus">＋</span></span></button>`; }).join('');
+    const libHtml = r.map(x => `<button class="opt" data-add="${esc(x.id)}"><span><b>${esc((EXMETA[x.id] || {}).name || x.n)}</b><br><span class="muted small">${esc(musclesPt(x))} · ${esc(EQ_PT[x.e] || '—')}</span></span><span class="opt-r"><span class="info-btn" data-axinfo="${esc(x.id)}" role="button" aria-label="Ver execução">i</span><span class="add-plus">＋</span></span></button>`).join('');
+    $('#axList', el).innerHTML = (doneHtml ? `<div class="ax-sec">Seus exercícios</div>${doneHtml}` : '') + (libHtml ? `${doneHtml ? '<div class="ax-sec">Biblioteca</div>' : ''}${libHtml}` : '') || '<p class="note">Nada encontrado. Use "Não encontrei o exercício".</p>';
     el.querySelectorAll('[data-axinfo]').forEach(b => b.onclick = ev => { ev.stopPropagation(); openExDetail(b.dataset.axinfo); });
-    el.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { const e = libEx(b.dataset.add); if (e && onPick(e)) { el.remove(); render(); } });
+    el.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { const id = b.dataset.add; const e = libEx(id) || (mine[id] && exFor(id, mine[id].e)); if (e && onPick(e)) { el.remove(); render(); } });
   };
   loadLib().then(draw).catch(() => { $('#axList', el).innerHTML = '<p class="note">Sem conexão para carregar a biblioteca. Use "Não encontrei o exercício".</p>'; });
   $('#axQ', el).addEventListener('input', ev => { q = ev.target.value; draw(); });
@@ -3692,7 +3719,8 @@ function openAddExercise(onPick) {
   el.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { g = b.dataset.g; el.querySelectorAll('[data-g]').forEach(x => x.classList.toggle('on', x === b)); });
   $('#axCreate', el).onclick = () => {
     const name = $('#axName', el).value.trim(); if (!name) { $('#axName', el).classList.add('need'); return; }
-    const e = { id: 'u_' + norm(name).replace(/[^a-z0-9]+/g, '_').slice(0, 40), name, muscles: (CUSTOM_GROUPS.find(x => x[0] === g) || [])[1] || '', prim: g, equip: '', tip: '' };
+    const id = 'u_' + norm(name).replace(/[^a-z0-9]+/g, '_').slice(0, 40); const prev = myExercises()[id];
+    const e = prev ? exFor(id, prev.e) : { id, name, muscles: (CUSTOM_GROUPS.find(x => x[0] === g) || [])[1] || '', prim: g, equip: '', tip: '' };
     if (onPick(e)) { el.remove(); render(); }
   };
 }
