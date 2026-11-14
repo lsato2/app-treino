@@ -350,6 +350,22 @@
   .cal-d.on.C, .cal-d.on.legs { background: var(--plan-c); border-color: var(--plan-c); color: var(--ink); }
   .cal-d.on.push, .cal-d.on.upper { background: var(--a); border-color: var(--a); } .cal-d.on.pull, .cal-d.on.full { background: var(--b); border-color: var(--b); }
   .cal-d.today { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .cal-d[data-cal] { cursor: pointer; } .cal-d { position: relative; }
+  .cal-d.st-follow, .cal-d.st-extra, .cal-d.st-old { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .cal-d.st-extra { background: #6f8fbf; border-color: #6f8fbf; }
+  .cal-d.st-old { background: #8a9bb3; border-color: #8a9bb3; }
+  .cal-d.st-other { background: #7c5cc4; border-color: #7c5cc4; color: #fff; font-weight: 600; }
+  .cal-d.st-custom { background: var(--c); border-color: var(--c); color: #fff; font-weight: 600; }
+  .cal-d.st-restwork { background: #2a9d8f; border-color: #2a9d8f; color: #fff; font-weight: 600; }
+  .cal-d.st-cardio { border: 2px solid #d9467a; color: #d9467a; font-weight: 600; }
+  .cal-d.st-missed { border: 2px solid var(--danger); color: var(--danger); font-weight: 600; background: rgba(214,69,69,.08); }
+  .cal-d.st-optskip { border: 1.5px dashed var(--muted); }
+  .cal-d.st-rest { background: var(--w85); }
+  .cal-d.has-pain::after { content: ''; position: absolute; top: 2px; right: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--danger); border: 1px solid #fff; }
+  .cal-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .cal-lg { display: inline-flex; align-items: center; gap: 5px; } .cal-lg .cal-d { width: 14px; height: 14px; aspect-ratio: auto; display: inline-block; font-size: 0; }
+  .cal-tag { display: flex; align-items: center; gap: 10px; margin-top: 6px; } .cal-tag .cal-d { width: 22px; height: 22px; aspect-ratio: auto; flex: none; }
+  .cal-w { padding: 10px 0; border-top: 1px solid var(--line); }
   .chart { position: relative; margin-top: 10px; touch-action: pan-y; }
   .chart svg { width: 100%; height: 132px; display: block; overflow: visible; }
   .chart .grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
@@ -2214,17 +2230,101 @@ const msgIco = { ok: '✓', warn: '!', info: 'i', deload: '↓', prop: '★', to
 const msgHtml = x => `<div class="msg ${x.t}" ${x.go ? `data-goto="${x.go}"` : ''}><span class="msg-ico">${msgIco[x.t] || 'i'}</span><span>${esc(x.text)}</span></div>`;
 
 /* ---------- Calendário ---------- */
+/* ---------- Calendário: o que o app sugeriu x o que você fez, dia a dia ---------- */
+/* A sugestão de cada dia fica gravada quando aparece na tela inicial; dias anteriores a isso são estimados com as regras atuais */
+function logSuggestion(t) {
+  if (!t || t.type === 'done' || S.active) return;
+  const day = dayKeyOf(Date.now()); S.sugLog = S.sugLog || {};
+  const v = { t: t.type, k: t.type === 'train' ? t.best.k : null, x: t.extra ? 1 : 0, n: t.type === 'train' ? PLANS[t.best.k].name : '', w: (t.why[0] || '').slice(0, 160) };
+  const o = S.sugLog[day]; if (o && o.t === v.t && o.k === v.k && o.x === v.x) return;
+  S.sugLog[day] = v;
+  for (const d of Object.keys(S.sugLog)) if (+d < day - 120 * DAY) delete S.sugLog[d];
+  save(false);
+}
+let SUG_CACHE = { key: '', map: {} };
+function suggestionOn(day) {
+  const lg = (S.sugLog || {})[day]; if (lg) return { ...lg, src: 'app' };
+  const key = `${S.history.length}:${(S.history[S.history.length - 1] || {}).end}:${JSON.stringify(S.goal)}`;
+  if (SUG_CACHE.key !== key) SUG_CACHE = { key, map: {} };
+  if (day in SUG_CACHE.map) return SUG_CACHE.map[day];
+  const first = S.history.length ? dayKeyOf(S.history[0].end) : Infinity;
+  if (day <= first || day >= dayKeyOf(Date.now())) return (SUG_CACHE.map[day] = null);
+  const real = Date.now; const H = S.history; const P0 = PLANS; let out = null;
+  try {
+    const t0 = day + 8 * 36e5; Date.now = () => t0; S.history = H.filter(h => h.end < t0); PLANS = genPlans();
+    const t = todayPlan(); out = { t: t.type, k: t.type === 'train' ? t.best.k : null, x: t.extra ? 1 : 0, n: t.type === 'train' ? PLANS[t.best.k].name : '', w: (t.why[0] || '').slice(0, 160), src: 'estimada' };
+  } catch (e) { out = null; } finally { Date.now = real; S.history = H; PLANS = P0; }
+  return (SUG_CACHE.map[day] = out);
+}
+const CAL_ST = {
+  follow: ['Seguiu a sugestão', 'Fez o treino que o app sugeriu.'],
+  other: ['Outro foco', 'Fez um treino gerado pelo app, mas com outro foco que não o sugerido.'],
+  custom: ['Personalizado no lugar', 'O app sugeria um treino e você fez um treino personalizado.'],
+  restwork: ['Treinou no descanso', 'O app sugeria descanso e você treinou mesmo assim.'],
+  extra: ['Treino opcional feito', 'A meta da semana já estava cumprida e você fez o treino opcional.'],
+  cardio: ['Só aeróbico', 'Registrou apenas aeróbico.'],
+  missed: ['Faltou', 'O app sugeria treino e nada foi registrado.'],
+  optskip: ['Opcional não feito', 'O treino era opcional (meta da semana cumprida) e você descansou.'],
+  rest: ['Descanso', 'O app sugeria descanso e você descansou.'],
+  old: ['Treino do plano antigo', 'Treino feito antes do treino variável.'],
+};
+function dayInfo(day) {
+  const today = dayKeyOf(Date.now()); if (day > today) return null;
+  const hs = S.history.filter(h => dayKeyOf(h.end) === day); const str = hs.filter(isStrength);
+  let sug = null;
+  if (day === today) { if (!S.active && LIB) { const t = todayPlan(); sug = t.type === 'done' ? (S.sugLog || {})[day] || null : { t: t.type, k: t.type === 'train' ? t.best.k : null, x: t.extra ? 1 : 0, n: t.type === 'train' ? PLANS[t.best.k].name : '', w: t.why[0] || '', src: 'app' }; } }
+  else sug = LIB ? suggestionOn(day) : (S.sugLog || {})[day] || null;
+  let st = null;
+  if (str.length) {
+    const h = str[0];
+    if (!h.custom && ['A', 'B', 'C'].includes(h.plan)) st = 'old';
+    else if (!sug) st = h.custom ? 'custom' : 'follow';
+    else if (sug.t === 'rest') st = 'restwork';
+    else if (h.custom) st = 'custom';
+    else if (h.plan === sug.k) st = sug.x ? 'extra' : 'follow';
+    else st = 'other';
+  } else if (hs.some(h => h.cardioOnly)) st = 'cardio';
+  else if (day < today && sug) st = sug.t === 'train' ? (sug.x ? 'optskip' : 'missed') : 'rest';
+  const pain = hs.some(h => h.pain) || (S.pains || []).some(x => dayKeyOf(x.t) === day);
+  return { day, hs, str, sug, st, pain, travel: hs.some(h => h.travel) };
+}
 function calendar(y, mo) {
   const first = new Date(y, mo, 1); const days = new Date(y, mo + 1, 0).getDate(); const off = (first.getDay() + 6) % 7;
-  const byDay = {}; S.history.forEach(h => { const d = new Date(h.end); if (d.getFullYear() === y && d.getMonth() === mo) (byDay[d.getDate()] = byDay[d.getDate()] || []).push(h.custom ? 'P' : h.plan); });
   const today = new Date(); const isToday = d => today.getFullYear() === y && today.getMonth() === mo && today.getDate() === d;
-  let cells = '';
+  const seen = new Set(); let cells = ''; let anyPain = false;
   for (let i = 0; i < off; i++) cells += '<div></div>';
   for (let d = 1; d <= days; d++) {
-    const pl = byDay[d];
-    cells += `<div class="cal-d ${pl ? 'on ' + pl[0] : ''} ${isToday(d) ? 'today' : ''}" title="${pl ? 'Treino ' + pl.map(tagOf).join(', ') : ''}">${pl ? (pl[0] in SESSION_TYPES ? d : pl[0]) : d}</div>`;
+    const k = new Date(y, mo, d).getTime(); const inf = dayInfo(k); const st = inf && inf.st; if (st) seen.add(st); if (inf && inf.pain) anyPain = true;
+    const clickable = inf && (inf.st || inf.sug);
+    cells += `<div class="cal-d ${st ? 'st-' + st : ''} ${inf && inf.pain ? 'has-pain' : ''} ${isToday(d) ? 'today' : ''}" ${clickable ? `data-cal="${k}" role="button" tabindex="0"` : ''} title="${st ? CAL_ST[st][0] : ''}">${inf && inf.travel ? '✈︎' : d}</div>`;
   }
-  return `<div class="cal"><div class="cal-h">S</div><div class="cal-h">T</div><div class="cal-h">Q</div><div class="cal-h">Q</div><div class="cal-h">S</div><div class="cal-h">S</div><div class="cal-h">D</div>${cells}</div>`;
+  const legend = [...seen].map(st => `<span class="cal-lg"><i class="cal-d st-${st}"></i>${CAL_ST[st][0]}</span>`).join('');
+  return `<div class="cal"><div class="cal-h">S</div><div class="cal-h">T</div><div class="cal-h">Q</div><div class="cal-h">Q</div><div class="cal-h">S</div><div class="cal-h">S</div><div class="cal-h">D</div>${cells}</div>
+    ${legend ? `<div class="cal-legend">${legend}${anyPain ? '<span class="cal-lg"><i class="cal-d has-pain"></i>Dor relatada</span>' : ''}</div><p class="note" style="margin:6px 0 0">Toque num dia para ver o que aconteceu.</p>` : ''}`;
+}
+function openCalDay(day) {
+  const inf = dayInfo(day); if (!inf) return;
+  const dt0 = new Date(day).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }); const dt = dt0[0].toUpperCase() + dt0.slice(1);
+  const sg = inf.sug; const st = inf.st;
+  const sugTxt = !sg ? 'Sem registro da sugestão para este dia.' : sg.t === 'train' ? `<b>${esc(sg.n || PLANS[sg.k]?.name || '')}</b>${sg.x ? ' (opcional)' : ''}` : '<b>Descanso</b>';
+  const work = inf.hs.map(h => { const m = planMeta(h); const mins = Math.max(1, Math.round((h.end - h.start) / 60000));
+    const exs = exList(h).filter(e => (h.sets[e.id] || []).some(x => x.done));
+    return `<div class="cal-w"><div class="row between"><b>${esc(h.cardioOnly ? 'Aeróbico' : h.custom ? (h.pfocus || 'Treino livre') : m.name)}${h.custom && !h.cardioOnly ? ' <span class="pill">personalizado</span>' : ''}${h.travel ? ' <span class="pill travel-pill">✈︎ viagem</span>' : ''}</b><span class="muted small">${h.cardioOnly ? (h.cardio ? h.cardio.min + ' min' : '') : `${setsDone(h)} séries · ${mins} min`}</span></div>
+      ${exs.length ? `<div class="muted small" style="margin-top:4px">${exs.map(e => esc(e.name)).join(' · ')}</div>` : ''}
+      ${h.cardio ? `<div class="muted small" style="margin-top:4px">Aeróbico: ${esc(h.cardio.type)} · ${h.cardio.min} min</div>` : ''}
+      ${h.feel || h.pain ? `<div class="muted small" style="margin-top:4px">${h.feel ? 'Esforço ' + h.feel + '/5' : ''}${h.feel && h.pain ? ' · ' : ''}${h.pain ? 'Dor relatada' + (h.painLvl ? ' nível ' + h.painLvl : '') : ''}</div>` : ''}
+      ${!h.cardioOnly ? `<button class="hbtn small" data-calsum="${h.end}" style="margin-top:8px">Ver resumo do treino</button>` : ''}</div>`; }).join('');
+  const el = sheet(`<h3>${dt}</h3>
+    ${st ? `<div class="cal-tag" style="margin-top:2px"><i class="cal-d st-${st}"></i><div><b>${CAL_ST[st][0]}</b><div class="muted small">${CAL_ST[st][1]}</div></div></div>` : ''}
+    <div class="kv" style="margin-top:10px"><span>Sugestão do app</span><span style="text-align:right">${sugTxt}</span></div>
+    ${sg && sg.w ? `<p class="note" style="margin:4px 0 0">${esc(sg.w)}</p>` : ''}
+    ${sg && sg.src === 'estimada' ? '<p class="note" style="margin:4px 0 0;font-style:italic">Sugestão estimada com as regras atuais (este dia é anterior ao registro das sugestões).</p>' : ''}
+    <div class="muted small" style="margin:14px 0 4px">O que você fez</div>
+    ${work || '<p class="note" style="margin:0">Nada registrado neste dia.</p>'}
+    ${inf.pain && !inf.hs.some(h => h.pain) ? '<p class="note">Dor relatada neste dia.</p>' : ''}
+    <button class="btn ghost" data-close style="margin-top:12px">Fechar</button>`);
+  $('[data-close]', el).onclick = () => el.remove();
+  el.querySelectorAll('[data-calsum]').forEach(b => b.onclick = () => { el.remove(); summaryEnd = +b.dataset.calsum; go('summary'); });
 }
 
 /* ---------- Gráfico de linha (série única, toque para ver o valor) ---------- */
@@ -2423,6 +2523,7 @@ function bindCoach() {
   if ($('#wSave')) $('#wSave').onclick = saveWeight;
   if ($('#antDeload')) $('#antDeload').onclick = () => { if (confirm('Fazer a semana leve agora? O próximo bloco começa na semana que vem.')) { anticipateDeload(); render(); } };
   if ($('#calPrev')) $('#calPrev').onclick = () => { calOff--; render(); };
+  document.querySelectorAll('[data-cal]').forEach(c => c.onclick = () => openCalDay(+c.dataset.cal));
   if ($('#calNext')) $('#calNext').onclick = () => { calOff = Math.min(0, calOff + 1); render(); };
   const h = S.history.find(x => x.end === summaryEnd);
   if (h && tab === 'summary') {
@@ -3496,7 +3597,7 @@ function todayCard() {
   if (!LIB) return `<div class="card hero" style="margin-top:16px"><div class="muted small">Treino de hoje</div><h3 style="margin-top:2px">${libFailed ? 'Sem conexão para montar o treino' : 'Montando o treino…'}</h3>
       <p class="note" style="margin:6px 0 0">${libFailed ? 'A biblioteca de exercícios ainda não foi baixada neste aparelho. Conecte-se à internet e toque em Tentar de novo.' : 'Carregando a biblioteca de exercícios.'}</p>
       ${libFailed ? '<button class="btn ghost" data-lib-retry style="margin-top:12px">Tentar de novo</button>' : ''}</div>`;
-  const t = todayPlan(); const k = t.best.k; const p = PLANS[k];
+  const t = todayPlan(); const k = t.best.k; const p = PLANS[k]; logSuggestion(t);
   const reasons = `<ul class="why">${t.why.slice(0, 2).map(w => `<li>${esc(w)}</li>`).join('')}</ul>`;
   const custom = `<button class="hbtn small" data-custom>＋ Personalizado</button><button class="hbtn small" data-pain-sheet>${activePain().any ? 'Dor relatada' : 'Sentindo dor?'}</button>`;
   if (t.type === 'rest' || t.type === 'done') {
